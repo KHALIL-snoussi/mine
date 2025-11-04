@@ -31,13 +31,14 @@ from scipy import ndimage
 @dataclass
 class PaintByNumbersConfig:
     """Configuration for paint-by-numbers generation."""
-    width_mm: float = 400.0          # Canvas width (A3 size)
-    height_mm: float = 300.0         # Canvas height
+    width_mm: float = 400.0          # Canvas width (40cm default)
+    height_mm: float = 500.0         # Canvas height (50cm default)
     num_colors: int = 24             # Number of paint colors
-    min_region_size: int = 100       # Minimum pixels per region
+    min_region_size: int = 400       # Minimum pixels per region (increased!)
     detail_level: str = "medium"     # low/medium/high
     preview_dpi: int = 300           # Preview resolution
     canvas_dpi: int = 200            # Canvas output resolution
+    show_numbers_threshold: int = 200  # Only show numbers in regions larger than this
 
 
 # ============================================================================
@@ -322,31 +323,36 @@ class PaintByNumbersGenerator:
                 id=f'region_{region_id}'
             ))
 
-            # Add number at centroid
-            M = cv2.moments(region_mask)
-            if M['m00'] > 0:
-                cx = int(M['m10'] / M['m00'])
-                cy = int(M['m01'] / M['m00'])
+            # Add number at centroid (only for larger regions)
+            region_area = region_mask.sum()
+            if region_area >= self.config.show_numbers_threshold:
+                M = cv2.moments(region_mask)
+                if M['m00'] > 0:
+                    cx = int(M['m10'] / M['m00'])
+                    cy = int(M['m01'] / M['m00'])
 
-                color_idx = self.region_colors[region_id]
-                number = color_idx + 1  # 1-indexed for users
+                    color_idx = self.region_colors[region_id]
+                    number = color_idx + 1  # 1-indexed for users
 
-                # Choose text color based on background brightness
-                bg_color = self.palette[color_idx]
-                brightness = int(bg_color[0]) * 0.299 + int(bg_color[1]) * 0.587 + int(bg_color[2]) * 0.114
-                text_color = 'white' if brightness < 128 else 'black'
+                    # Choose text color based on background brightness
+                    bg_color = self.palette[color_idx]
+                    brightness = int(bg_color[0]) * 0.299 + int(bg_color[1]) * 0.587 + int(bg_color[2]) * 0.114
+                    text_color = 'white' if brightness < 128 else 'black'
 
-                dwg.add(dwg.text(
-                    str(number),
-                    insert=(cx, cy),
-                    text_anchor='middle',
-                    dominant_baseline='middle',
-                    font_size='12px',
-                    font_family='Arial',
-                    font_weight='bold',
-                    fill=text_color,
-                    stroke='none'
-                ))
+                    # Scale font size based on region size
+                    font_size = min(18, max(10, int(np.sqrt(region_area) / 3)))
+
+                    dwg.add(dwg.text(
+                        str(number),
+                        insert=(cx, cy),
+                        text_anchor='middle',
+                        dominant_baseline='middle',
+                        font_size=f'{font_size}px',
+                        font_family='Arial',
+                        font_weight='bold',
+                        fill=text_color,
+                        stroke='none'
+                    ))
 
         dwg.save()
         print(f"✓ Exported canvas: {output_path}")
@@ -526,9 +532,22 @@ def main():
         description='Paint-By-Numbers Photo Generator',
         epilog="""
 Examples:
-  %(prog)s --photo portrait.jpg --output-dir output
-  %(prog)s --photo image.jpg --colors 36 --detail high
-  %(prog)s --photo face.jpg --colors 24 --size 400x300
+  # Standard 40x50cm with 24 colors
+  %(prog)s --photo portrait.jpg
+
+  # Larger canvas with more detail
+  %(prog)s --photo image.jpg --size 50x70 --colors 30
+
+  # Simplified version (fewer, larger regions)
+  %(prog)s --photo face.jpg --simplify
+
+  # Small canvas, easy to paint
+  %(prog)s --photo photo.jpg --size 30x40 --colors 18 --simplify
+
+Popular sizes:
+  30x40 cm - Small, beginner-friendly
+  40x50 cm - Most popular (default)
+  50x70 cm - Large, detailed
         """
     )
 
@@ -564,15 +583,21 @@ Examples:
     parser.add_argument(
         '--size',
         type=str,
-        default='400x300',
-        help='Canvas size in mm WxH (default: 400x300)'
+        default='40x50',
+        help='Canvas size: 30x40, 40x50 (default), 50x70 cm, or custom WxH in cm'
     )
 
     parser.add_argument(
         '--min-region-size',
         type=int,
-        default=100,
-        help='Minimum pixels per region (default: 100)'
+        default=400,
+        help='Minimum pixels per region (default: 400, recommended: 300-600)'
+    )
+
+    parser.add_argument(
+        '--simplify',
+        action='store_true',
+        help='Create fewer, larger regions (easier to paint)'
     )
 
     args = parser.parse_args()
@@ -584,13 +609,20 @@ Examples:
     if args.colors < 6 or args.colors > 48:
         parser.error("Number of colors must be between 6 and 48")
 
-    # Parse size
+    # Parse size (convert cm to mm)
     try:
         width_str, height_str = args.size.lower().split('x')
-        width_mm = float(width_str)
-        height_mm = float(height_str)
+        width_cm = float(width_str)
+        height_cm = float(height_str)
+        width_mm = width_cm * 10  # cm to mm
+        height_mm = height_cm * 10
     except:
-        parser.error("Size must be in format WxH (e.g., 400x300)")
+        parser.error("Size must be in format WxH in cm (e.g., 40x50)")
+
+    # Adjust settings if simplify mode
+    if args.simplify:
+        args.min_region_size = max(args.min_region_size, 600)
+        args.colors = min(args.colors, 20)
 
     # Create output dir
     output_dir = Path(args.output_dir)
@@ -610,9 +642,12 @@ Examples:
     print("PAINT-BY-NUMBERS GENERATOR")
     print("=" * 70)
     print(f"Photo:            {args.photo}")
-    print(f"Canvas size:      {config.width_mm}×{config.height_mm} mm")
+    print(f"Canvas size:      {config.width_mm/10:.0f}×{config.height_mm/10:.0f} cm ({config.width_mm:.0f}×{config.height_mm:.0f} mm)")
     print(f"Colors:           {config.num_colors}")
     print(f"Detail level:     {config.detail_level}")
+    print(f"Min region size:  {config.min_region_size} pixels")
+    if args.simplify:
+        print(f"Mode:             SIMPLIFIED (fewer, larger regions)")
     print(f"Output:           {output_dir}")
     print("=" * 70)
     print()
@@ -630,16 +665,26 @@ Examples:
     generator.export_numbered_preview(str(output_dir / 'canvas_numbered.png'))
     generator.export_data_json(str(output_dir / 'data.json'))
 
+    # Count numbered regions
+    num_numbered = 0
+    for region_id in range(1, generator.regions.max() + 1):
+        region_mask = (generator.regions == region_id).astype(np.uint8)
+        if region_mask.sum() >= config.show_numbers_threshold:
+            num_numbered += 1
+
     print("\n" + "=" * 70)
     print("✓ GENERATION COMPLETE")
     print("=" * 70)
-    print(f"Created {generator.regions.max()} regions with {len(generator.palette)} colors")
+    print(f"Total regions:    {generator.regions.max()}")
+    print(f"Numbered regions: {num_numbered} (large enough to show numbers)")
+    print(f"Colors used:      {len(generator.palette)}")
     print(f"\nFiles saved to: {output_dir}")
     print("\nNext steps:")
     print("  1. Print/engrave 'canvas_template.svg' on wood/canvas")
     print("  2. Use 'color_legend.png' to mix/buy paints")
     print("  3. Paint each numbered region with matching color")
     print("  4. See 'preview_finished.png' for final result")
+    print("\nTIP: If too many tiny regions, try --simplify or increase --min-region-size")
     print()
 
 
