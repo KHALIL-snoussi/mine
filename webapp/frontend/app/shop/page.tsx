@@ -151,13 +151,13 @@ export default function ShopPage() {
 
   // Load cart count on mount
   useEffect(() => {
-    const cart = JSON.parse(localStorage.getItem('paintKitsCart') || '[]')
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]')
     setCartCount(cart.length)
   }, [])
 
   const addToCart = (kit: typeof PAINT_KITS[0]) => {
     // Get existing cart
-    const cart = JSON.parse(localStorage.getItem('paintKitsCart') || '[]')
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]')
 
     // Check if kit already in cart
     const existingIndex = cart.findIndex((item: any) => item.id === kit.id)
@@ -166,12 +166,23 @@ export default function ShopPage() {
       // Update quantity
       cart[existingIndex].quantity = (cart[existingIndex].quantity || 1) + 1
     } else {
-      // Add new item
-      cart.push({ ...kit, quantity: 1 })
+      // Add new item with standardized structure
+      cart.push({
+        id: kit.id,
+        type: 'kit', // Identify as paint kit purchase
+        name: kit.name,
+        displayName: kit.displayName,
+        price: kit.price,
+        quantity: 1,
+        sku: kit.sku,
+        numColors: kit.numColors,
+        palette: kit.palette,
+        includes: kit.includes
+      })
     }
 
     // Save to localStorage
-    localStorage.setItem('paintKitsCart', JSON.stringify(cart))
+    localStorage.setItem('cart', JSON.stringify(cart))
     setCartCount(cart.length)
 
     // Show feedback

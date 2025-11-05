@@ -73,8 +73,8 @@ export default function CartPage() {
       return
     }
 
-    // Store order info
-    const order = {
+    // Store cart in session for checkout page
+    sessionStorage.setItem('checkout_cart', JSON.stringify({
       items: cartItems,
       customer: {
         email,
@@ -93,15 +93,13 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
       {/* Navigation */}
-      <nav className="border-b bg-white">
+      <nav className="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href="/">
-              <h1 className="text-2xl font-bold text-primary-600 cursor-pointer">
-                🎨 Paint by Numbers AI
-              </h1>
+            <Link href="/" className="text-2xl font-bold text-slate-900 hover:text-primary-600 transition-colors">
+              🎨 Paint by Numbers AI
             </Link>
             <div className="flex items-center gap-4">
               <Link href="/shop">
@@ -116,7 +114,8 @@ export default function CartPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
+        <h1 className="text-4xl font-bold text-slate-900 mb-2">Shopping Cart</h1>
+        <p className="text-slate-600 mb-8">Review your items and proceed to checkout</p>
 
         {cartItems.length === 0 ? (
           <div className="text-center py-16">
@@ -317,9 +316,9 @@ export default function CartPage() {
 
             {/* Order Summary */}
             <div>
-              <Card className="sticky top-4">
+              <Card className="sticky top-20">
                 <CardHeader>
-                  <CardTitle>Order Summary</CardTitle>
+                  <CardTitle className="text-2xl">Order Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between text-sm">
@@ -340,24 +339,21 @@ export default function CartPage() {
                     <div className="text-xs text-gray-500 -mt-2">
                       Add ${(50 - subtotal).toFixed(2)} more for free shipping!
                     </div>
-                  )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax (estimated)</span>
-                    <span className="font-medium">${tax.toFixed(2)}</span>
                   </div>
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Total</span>
-                      <span className="text-primary-600">${total.toFixed(2)}</span>
+
+                  <div className="border-t border-slate-200 pt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-slate-900">Total</span>
+                      <span className="text-3xl font-bold text-primary-600">${total.toFixed(2)}</span>
                     </div>
                   </div>
 
                   <Button
-                    className="w-full"
+                    className="w-full h-14 text-lg font-semibold"
                     size="lg"
                     onClick={handleCheckout}
                   >
-                    Proceed to Checkout
+                    Proceed to Checkout →
                   </Button>
 
                   <div className="space-y-2 pt-4 border-t">
