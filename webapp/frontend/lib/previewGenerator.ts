@@ -19,14 +19,32 @@ export async function generatePaintPreview(
   palette: Palette
 ): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Validate inputs
+    if (!imageUrl) {
+      reject(new Error('No image provided'))
+      return
+    }
+
+    if (!palette || !palette.colors || palette.colors.length === 0) {
+      reject(new Error('Invalid palette'))
+      return
+    }
+
+    // Set timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      reject(new Error('Preview generation timed out'))
+    }, 30000) // 30 second timeout
+
     const img = new Image()
     img.crossOrigin = 'anonymous'
 
     img.onload = () => {
       try {
+        clearTimeout(timeout)
+
         // Create canvas
         const canvas = document.createElement('canvas')
-        const ctx = canvas.getContext('2d')
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
 
         if (!ctx) {
           reject(new Error('Could not get canvas context'))
@@ -34,15 +52,16 @@ export async function generatePaintPreview(
         }
 
         // Set canvas size (scale down for performance)
-        const maxSize = 800
+        // Limit to 600px for better performance
+        const maxSize = 600
         let width = img.width
         let height = img.height
 
         if (width > height && width > maxSize) {
-          height = (height / width) * maxSize
+          height = Math.floor((height / width) * maxSize)
           width = maxSize
         } else if (height > maxSize) {
-          width = (width / height) * maxSize
+          width = Math.floor((width / height) * maxSize)
           height = maxSize
         }
 
@@ -66,13 +85,21 @@ export async function generatePaintPreview(
         addEdgeEffect(ctx, width, height)
 
         // Convert to data URL
-        resolve(canvas.toDataURL('image/jpeg', 0.9))
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+
+        // Cleanup
+        canvas.width = 0
+        canvas.height = 0
+
+        resolve(dataUrl)
       } catch (error) {
+        clearTimeout(timeout)
         reject(error)
       }
     }
 
     img.onerror = () => {
+      clearTimeout(timeout)
       reject(new Error('Failed to load image'))
     }
 
