@@ -8,7 +8,7 @@ Customers can choose the model that best fits their needs and skill level.
 
 from dataclasses import dataclass, field
 from typing import Dict, Any, Optional
-from config import Config
+from .config import Config
 
 
 @dataclass
