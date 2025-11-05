@@ -8,41 +8,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 
 interface CartItem {
-  templateId: number
-  kitSku: string
-  kitBundle: {
-    id: number
-    sku: string
-    name: string
-    price: number
-    description?: string
-    includes_frame: boolean
-    includes_paints: boolean
-    includes_brushes: boolean
-    includes_canvas: boolean
-  }
-  template: {
-    id?: number
-    title: string
-    preview_url?: string
-    difficulty_level?: string
-    num_colors?: number
-  }
+  id: string
+  type: 'kit'
+  name: string
+  displayName: string
+  price: number
+  quantity: number
+  sku: string
+  numColors?: number
+  palette?: string
+  includes?: string[]
 }
 
 export default function CartPage() {
   const router = useRouter()
   const [cartItems, setCartItems] = useState<CartItem[]>([])
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
-  const [shippingAddress, setShippingAddress] = useState({
-    name: '',
-    address: '',
-    city: '',
-    state: '',
-    zip: '',
-    country: 'USA'
-  })
 
   useEffect(() => {
     // Load cart from localStorage
@@ -56,60 +36,52 @@ export default function CartPage() {
     localStorage.setItem('cart', JSON.stringify(newCart))
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.kitBundle.price, 0)
-  // Shipping is free for kits with canvas/physical items, no shipping for digital-only
-  const needsShipping = cartItems.some(item => item.kitBundle.includes_canvas)
-  const shipping = needsShipping ? 0 : 0 // Free shipping for all physical kits!
+  const updateQuantity = (index: number, newQuantity: number) => {
+    if (newQuantity < 1) return
+    const newCart = [...cartItems]
+    newCart[index].quantity = newQuantity
+    setCartItems(newCart)
+    localStorage.setItem('cart', JSON.stringify(newCart))
+  }
+
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const shipping = 0 // Free shipping!
   const tax = subtotal * 0.08 // 8% tax
   const total = subtotal + shipping + tax
 
   const handleCheckout = () => {
-    // Validate inputs
-    if (!email || cartItems.length === 0) {
-      alert('Please fill in all required fields')
+    if (cartItems.length === 0) {
+      alert('Your cart is empty')
       return
     }
 
-    // Check if shipping address is needed (for physical items)
-    const needsShipping = cartItems.some(item => item.kitBundle.includes_canvas || item.kitBundle.includes_frame)
-    if (needsShipping && (!shippingAddress.name || !shippingAddress.address)) {
-      alert('Please fill in shipping address')
-      return
-    }
-
-    // Store order info
-    const order = {
+    // Store cart in session for checkout page
+    sessionStorage.setItem('checkout_cart', JSON.stringify({
       items: cartItems,
-      customer: {
-        email,
-        phone,
-        shipping: needsShipping ? shippingAddress : null
-      },
-      total,
-      date: new Date().toISOString()
-    }
+      subtotal,
+      tax,
+      shipping,
+      total
+    }))
 
-    localStorage.setItem('pending_order', JSON.stringify(order))
     router.push('/checkout')
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
       {/* Navigation */}
-      <nav className="border-b bg-white">
+      <nav className="border-b border-slate-200/60 bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link href="/">
-              <h1 className="text-2xl font-bold text-primary-600 cursor-pointer">
-                🎨 Paint by Numbers AI
-              </h1>
+            <Link href="/" className="text-2xl font-bold text-slate-900 hover:text-primary-600 transition-colors">
+              🎨 Paint by Numbers AI
             </Link>
             <div className="flex items-center gap-4">
-              <Link href="/create">
-                <Button variant="ghost">Create New</Button>
+              <Link href="/shop">
+                <Button variant="ghost" size="sm">Shop Kits</Button>
               </Link>
-              <Link href="/gallery">
-                <Button variant="ghost">Gallery</Button>
+              <Link href="/create">
+                <Button variant="ghost" size="sm">Create Template</Button>
               </Link>
             </div>
           </div>
@@ -117,15 +89,19 @@ export default function CartPage() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
+        <h1 className="text-4xl font-bold text-slate-900 mb-2">Shopping Cart</h1>
+        <p className="text-slate-600 mb-8">Review your items and proceed to checkout</p>
 
         {cartItems.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🛒</div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
-            <p className="text-gray-600 mb-6">Start creating your custom paint by numbers!</p>
+          <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
+            <div className="text-7xl mb-6">🛒</div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-3">Your cart is empty</h2>
+            <p className="text-lg text-slate-600 mb-8">Start by choosing a paint kit for your projects!</p>
+            <Link href="/shop">
+              <Button size="lg" className="mr-4">Shop Paint Kits</Button>
+            </Link>
             <Link href="/create">
-              <Button size="lg">Create Your First Template</Button>
+              <Button size="lg" variant="outline">Create Template</Button>
             </Link>
           </div>
         ) : (
@@ -133,46 +109,89 @@ export default function CartPage() {
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
               {cartItems.map((item, index) => (
-                <Card key={index}>
+                <Card key={index} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
-                    <div className="flex gap-4">
-                      <div className="w-24 h-24 bg-gray-200 rounded-lg flex-shrink-0">
-                        {item.template.preview_url && (
-                          <img
-                            src={item.template.preview_url}
-                            alt="Template"
-                            className="w-full h-full object-cover rounded-lg"
-                          />
+                    <div className="flex gap-6">
+                      {/* Product Icon */}
+                      <div className="w-24 h-24 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <span className="text-4xl">🎨</span>
+                      </div>
+
+                      {/* Product Info */}
+                      <div className="flex-grow">
+                        <h3 className="font-bold text-xl text-slate-900 mb-1">{item.displayName}</h3>
+                        <p className="text-sm text-slate-600 mb-2">SKU: {item.sku}</p>
+
+                        {item.numColors && (
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="inline-flex items-center text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">
+                              🎨 {item.numColors} Colors
+                            </span>
+                            {item.palette && (
+                              <span className="inline-flex items-center text-xs bg-secondary-100 text-secondary-700 px-2 py-1 rounded-full font-medium">
+                                {item.palette}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* What's Included */}
+                        {item.includes && item.includes.length > 0 && (
+                          <details className="text-sm text-slate-600">
+                            <summary className="cursor-pointer hover:text-primary-600 font-medium mb-1">
+                              What's Included ▼
+                            </summary>
+                            <ul className="space-y-1 pl-4 mt-2">
+                              {item.includes.slice(0, 4).map((feature, idx) => (
+                                <li key={idx} className="flex items-start">
+                                  <span className="text-primary-600 mr-2">✓</span>
+                                  <span>{feature}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
                         )}
                       </div>
-                      <div className="flex-grow">
-                        <h3 className="font-semibold text-lg">{item.kitBundle.name}</h3>
-                        <p className="text-sm text-gray-600">{item.kitBundle.description}</p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Template: {item.template.title}
-                        </p>
-                        <div className="flex gap-2 mt-2">
-                          {item.kitBundle.includes_canvas && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Canvas</span>
-                          )}
-                          {item.kitBundle.includes_paints && (
-                            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Paints</span>
-                          )}
-                          {item.kitBundle.includes_brushes && (
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Brushes</span>
-                          )}
-                          {item.kitBundle.includes_frame && (
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Frame</span>
+
+                      {/* Price & Actions */}
+                      <div className="text-right flex flex-col justify-between">
+                        <div>
+                          <p className="text-2xl font-bold text-primary-600">
+                            ${(item.price * item.quantity).toFixed(2)}
+                          </p>
+                          {item.quantity > 1 && (
+                            <p className="text-sm text-slate-500">
+                              ${item.price.toFixed(2)} each
+                            </p>
                           )}
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-primary-600">${item.kitBundle.price.toFixed(2)}</p>
+
+                        {/* Quantity Controls */}
+                        <div className="flex items-center gap-2 mt-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateQuantity(index, item.quantity - 1)}
+                            className="w-8 h-8 p-0"
+                          >
+                            −
+                          </Button>
+                          <span className="w-8 text-center font-medium">{item.quantity}</span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateQuantity(index, item.quantity + 1)}
+                            className="w-8 h-8 p-0"
+                          >
+                            +
+                          </Button>
+                        </div>
+
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => removeItem(index)}
-                          className="text-red-600 hover:bg-red-50 mt-2"
+                          className="text-red-600 hover:bg-red-50 hover:text-red-700 mt-2"
                         >
                           Remove
                         </Button>
@@ -182,182 +201,93 @@ export default function CartPage() {
                 </Card>
               ))}
 
-              {/* Customer Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Contact Information</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Address *
-                    </label>
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone Number (Optional)
-                    </label>
-                    <Input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="+1 (555) 123-4567"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Shipping Address */}
-              {cartItems.some(item => item.kitBundle.includes_canvas || item.kitBundle.includes_frame) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Shipping Address</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Full Name *
-                      </label>
-                      <Input
-                        value={shippingAddress.name}
-                        onChange={(e) => setShippingAddress({...shippingAddress, name: e.target.value})}
-                        placeholder="John Doe"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Street Address *
-                      </label>
-                      <Input
-                        value={shippingAddress.address}
-                        onChange={(e) => setShippingAddress({...shippingAddress, address: e.target.value})}
-                        placeholder="123 Main St, Apt 4B"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          City *
-                        </label>
-                        <Input
-                          value={shippingAddress.city}
-                          onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
-                          placeholder="New York"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          State *
-                        </label>
-                        <Input
-                          value={shippingAddress.state}
-                          onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
-                          placeholder="NY"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          ZIP Code *
-                        </label>
-                        <Input
-                          value={shippingAddress.zip}
-                          onChange={(e) => setShippingAddress({...shippingAddress, zip: e.target.value})}
-                          placeholder="10001"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Country
-                        </label>
-                        <Input
-                          value={shippingAddress.country}
-                          onChange={(e) => setShippingAddress({...shippingAddress, country: e.target.value})}
-                          disabled
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/* Trust Signals */}
+              <div className="grid grid-cols-3 gap-4 mt-6">
+                <div className="text-center p-4 bg-white rounded-lg">
+                  <div className="text-2xl mb-2">🚚</div>
+                  <p className="text-sm font-medium text-slate-900">Free Shipping</p>
+                  <p className="text-xs text-slate-500">On all orders</p>
+                </div>
+                <div className="text-center p-4 bg-white rounded-lg">
+                  <div className="text-2xl mb-2">💝</div>
+                  <p className="text-sm font-medium text-slate-900">30-Day Returns</p>
+                  <p className="text-xs text-slate-500">Money back guarantee</p>
+                </div>
+                <div className="text-center p-4 bg-white rounded-lg">
+                  <div className="text-2xl mb-2">🔒</div>
+                  <p className="text-sm font-medium text-slate-900">Secure Checkout</p>
+                  <p className="text-xs text-slate-500">Powered by Stripe</p>
+                </div>
+              </div>
             </div>
 
             {/* Order Summary */}
             <div>
-              <Card className="sticky top-4">
+              <Card className="sticky top-20">
                 <CardHeader>
-                  <CardTitle>Order Summary</CardTitle>
+                  <CardTitle className="text-2xl">Order Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Subtotal ({cartItems.length} items)</span>
-                    <span className="font-medium">${subtotal.toFixed(2)}</span>
-                  </div>
-                  {shipping > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Shipping</span>
-                      <span className="font-medium">${shipping.toFixed(2)}</span>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-base">
+                      <span className="text-slate-600">Subtotal ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                      <span className="font-medium text-slate-900">${subtotal.toFixed(2)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Tax (estimated)</span>
-                    <span className="font-medium">${tax.toFixed(2)}</span>
+
+                    <div className="flex justify-between text-base">
+                      <span className="text-slate-600">Shipping</span>
+                      <span className="font-medium text-green-600">FREE</span>
+                    </div>
+
+                    <div className="flex justify-between text-base">
+                      <span className="text-slate-600">Tax (estimated)</span>
+                      <span className="font-medium text-slate-900">${tax.toFixed(2)}</span>
+                    </div>
                   </div>
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>Total</span>
-                      <span className="text-primary-600">${total.toFixed(2)}</span>
+
+                  <div className="border-t border-slate-200 pt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-slate-900">Total</span>
+                      <span className="text-3xl font-bold text-primary-600">${total.toFixed(2)}</span>
                     </div>
                   </div>
 
                   <Button
-                    className="w-full"
+                    className="w-full h-14 text-lg font-semibold"
                     size="lg"
                     onClick={handleCheckout}
                   >
-                    Proceed to Checkout
+                    Proceed to Checkout →
                   </Button>
 
-                  <div className="text-center space-y-2">
-                    <p className="text-xs text-gray-500">
-                      🔒 Secure checkout powered by Stripe
+                  <div className="space-y-2 pt-4 border-t border-slate-100">
+                    <p className="text-xs text-center text-slate-500 flex items-center justify-center gap-1">
+                      <span>🔒</span>
+                      Secure 256-bit SSL encryption
                     </p>
-                    <p className="text-xs text-gray-500">
-                      💝 30-day money-back guarantee
+                    <p className="text-xs text-center text-slate-500 flex items-center justify-center gap-1">
+                      <span>💳</span>
+                      All major credit cards accepted
                     </p>
                   </div>
 
-                  <div className="border-t pt-4">
-                    <p className="text-xs text-gray-600 mb-2">
-                      <strong>What's included:</strong>
-                    </p>
-                    <ul className="text-xs text-gray-600 space-y-1">
-                      {cartItems.map((item, idx) => (
-                        <li key={idx} className="flex items-start">
-                          <span className="text-primary-600 mr-1">•</span>
-                          {item.kitBundle.name}
-                        </li>
-                      ))}
-                    </ul>
+                  {/* Promo Code */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <details>
+                      <summary className="cursor-pointer text-sm font-medium text-primary-600 hover:text-primary-700">
+                        Have a promo code?
+                      </summary>
+                      <div className="mt-3 flex gap-2">
+                        <Input placeholder="Enter code" className="flex-1" />
+                        <Button variant="outline" size="sm">Apply</Button>
+                      </div>
+                    </details>
                   </div>
                 </CardContent>
               </Card>
 
               <div className="mt-4 text-center">
-                <Link href="/create" className="text-sm text-primary-600 hover:underline">
+                <Link href="/shop" className="text-sm text-primary-600 hover:underline font-medium">
                   ← Continue Shopping
                 </Link>
               </div>
