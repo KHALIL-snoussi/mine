@@ -9,13 +9,13 @@ from pathlib import Path
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import rgb_to_hex, get_contrasting_color
-    from paint_by_numbers.utils.import_utils import require_cv2
+    from paint_by_numbers.utils.opencv import require_cv2
 except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import rgb_to_hex, get_contrasting_color
-    from utils.import_utils import require_cv2
+    from utils.opencv import require_cv2
 
 
 class LegendGenerator:
@@ -84,9 +84,6 @@ class LegendGenerator:
         width = cols * cell_width + (cols + 1) * padding
         height = rows * cell_height + (rows + 1) * padding + 60  # Extra for title
 
-        cv2 = require_cv2()
-        cv2 = require_cv2()
-        cv2 = require_cv2()
         legend = np.ones((height, width, 3), dtype=np.uint8) * 255
 
         # Add title
@@ -392,7 +389,6 @@ class LegendGenerator:
 
         # Add title
         title = "Color Mixing Guide"
-        cv2 = require_cv2()
         cv2.putText(
             guide, title,
             (20, 40),
