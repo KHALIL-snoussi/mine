@@ -26,10 +26,27 @@ export default function BeforeAfterSlider({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // Generate preview when image or palette changes
+    const generatePreview = async () => {
+      setIsGenerating(true)
+      setError(null)
+      setPreviewImage(null)
+
+      try {
+        const preview = await generatePaintPreview(originalImage, palette)
+        setPreviewImage(preview)
+      } catch (err) {
+        console.error('Error generating preview:', err)
+        setError('Failed to generate preview. Try a smaller image.')
+      } finally {
+        setIsGenerating(false)
+      }
+    }
+
     generatePreview()
   }, [originalImage, palette])
 
-  const generatePreview = async () => {
+  const retryGeneration = async () => {
     setIsGenerating(true)
     setError(null)
 
@@ -38,7 +55,7 @@ export default function BeforeAfterSlider({
       setPreviewImage(preview)
     } catch (err) {
       console.error('Error generating preview:', err)
-      setError('Failed to generate preview')
+      setError('Failed to generate preview. Try a smaller image.')
     } finally {
       setIsGenerating(false)
     }
@@ -69,7 +86,7 @@ export default function BeforeAfterSlider({
               {error || 'Preview not available'}
             </p>
             <button
-              onClick={generatePreview}
+              onClick={retryGeneration}
               className="mt-3 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
             >
               Try Again
