@@ -386,7 +386,7 @@ export default function ShopPage() {
                     <Button
                       onClick={() => addToCart(kit)}
                       className="w-full h-12 text-base font-semibold"
-                      variant={kit.badge ? 'default' : 'outline'}
+                      variant={kit.badge ? 'primary' : 'outline'}
                       disabled={addedKit === kit.id}
                     >
                       {addedKit === kit.id ? (
