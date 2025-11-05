@@ -127,7 +127,8 @@ class ImageProcessor:
 
         Raises:
             FileNotFoundError: If image file doesn't exist
-            ValueError: If image is invalid or too small
+            ValueError: If image is invalid, too small, or too large
+            MemoryError: If image is too large to process
         """
         # Check if file exists
         path = Path(image_path)
@@ -144,27 +145,62 @@ class ImageProcessor:
         if not path.is_file():
             raise ValueError(f"Path is not a file: {image_path}")
 
+        # Check file size to prevent loading extremely large files
+        file_size_mb = path.stat().st_size / (1024 * 1024)
+        if file_size_mb > 100:  # 100MB limit
+            raise ValueError(
+                f"Image file too large: {file_size_mb:.1f}MB. "
+                f"Maximum supported file size is 100MB."
+            )
+
         cv2 = require_cv2()
-        # Load image
-        image = cv2.imread(str(path))
+
+        # Load image with error handling
+        try:
+            image = cv2.imread(str(path))
+        except Exception as e:
+            raise ValueError(f"Failed to read image file: {e}")
+
         if image is None:
             raise ValueError(f"Failed to load image: {image_path}. "
                            f"This may not be a valid image file or the format is not supported.")
 
-        # Convert BGR to RGB
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        # Validate image size
+        # Validate image dimensions
         h, w = image.shape[:2]
-        min_w, min_h = self.config.MIN_IMAGE_SIZE
 
+        # Check minimum size
+        min_w, min_h = self.config.MIN_IMAGE_SIZE
         if h < min_h or w < min_w:
             raise ValueError(
                 f"Image too small. Minimum size is {min_w}x{min_h}, "
                 f"got {w}x{h}"
             )
 
+        # Check maximum size to prevent memory issues
+        MAX_DIMENSION = 10000  # 10k pixels per dimension
+        if h > MAX_DIMENSION or w > MAX_DIMENSION:
+            raise ValueError(
+                f"Image dimensions too large: {w}x{h}. "
+                f"Maximum dimension is {MAX_DIMENSION} pixels. "
+                f"Please resize your image before processing."
+            )
+
+        # Estimate memory usage (3 bytes per pixel for RGB)
+        estimated_memory_mb = (w * h * 3) / (1024 * 1024)
+        if estimated_memory_mb > 300:  # 300MB limit for single image
+            logger.warning(
+                f"Large image detected ({w}x{h}, ~{estimated_memory_mb:.1f}MB). "
+                f"Processing may be slow or fail on systems with limited memory."
+            )
+
+        # Convert BGR to RGB with error handling
+        try:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        except cv2.error as e:
+            raise ValueError(f"Failed to convert image color space: {e}")
+
         self.original_image = image
+        logger.info(f"Successfully loaded image: {w}x{h} pixels")
         return image
 
     def preprocess(self, image: Optional[np.ndarray] = None,

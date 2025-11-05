@@ -3,8 +3,12 @@ Application configuration
 """
 
 from typing import List
+import os
+import logging
 from pydantic_settings import BaseSettings
-from pydantic import AnyHttpUrl
+from pydantic import AnyHttpUrl, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -58,6 +62,45 @@ class Settings(BaseSettings):
     # Generation Settings
     MAX_IMAGE_SIZE: int = 4000
     DEFAULT_PALETTE: str = "classic_18"
+
+    @field_validator('SECRET_KEY')
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Validate that SECRET_KEY is not the default value in production"""
+        if v == "your-secret-key-change-in-production":
+            # Check if we're in production (not in development/testing)
+            env = os.getenv('ENVIRONMENT', 'development').lower()
+            if env in ['production', 'prod']:
+                raise ValueError(
+                    "SECRET_KEY must be changed from default value in production! "
+                    "Set it in your .env file or environment variables."
+                )
+            else:
+                logger.warning(
+                    "Using default SECRET_KEY. This is OK for development but "
+                    "MUST be changed for production!"
+                )
+
+        # Validate minimum length
+        if len(v) < 32:
+            logger.warning(
+                f"SECRET_KEY is only {len(v)} characters. "
+                "Recommended minimum is 32 characters for security."
+            )
+
+        return v
+
+    @field_validator('DATABASE_URL')
+    @classmethod
+    def validate_database_url(cls, v: str) -> str:
+        """Validate database URL doesn't use default insecure credentials in production"""
+        env = os.getenv('ENVIRONMENT', 'development').lower()
+        if env in ['production', 'prod'] and 'postgres:postgres@' in v:
+            logger.warning(
+                "Database appears to use default credentials (postgres:postgres). "
+                "This is INSECURE for production!"
+            )
+        return v
 
     class Config:
         env_file = ".env"

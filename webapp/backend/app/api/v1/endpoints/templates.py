@@ -7,8 +7,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import shutil
 import sys
+import logging
 from pathlib import Path
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 # Add paint_by_numbers to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent / "paint_by_numbers"))
@@ -43,7 +46,6 @@ async def generate_template_background(
     paper_format: str,
 ):
     """Generate template in background"""
-    db: Optional[Session] = None
     try:
         # Create generator with model configuration
         generator = PaintByNumbersGenerator()
@@ -59,10 +61,13 @@ async def generate_template_background(
             paper_format=paper_format  # Apply paper format
         )
 
-        # Update template in database
-        db = SessionLocal()
-        template = db.query(Template).filter(Template.id == template_id).first()
-        if template:
+        # Update template in database using context manager
+        with SessionLocal() as db:
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if not template:
+                logger.error(f"Template {template_id} not found in database")
+                return
+
             template.template_url = results.get('template')
             template.legend_url = results.get('legend')
             template.solution_url = results.get('solution')
@@ -88,20 +93,20 @@ async def generate_template_background(
 
             template.num_colors = len(generator.palette)
             db.commit()
+            logger.info(f"Successfully generated template {template_id}")
 
     except Exception as e:
-        print(f"Error generating template: {e}")
-        error_session = SessionLocal()
+        logger.error(f"Error generating template {template_id}: {e}", exc_info=True)
+        # Update error status in a separate session
         try:
-            template = error_session.query(Template).filter(Template.id == template_id).first()
-            if template:
-                template.difficulty_level = "error"
-                error_session.commit()
-        finally:
-            error_session.close()
-    finally:
-        if db:
-            db.close()
+            with SessionLocal() as error_session:
+                template = error_session.query(Template).filter(Template.id == template_id).first()
+                if template:
+                    template.difficulty_level = "error"
+                    template.error_message = str(e)[:500]  # Truncate long error messages
+                    error_session.commit()
+        except Exception as db_error:
+            logger.error(f"Failed to update template error status: {db_error}", exc_info=True)
 
 
 @router.post("/generate", response_model=TemplateResponse)
@@ -129,6 +134,80 @@ async def generate_template(
         title: Template title
         is_public: Make template visible in gallery
     """
+    # Validate file type
+    allowed_content_types = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/bmp"]
+    if file.content_type not in allowed_content_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(allowed_content_types)}"
+        )
+
+    # Validate file extension
+    allowed_extensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp"]
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file extension. Allowed extensions: {', '.join(allowed_extensions)}"
+        )
+
+    # Validate num_colors range
+    if num_colors is not None and not (5 <= num_colors <= 30):
+        raise HTTPException(
+            status_code=400,
+            detail="num_colors must be between 5 and 30"
+        )
+
+    # Validate palette exists
+    palette_manager = PaletteManager()
+    available_palettes = palette_manager.list_palettes()
+    if palette_name not in available_palettes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid palette_name. Available palettes: {', '.join(available_palettes)}"
+        )
+
+    # Validate model exists
+    available_models = [m['id'] for m in ModelRegistry.get_models_list()]
+    if model not in available_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model. Available models: {', '.join(available_models)}"
+        )
+
+    # Validate paper format (common formats)
+    valid_paper_formats = ["a4", "a3", "a5", "letter", "square_small", "square_medium", "square_large"]
+    if paper_format not in valid_paper_formats:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid paper_format. Valid formats: {', '.join(valid_paper_formats)}"
+        )
+
+    # Validate title length
+    if title and len(title) > 200:
+        raise HTTPException(
+            status_code=400,
+            detail="Title must be 200 characters or less"
+        )
+
+    # Validate file size (max 50MB)
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
+    file.file.seek(0, 2)  # Seek to end
+    file_size = file.file.tell()
+    file.file.seek(0)  # Reset to beginning
+
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE // (1024 * 1024)}MB"
+        )
+
+    if file_size == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="File is empty"
+        )
+
     # Check user limits when authenticated
     if current_user and current_user.role == "free" and current_user.templates_used_this_month >= settings.FREE_TEMPLATES_PER_MONTH:
         raise HTTPException(
@@ -361,8 +440,8 @@ async def recommend_kit_for_image(
         # Cleanup temporary file
         try:
             shutil.rmtree(temp_dir)
-        except:
-            pass
+        except OSError as e:
+            logger.warning(f"Failed to cleanup temporary directory {temp_dir}: {e}")
 
 
 @router.get("/palettes/list", response_model=List[PaletteInfo])
