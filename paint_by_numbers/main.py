@@ -28,6 +28,10 @@ from output.legend_generator import LegendGenerator
 from output.svg_exporter import SVGExporter
 from output.pdf_generator import PDFGenerator
 from batch_processor import BatchProcessor
+from intelligence.palette_selector import IntelligentPaletteSelector
+from intelligence.difficulty_analyzer import DifficultyAnalyzer
+from intelligence.quality_scorer import QualityScorer
+from intelligence.color_optimizer import ColorOptimizer
 
 
 class PaintByNumbersGenerator:
@@ -60,6 +64,12 @@ class PaintByNumbersGenerator:
         self.pdf_generator = PDFGenerator(self.config)
         self.palette_manager = PaletteManager()
 
+        # Initialize intelligence modules
+        self.palette_selector = IntelligentPaletteSelector()
+        self.difficulty_analyzer = DifficultyAnalyzer()
+        self.quality_scorer = QualityScorer()
+        self.color_optimizer = ColorOptimizer()
+
         # Storage for intermediate results
         self.original_image = None
         self.processed_image = None
@@ -71,6 +81,9 @@ class PaintByNumbersGenerator:
         self.numbered_image = None
         self.template = None
         self.legend = None
+        self.difficulty_analysis = None
+        self.quality_analysis = None
+        self.color_mixing_guide = None
 
     def generate(self, input_path: str, output_dir: str = "output",
                 n_colors: int = None, merge_similar: bool = True,
@@ -133,8 +146,23 @@ class PaintByNumbersGenerator:
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
 
-        # Step 2: Color quantization
-        logger.info(f"\n[2/8] Performing color quantization...")
+        # Step 2: Intelligent Palette Selection & Color quantization
+        logger.info(f"\n[2/8] Intelligent palette selection and color quantization...")
+
+        # Auto-select palette if not specified
+        if use_unified_palette is None:
+            use_unified_palette = self.config.USE_UNIFIED_PALETTE
+
+        if palette_name is None and use_unified_palette:
+            # Use intelligent palette selector
+            recommended_palette, image_analysis = self.palette_selector.recommend_palette(
+                self.processed_image, n_colors
+            )
+            palette_name = recommended_palette
+            logger.info(f"✨ Intelligently selected: {palette_name}")
+        elif palette_name is None:
+            palette_name = self.config.UNIFIED_PALETTE_NAME
+
         if n_colors is None:
             n_colors = self.config.DEFAULT_NUM_COLORS
 
@@ -145,6 +173,14 @@ class PaintByNumbersGenerator:
             use_unified_palette=use_unified_palette,
             palette_name=palette_name
         )
+
+        # Optimize color mapping for better visual quality
+        if use_unified_palette:
+            logger.info("Optimizing color mapping...")
+            self.quantized_image, optimized_labels = self.color_optimizer.optimize_palette_mapping(
+                self.processed_image, self.palette, perceptual=True
+            )
+            self.color_quantizer.labels = optimized_labels
 
         # Get color names if using unified palette
         if self.color_quantizer.color_names:
@@ -182,6 +218,28 @@ class PaintByNumbersGenerator:
         stats = self.region_detector.get_region_statistics()
         logger.info(f"  Total regions: {stats['total_regions']}")
         logger.info(f"  Average region size: {stats['mean_area']:.0f} pixels")
+
+        # Analyze difficulty
+        self.difficulty_analysis = self.difficulty_analyzer.analyze_difficulty(
+            self.regions, self.palette, self.processed_image.shape[:2]
+        )
+
+        # Analyze quality
+        self.quality_analysis = self.quality_scorer.score_template(
+            self.original_image,
+            self.quantized_image,
+            self.regions,
+            self.palette
+        )
+
+        # Generate color mixing guide
+        self.color_mixing_guide = self.color_optimizer.generate_color_mixing_guide(
+            self.palette, self.color_names
+        )
+
+        # Analyze color harmony
+        harmony_analysis = self.color_optimizer.analyze_color_harmony(self.palette)
+        logger.info(f"🎨 Color Harmony: {harmony_analysis['harmony_type']} ({harmony_analysis['harmony_score']:.1f}/100)")
 
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
@@ -295,6 +353,33 @@ class PaintByNumbersGenerator:
         logger.info(f"  Comparison saved to: {comparison_path}")
         result_files['comparison'] = str(comparison_path)
 
+        # Save intelligent analysis and guides
+        import json
+        try:
+            # Save color mixing guide
+            mixing_guide_path = output_path / f"{input_name}_color_mixing_guide.json"
+            with open(mixing_guide_path, 'w') as f:
+                json.dump(self.color_mixing_guide, f, indent=2)
+            result_files['mixing_guide'] = str(mixing_guide_path)
+            logger.info(f"  Color mixing guide saved to: {mixing_guide_path}")
+
+            # Save difficulty analysis
+            if self.difficulty_analysis:
+                difficulty_path = output_path / f"{input_name}_difficulty_analysis.json"
+                with open(difficulty_path, 'w') as f:
+                    json.dump(self.difficulty_analysis, f, indent=2)
+                result_files['difficulty_analysis'] = str(difficulty_path)
+
+            # Save quality analysis
+            if self.quality_analysis:
+                quality_path = output_path / f"{input_name}_quality_analysis.json"
+                with open(quality_path, 'w') as f:
+                    json.dump(self.quality_analysis, f, indent=2)
+                result_files['quality_analysis'] = str(quality_path)
+
+        except Exception as e:
+            logger.warning(f"  Failed to save analysis files: {str(e)}")
+
         # Export SVG if enabled
         if self.config.GENERATE_SVG:
             try:
@@ -346,13 +431,31 @@ class PaintByNumbersGenerator:
         logger.info("\n" + "=" * 60)
         logger.info("GENERATION COMPLETE!")
         logger.info("=" * 60)
-        logger.info(f"\nOutput directory: {output_path.absolute()}")
-        logger.info(f"\nFiles generated:")
+
+        # Display intelligent analysis summary
+        if self.difficulty_analysis:
+            logger.info(f"\n📊 TEMPLATE ANALYSIS:")
+            logger.info(f"  Difficulty: {self.difficulty_analysis['difficulty_emoji']} {self.difficulty_analysis['difficulty_level']} ({self.difficulty_analysis['overall_difficulty']}/100)")
+            logger.info(f"  Estimated Time: {self.difficulty_analysis['time_estimate']}")
+
+        if self.quality_analysis:
+            logger.info(f"  Quality: {self.quality_analysis['quality_emoji']} {self.quality_analysis['quality_grade']} ({self.quality_analysis['overall_quality']}/100)")
+
+        if self.difficulty_analysis and self.difficulty_analysis.get('recommendations'):
+            logger.info(f"\n💡 RECOMMENDATIONS:")
+            for rec in self.difficulty_analysis['recommendations'][:3]:  # Show top 3
+                logger.info(f"  • {rec}")
+
+        logger.info(f"\n📁 Output directory: {output_path.absolute()}")
+        logger.info(f"\n📄 Files generated:")
         logger.info(f"  • Template: {template_path.name}")
         logger.info(f"  • Legend: {legend_path.name}")
         logger.info(f"  • Solution: {solution_path.name}")
         logger.info(f"  • Guide: {guide_path.name}")
         logger.info(f"  • Comparison: {comparison_path.name}")
+
+        if 'mixing_guide' in result_files:
+            logger.info(f"  • Color Mixing Guide: {Path(result_files['mixing_guide']).name}")
 
         if 'svg_template' in result_files:
             logger.info(f"  • SVG Template: {Path(result_files['svg_template']).name}")
@@ -360,6 +463,8 @@ class PaintByNumbersGenerator:
 
         if 'pdf' in result_files:
             logger.info(f"  • PDF Kit: {Path(result_files['pdf']).name}")
+
+        logger.info(f"\n✨ Generated with intelligent color selection and quality analysis!")
 
         return result_files
 
