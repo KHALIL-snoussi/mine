@@ -1,15 +1,13 @@
 'use client'
 
-import { use } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useTemplate } from '@/lib/hooks'
 import { formatDate } from '@/lib/utils'
 
-export default function TemplatePage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params)
-  const templateId = parseInt(resolvedParams.id)
+export default function TemplatePage({ params }: { params: { id: string } }) {
+  const templateId = parseInt(params.id)
   const { data: template, isLoading, error } = useTemplate(templateId)
 
   const getDifficultyEmoji = (level?: string) => {

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     USE_S3: bool = False  # Set to True for production
     UPLOAD_DIR: str = "/tmp/uploads"
 
+    # Backend URL for static file serving
+    BACKEND_URL: str = "http://localhost:8000"
+
     # Stripe
     STRIPE_API_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""

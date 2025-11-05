@@ -95,8 +95,8 @@ services:
   # Frontend
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: webapp/frontend/Dockerfile
     container_name: paintbynumbers-frontend
     environment:
       NEXT_PUBLIC_API_URL: http://backend:8000

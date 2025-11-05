@@ -379,6 +379,10 @@ class PaintKitManager:
         self.subscriptions = SUBSCRIPTION_PLANS
         self.accessories = ACCESSORIES
 
+    def get_all_kits(self) -> Dict[str, PaintKit]:
+        """Get all available paint kits"""
+        return self.kits
+
     def get_kit_by_id(self, kit_id: str) -> Optional[PaintKit]:
         """Get paint kit by ID"""
         return self.kits.get(kit_id)

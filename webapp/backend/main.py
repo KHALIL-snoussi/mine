@@ -7,8 +7,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 import time
 import logging
+import os
 
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -38,6 +40,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -85,6 +88,14 @@ async def root():
 
 # Include API router
 app.include_router(api_router, prefix="/api/v1")
+
+# Mount static files for uploads
+uploads_dir = "/app/uploads"
+if os.path.exists(uploads_dir):
+    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+    logger.info(f"Mounted static files from {uploads_dir}")
+else:
+    logger.warning(f"Uploads directory not found: {uploads_dir}")
 
 
 # Startup event

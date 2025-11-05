@@ -35,6 +35,72 @@ from paint_by_numbers.intelligence.kit_recommender import KitRecommender
 router = APIRouter()
 
 
+# Helper functions
+def convert_file_path_to_url(file_path: Optional[str]) -> Optional[str]:
+    """Convert absolute file path to HTTP URL for frontend access"""
+    if not file_path:
+        return None
+
+    # If it's already a URL, return as is
+    if file_path.startswith('http://') or file_path.startswith('https://'):
+        return file_path
+
+    # Convert /app/uploads/... to absolute backend URL
+    if file_path.startswith('/app/uploads/'):
+        relative_path = file_path.replace('/app/uploads/', '/uploads/')
+        return f"{settings.BACKEND_URL}{relative_path}"
+
+    # If it's relative to uploads, ensure it starts with backend URL
+    if file_path.startswith('/uploads/'):
+        return f"{settings.BACKEND_URL}{file_path}"
+
+    # Otherwise add backend URL with /uploads/ prefix
+    return f"{settings.BACKEND_URL}/uploads/{file_path.lstrip('/')}"
+
+
+def prepare_template_response(template: Template) -> dict:
+    """Convert template model to response dict with proper URLs"""
+    template_dict = {
+        'id': template.id,
+        'user_id': template.user_id,
+        'title': template.title,
+        'description': template.description,
+        'palette_name': template.palette_name,
+        'num_colors': template.num_colors,
+        'model': template.model,
+        'paper_format': template.paper_format,
+        'difficulty_level': template.difficulty_level,
+        'difficulty_score': template.difficulty_score,
+        'quality_score': template.quality_score,
+        'estimated_time': template.estimated_time,
+        'is_public': template.is_public,
+        'is_featured': template.is_featured,
+        'created_at': template.created_at,
+        'updated_at': template.updated_at,
+
+        # Convert file paths to HTTP URLs
+        'original_image_url': convert_file_path_to_url(template.original_image_url),
+        'template_url': convert_file_path_to_url(template.template_url),
+        'legend_url': convert_file_path_to_url(template.legend_url),
+        'solution_url': convert_file_path_to_url(template.solution_url),
+        'guide_url': convert_file_path_to_url(template.guide_url),
+        'comparison_url': convert_file_path_to_url(template.comparison_url),
+        'svg_template_url': convert_file_path_to_url(template.svg_template_url),
+        'svg_legend_url': convert_file_path_to_url(template.svg_legend_url),
+        'pdf_url': convert_file_path_to_url(template.pdf_url),
+
+        # Additional fields required by response model
+        'difficulty_analysis': template.difficulty_analysis,
+        'quality_analysis': template.quality_analysis,
+        'color_mixing_guide': template.color_mixing_guide,
+        'views': template.views,
+        'likes': template.likes,
+        'downloads': template.downloads,
+    }
+
+    return template_dict
+
+
 # Background task for generation
 async def generate_template_background(
     template_id: int,
@@ -81,12 +147,14 @@ async def generate_template_background(
             if hasattr(generator, 'difficulty_analysis'):
                 template.difficulty_analysis = generator.difficulty_analysis
                 template.difficulty_level = generator.difficulty_analysis.get('difficulty_level')
-                template.difficulty_score = generator.difficulty_analysis.get('overall_difficulty')
+                difficulty_score = generator.difficulty_analysis.get('overall_difficulty')
+                template.difficulty_score = float(difficulty_score) if difficulty_score is not None else None
                 template.estimated_time = generator.difficulty_analysis.get('time_estimate')
 
             if hasattr(generator, 'quality_analysis'):
                 template.quality_analysis = generator.quality_analysis
-                template.quality_score = generator.quality_analysis.get('overall_quality')
+                quality_score = generator.quality_analysis.get('overall_quality')
+                template.quality_score = float(quality_score) if quality_score is not None else None
 
             if hasattr(generator, 'color_mixing_guide'):
                 template.color_mixing_guide = generator.color_mixing_guide
@@ -298,7 +366,7 @@ async def list_templates(
     templates = query.order_by(Template.created_at.desc()).offset(skip).limit(limit).all()
 
     return {
-        "templates": templates,
+        "templates": [prepare_template_response(t) for t in templates],
         "total": total,
         "page": skip // limit + 1,
         "per_page": limit,
@@ -330,7 +398,7 @@ async def get_template(
     template.views += 1
     db.commit()
 
-    return template
+    return prepare_template_response(template)
 
 
 @router.delete("/{template_id}")

@@ -142,15 +142,15 @@ class KitRecommender:
         is_nature = nature_ratio > 0.3
 
         return {
-            'n_colors': n_colors,
+            'n_colors': int(n_colors),
             'dominant_colors': dominant_colors.tolist(),
-            'is_warm': is_warm,
-            'is_cool': is_cool,
-            'is_vibrant': is_vibrant,
-            'is_pastel': is_pastel,
-            'is_bright': is_bright,
-            'is_dark': is_dark,
-            'is_nature': is_nature,
+            'is_warm': bool(is_warm),
+            'is_cool': bool(is_cool),
+            'is_vibrant': bool(is_vibrant),
+            'is_pastel': bool(is_pastel),
+            'is_bright': bool(is_bright),
+            'is_dark': bool(is_dark),
+            'is_nature': bool(is_nature),
             'avg_saturation': float(avg_saturation),
             'avg_brightness': float(avg_brightness),
             'warmth_score': float(warmth)
@@ -195,10 +195,10 @@ class KitRecommender:
 
         return {
             'type': subject_type,
-            'is_portrait': is_portrait,
-            'is_pet': is_pet,
-            'is_landscape': is_landscape,
-            'is_abstract': is_abstract,
+            'is_portrait': bool(is_portrait),
+            'is_pet': bool(is_pet),
+            'is_landscape': bool(is_landscape),
+            'is_abstract': bool(is_abstract),
             'aspect_ratio': float(aspect_ratio),
             'skin_ratio': float(skin_ratio),
             'fur_ratio': float(fur_ratio)
@@ -252,7 +252,7 @@ class KitRecommender:
         all_kits = self.paint_kit_manager.get_all_kits()
         scored_kits = []
 
-        for kit in all_kits:
+        for kit in all_kits.values():
             score, reasons = self._score_kit(kit, color_analysis, subject_analysis, complexity_analysis)
             scored_kits.append({
                 'kit': kit,

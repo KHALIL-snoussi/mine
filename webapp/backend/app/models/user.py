@@ -44,4 +44,3 @@ class User(Base):
 
     # Relationships
     templates = relationship("Template", back_populates="user", cascade="all, delete-orphan")
-    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
