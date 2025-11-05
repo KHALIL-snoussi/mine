@@ -17,6 +17,7 @@ from tqdm import tqdm
 from config import Config
 from logger import setup_logger, logger
 from palettes import PaletteManager
+from paint_kits import PaintKitManager
 from core.image_processor import ImageProcessor
 from core.color_quantizer import ColorQuantizer
 from core.region_detector import RegionDetector
@@ -65,6 +66,7 @@ class PaintByNumbersGenerator:
         self.svg_exporter = SVGExporter(self.config)
         self.pdf_generator = PDFGenerator(self.config)
         self.palette_manager = PaletteManager()
+        self.paint_kit_manager = PaintKitManager()
 
         # Initialize intelligence modules
         self.palette_selector = IntelligentPaletteSelector(self.config)
@@ -87,6 +89,7 @@ class PaintByNumbersGenerator:
         self.quality_analysis = None
         self.color_mixing_guide = None
         self.current_model = None
+        self.recommended_paint_kit = None  # Business: Recommend which kit to buy
 
     def apply_model(self, model_id: str) -> ModelProfile:
         """
@@ -303,6 +306,15 @@ class PaintByNumbersGenerator:
             self.palette
         )
 
+        # Business: Recommend paint kit based on difficulty and colors
+        difficulty_score = self.difficulty_analysis['overall_difficulty']
+        num_colors_used = len(self.palette)
+        self.recommended_paint_kit = self.paint_kit_manager.recommend_kit_for_image(
+            difficulty_score, num_colors_used
+        )
+        logger.info(f"  💰 Recommended Paint Kit: {self.recommended_paint_kit.display_name} (${self.recommended_paint_kit.price_usd})")
+        logger.info(f"      Perfect for: {', '.join(self.recommended_paint_kit.best_for[:2])}")
+
         # Generate color mixing guide
         self.color_mixing_guide = self.color_optimizer.generate_color_mixing_guide(
             self.palette, self.color_names
@@ -460,6 +472,37 @@ class PaintByNumbersGenerator:
                 with open(quality_path, 'w') as f:
                     json.dump(self.quality_analysis, f, indent=2)
                 result_files['quality_analysis'] = str(quality_path)
+
+            # Save paint kit recommendation (BUSINESS FEATURE)
+            if self.recommended_paint_kit:
+                kit_recommendation = {
+                    "recommended_kit": {
+                        "id": self.recommended_paint_kit.id,
+                        "name": self.recommended_paint_kit.display_name,
+                        "price_usd": self.recommended_paint_kit.price_usd,
+                        "num_colors": self.recommended_paint_kit.num_colors,
+                        "palette_name": self.recommended_paint_kit.palette_name,
+                        "sku": self.recommended_paint_kit.sku,
+                        "description": self.recommended_paint_kit.description,
+                        "best_for": self.recommended_paint_kit.best_for,
+                        "includes": self.recommended_paint_kit.includes,
+                        "estimated_projects": self.recommended_paint_kit.estimated_projects,
+                    },
+                    "upsell_opportunities": self.paint_kit_manager.get_upsell_recommendations(
+                        self.recommended_paint_kit.id
+                    ),
+                    "lifetime_value": self.paint_kit_manager.calculate_lifetime_value(
+                        self.recommended_paint_kit.id
+                    ),
+                    "marketing_copy": self.paint_kit_manager.get_marketing_copy(
+                        self.recommended_paint_kit.id
+                    )
+                }
+                kit_rec_path = output_path / f"{input_name}_paint_kit_recommendation.json"
+                with open(kit_rec_path, 'w') as f:
+                    json.dump(kit_recommendation, f, indent=2, default=str)
+                result_files['paint_kit_recommendation'] = str(kit_rec_path)
+                logger.info(f"  Paint kit recommendation saved to: {kit_rec_path}")
 
         except Exception as e:
             logger.warning(f"  Failed to save analysis files: {str(e)}")
