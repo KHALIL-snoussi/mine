@@ -129,6 +129,43 @@ export interface InventoryStatus {
   in_stock: boolean
 }
 
+export interface PaintKit {
+  id: string
+  name: string
+  display_name: string
+  description?: string
+  palette_name: string
+  num_colors: number
+  price_usd: number
+  sku: string
+  target_audience: string
+  difficulty_level: string
+  best_for?: string[]
+  includes?: string[]
+  estimated_projects?: number
+}
+
+export interface KitRecommendation {
+  recommended_kit: PaintKit
+  confidence: number
+  reasoning: string[]
+  all_kits_ranked: Array<{
+    kit: PaintKit
+    score: number
+    reasons: string[]
+  }>
+  analysis: {
+    subject_type: string
+    complexity_level: string
+    is_portrait: boolean
+    is_pet: boolean
+    is_landscape: boolean
+    colors_detected: number
+    is_vibrant: boolean
+    is_pastel: boolean
+  }
+}
+
 class APIClient {
   private baseUrl: string
   private token: string | null = null
@@ -262,6 +299,16 @@ class APIClient {
 
   async getModel(modelId: string): Promise<ProcessingModel> {
     return this.request(`/api/v1/templates/models/${modelId}`)
+  }
+
+  async getKitRecommendation(file: File): Promise<KitRecommendation> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    return this.request<KitRecommendation>('/api/v1/templates/recommend-kit', {
+      method: 'POST',
+      body: formData,
+    })
   }
 
   // Auth endpoints

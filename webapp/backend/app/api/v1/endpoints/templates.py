@@ -27,6 +27,7 @@ from app.api.deps import get_current_user, get_optional_user
 from paint_by_numbers.main import PaintByNumbersGenerator
 from paint_by_numbers.palettes import PaletteManager
 from paint_by_numbers.models import ModelRegistry
+from paint_by_numbers.intelligence.kit_recommender import KitRecommender
 
 router = APIRouter()
 
@@ -272,6 +273,96 @@ async def delete_template(
     db.commit()
 
     return {"message": "Template deleted successfully"}
+
+
+@router.post("/recommend-kit")
+async def recommend_kit_for_image(
+    file: UploadFile = File(...)
+):
+    """
+    Analyze uploaded image and recommend the best paint kit
+
+    Args:
+        file: Image file to analyze
+
+    Returns:
+        Kit recommendation with reasoning and all kits ranked
+    """
+    # Save uploaded file temporarily
+    temp_dir = Path(settings.UPLOAD_DIR) / "temp" / uuid4().hex
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = temp_dir / file.filename
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    try:
+        # Run kit recommender
+        recommender = KitRecommender()
+        recommendation = recommender.analyze_image_for_kit(str(file_path))
+
+        # Format response
+        result = {
+            "recommended_kit": {
+                "id": recommendation['recommended_kit'].id,
+                "name": recommendation['recommended_kit'].name,
+                "display_name": recommendation['recommended_kit'].display_name,
+                "description": recommendation['recommended_kit'].description,
+                "palette_name": recommendation['recommended_kit'].palette_name,
+                "num_colors": recommendation['recommended_kit'].num_colors,
+                "price_usd": recommendation['recommended_kit'].price_usd,
+                "sku": recommendation['recommended_kit'].sku,
+                "target_audience": recommendation['recommended_kit'].target_audience,
+                "difficulty_level": recommendation['recommended_kit'].difficulty_level,
+                "best_for": recommendation['recommended_kit'].best_for,
+                "includes": recommendation['recommended_kit'].includes,
+                "estimated_projects": recommendation['recommended_kit'].estimated_projects,
+            },
+            "confidence": recommendation['confidence'],
+            "reasoning": recommendation['reasoning'],
+            "all_kits_ranked": [
+                {
+                    "kit": {
+                        "id": kit_data['kit'].id,
+                        "name": kit_data['kit'].name,
+                        "display_name": kit_data['kit'].display_name,
+                        "palette_name": kit_data['kit'].palette_name,
+                        "num_colors": kit_data['kit'].num_colors,
+                        "price_usd": kit_data['kit'].price_usd,
+                        "sku": kit_data['kit'].sku,
+                        "target_audience": kit_data['kit'].target_audience,
+                        "difficulty_level": kit_data['kit'].difficulty_level,
+                    },
+                    "score": kit_data['score'],
+                    "reasons": kit_data['reasons']
+                }
+                for kit_data in recommendation['all_kits_ranked']
+            ],
+            "analysis": {
+                "subject_type": recommendation['subject_analysis'].get('type', 'general'),
+                "complexity_level": recommendation['complexity_analysis'].get('complexity_level', 'moderate'),
+                "is_portrait": recommendation['subject_analysis'].get('is_portrait', False),
+                "is_pet": recommendation['subject_analysis'].get('is_pet', False),
+                "is_landscape": recommendation['subject_analysis'].get('is_landscape', False),
+                "colors_detected": recommendation['color_analysis'].get('n_colors', 0),
+                "is_vibrant": recommendation['color_analysis'].get('is_vibrant', False),
+                "is_pastel": recommendation['color_analysis'].get('is_pastel', False),
+            }
+        }
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing image: {str(e)}"
+        )
+    finally:
+        # Cleanup temporary file
+        try:
+            shutil.rmtree(temp_dir)
+        except:
+            pass
 
 
 @router.get("/palettes/list", response_model=List[PaletteInfo])
