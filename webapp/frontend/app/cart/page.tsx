@@ -76,20 +76,14 @@ export default function CartPage() {
     // Store cart in session for checkout page
     sessionStorage.setItem('checkout_cart', JSON.stringify({
       items: cartItems,
-      customer: {
-        email,
-        phone,
-        shipping: shippingAddress
-      },
-      total,
-      date: new Date().toISOString()
-    }
+      subtotal,
+      tax,
+      shipping,
+      total
+    }))
 
-    localStorage.setItem('pending_order', JSON.stringify(order))
-
-    // For now, show success message (until Stripe integration)
-    alert('Order placed! (Checkout integration coming soon)')
-    // router.push('/checkout')
+    // Redirect to checkout page
+    router.push('/checkout')
   }
 
   return (
