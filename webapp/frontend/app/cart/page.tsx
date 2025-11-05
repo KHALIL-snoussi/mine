@@ -7,64 +7,89 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 
-interface CartItem {
+interface PaintKit {
   id: string
-  type: 'kit'
   name: string
   displayName: string
   price: number
-  quantity: number
+  numColors: number
+  palette: string
   sku: string
-  numColors?: number
-  palette?: string
-  includes?: string[]
+  quantity: number
 }
 
 export default function CartPage() {
   const router = useRouter()
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [cartItems, setCartItems] = useState<PaintKit[]>([])
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [shippingAddress, setShippingAddress] = useState({
+    name: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'USA'
+  })
 
   useEffect(() => {
-    // Load cart from localStorage
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]')
+    // Load cart from localStorage (paintKitsCart from shop page)
+    const cart = JSON.parse(localStorage.getItem('paintKitsCart') || '[]')
     setCartItems(cart)
   }, [])
 
-  const removeItem = (index: number) => {
-    const newCart = cartItems.filter((_, i) => i !== index)
+  const removeItem = (kitId: string) => {
+    const newCart = cartItems.filter(item => item.id !== kitId)
     setCartItems(newCart)
-    localStorage.setItem('cart', JSON.stringify(newCart))
+    localStorage.setItem('paintKitsCart', JSON.stringify(newCart))
   }
 
-  const updateQuantity = (index: number, newQuantity: number) => {
-    if (newQuantity < 1) return
-    const newCart = [...cartItems]
-    newCart[index].quantity = newQuantity
+  const updateQuantity = (kitId: string, newQuantity: number) => {
+    if (newQuantity < 1) {
+      removeItem(kitId)
+      return
+    }
+    const newCart = cartItems.map(item =>
+      item.id === kitId ? { ...item, quantity: newQuantity } : item
+    )
     setCartItems(newCart)
-    localStorage.setItem('cart', JSON.stringify(newCart))
+    localStorage.setItem('paintKitsCart', JSON.stringify(newCart))
   }
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-  const shipping = 0 // Free shipping!
+  const shipping = subtotal >= 50 ? 0 : 7.99 // Free shipping over $50
   const tax = subtotal * 0.08 // 8% tax
   const total = subtotal + shipping + tax
 
   const handleCheckout = () => {
-    if (cartItems.length === 0) {
-      alert('Your cart is empty')
+    // Validate inputs
+    if (!email || cartItems.length === 0) {
+      alert('Please fill in your email address')
+      return
+    }
+
+    if (!shippingAddress.name || !shippingAddress.address || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zip) {
+      alert('Please fill in complete shipping address')
       return
     }
 
     // Store cart in session for checkout page
     sessionStorage.setItem('checkout_cart', JSON.stringify({
       items: cartItems,
-      subtotal,
-      tax,
-      shipping,
-      total
-    }))
+      customer: {
+        email,
+        phone,
+        shipping: shippingAddress
+      },
+      total,
+      date: new Date().toISOString()
+    }
 
-    router.push('/checkout')
+    localStorage.setItem('pending_order', JSON.stringify(order))
+
+    // For now, show success message (until Stripe integration)
+    alert('Order placed! (Checkout integration coming soon)')
+    // router.push('/checkout')
   }
 
   return (
@@ -78,10 +103,10 @@ export default function CartPage() {
             </Link>
             <div className="flex items-center gap-4">
               <Link href="/shop">
-                <Button variant="ghost" size="sm">Shop Kits</Button>
+                <Button variant="ghost">Shop Kits</Button>
               </Link>
               <Link href="/create">
-                <Button variant="ghost" size="sm">Create Template</Button>
+                <Button variant="ghost">Create Template</Button>
               </Link>
             </div>
           </div>
@@ -93,132 +118,200 @@ export default function CartPage() {
         <p className="text-slate-600 mb-8">Review your items and proceed to checkout</p>
 
         {cartItems.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-2xl shadow-sm">
-            <div className="text-7xl mb-6">🛒</div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-3">Your cart is empty</h2>
-            <p className="text-lg text-slate-600 mb-8">Start by choosing a paint kit for your projects!</p>
+          <div className="text-center py-16">
+            <div className="text-6xl mb-4">🛒</div>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
+            <p className="text-gray-600 mb-6">Add paint kits to get started!</p>
             <Link href="/shop">
-              <Button size="lg" className="mr-4">Shop Paint Kits</Button>
-            </Link>
-            <Link href="/create">
-              <Button size="lg" variant="outline">Create Template</Button>
+              <Button size="lg" className="text-lg px-8">
+                Browse Paint Kits
+              </Button>
             </Link>
           </div>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {cartItems.map((item, index) => (
-                <Card key={index} className="hover:shadow-md transition-shadow">
+              {cartItems.map((item) => (
+                <Card key={item.id}>
                   <CardContent className="p-6">
-                    <div className="flex gap-6">
-                      {/* Product Icon */}
-                      <div className="w-24 h-24 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <span className="text-4xl">🎨</span>
+                    <div className="flex gap-6 items-start">
+                      {/* Icon/Image */}
+                      <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center text-3xl flex-shrink-0">
+                        🎨
                       </div>
 
-                      {/* Product Info */}
+                      {/* Details */}
                       <div className="flex-grow">
-                        <h3 className="font-bold text-xl text-slate-900 mb-1">{item.displayName}</h3>
-                        <p className="text-sm text-slate-600 mb-2">SKU: {item.sku}</p>
+                        <h3 className="font-bold text-lg text-gray-900 mb-1">{item.displayName}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{item.numColors} premium acrylic colors</p>
+                        <p className="text-xs text-gray-500">SKU: {item.sku}</p>
 
-                        {item.numColors && (
-                          <div className="flex items-center gap-2 mb-3">
-                            <span className="inline-flex items-center text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">
-                              🎨 {item.numColors} Colors
+                        {/* Quantity Selector */}
+                        <div className="flex items-center gap-3 mt-3">
+                          <span className="text-sm font-medium text-gray-700">Quantity:</span>
+                          <div className="flex items-center border border-gray-300 rounded-lg">
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              className="px-3 py-1 hover:bg-gray-100 text-gray-600 font-semibold"
+                            >
+                              −
+                            </button>
+                            <span className="px-4 py-1 border-x border-gray-300 font-semibold">
+                              {item.quantity}
                             </span>
-                            {item.palette && (
-                              <span className="inline-flex items-center text-xs bg-secondary-100 text-secondary-700 px-2 py-1 rounded-full font-medium">
-                                {item.palette}
-                              </span>
-                            )}
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="px-3 py-1 hover:bg-gray-100 text-gray-600 font-semibold"
+                            >
+                              +
+                            </button>
                           </div>
-                        )}
-
-                        {/* What's Included */}
-                        {item.includes && item.includes.length > 0 && (
-                          <details className="text-sm text-slate-600">
-                            <summary className="cursor-pointer hover:text-primary-600 font-medium mb-1">
-                              What's Included ▼
-                            </summary>
-                            <ul className="space-y-1 pl-4 mt-2">
-                              {item.includes.slice(0, 4).map((feature, idx) => (
-                                <li key={idx} className="flex items-start">
-                                  <span className="text-primary-600 mr-2">✓</span>
-                                  <span>{feature}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </details>
-                        )}
+                        </div>
                       </div>
 
-                      {/* Price & Actions */}
-                      <div className="text-right flex flex-col justify-between">
-                        <div>
-                          <p className="text-2xl font-bold text-primary-600">
-                            ${(item.price * item.quantity).toFixed(2)}
-                          </p>
-                          {item.quantity > 1 && (
-                            <p className="text-sm text-slate-500">
-                              ${item.price.toFixed(2)} each
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Quantity Controls */}
-                        <div className="flex items-center gap-2 mt-4">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateQuantity(index, item.quantity - 1)}
-                            className="w-8 h-8 p-0"
-                          >
-                            −
-                          </Button>
-                          <span className="w-8 text-center font-medium">{item.quantity}</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateQuantity(index, item.quantity + 1)}
-                            className="w-8 h-8 p-0"
-                          >
-                            +
-                          </Button>
-                        </div>
-
+                      {/* Price & Remove */}
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-primary-600 mb-2">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500 mb-3">
+                          ${item.price.toFixed(2)} each
+                        </p>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:bg-red-50 hover:text-red-700 mt-2"
+                          onClick={() => removeItem(item.id)}
+                          className="text-red-600 hover:bg-red-50 text-sm"
                         >
                           Remove
                         </Button>
                       </div>
                     </div>
+
+                    {/* Benefits Banner */}
+                    <div className="mt-4 p-3 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-lg border border-primary-200">
+                      <p className="text-sm font-semibold text-primary-900">
+                        ✨ Includes: Unlimited Template Generation Forever!
+                      </p>
+                      <p className="text-xs text-primary-700 mt-1">
+                        Generate as many custom templates as you want with this kit
+                      </p>
+                    </div>
                   </CardContent>
                 </Card>
               ))}
 
-              {/* Trust Signals */}
-              <div className="grid grid-cols-3 gap-4 mt-6">
-                <div className="text-center p-4 bg-white rounded-lg">
-                  <div className="text-2xl mb-2">🚚</div>
-                  <p className="text-sm font-medium text-slate-900">Free Shipping</p>
-                  <p className="text-xs text-slate-500">On all orders</p>
-                </div>
-                <div className="text-center p-4 bg-white rounded-lg">
-                  <div className="text-2xl mb-2">💝</div>
-                  <p className="text-sm font-medium text-slate-900">30-Day Returns</p>
-                  <p className="text-xs text-slate-500">Money back guarantee</p>
-                </div>
-                <div className="text-center p-4 bg-white rounded-lg">
-                  <div className="text-2xl mb-2">🔒</div>
-                  <p className="text-sm font-medium text-slate-900">Secure Checkout</p>
-                  <p className="text-xs text-slate-500">Powered by Stripe</p>
-                </div>
-              </div>
+              {/* Customer Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Contact Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email Address *
+                    </label>
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">For order confirmation and template access</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number (Optional)
+                    </label>
+                    <Input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+1 (555) 123-4567"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Shipping Address */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Shipping Address</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Full Name *
+                    </label>
+                    <Input
+                      value={shippingAddress.name}
+                      onChange={(e) => setShippingAddress({...shippingAddress, name: e.target.value})}
+                      placeholder="John Doe"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Street Address *
+                    </label>
+                    <Input
+                      value={shippingAddress.address}
+                      onChange={(e) => setShippingAddress({...shippingAddress, address: e.target.value})}
+                      placeholder="123 Main St, Apt 4B"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        City *
+                      </label>
+                      <Input
+                        value={shippingAddress.city}
+                        onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                        placeholder="New York"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        State *
+                      </label>
+                      <Input
+                        value={shippingAddress.state}
+                        onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                        placeholder="NY"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        ZIP Code *
+                      </label>
+                      <Input
+                        value={shippingAddress.zip}
+                        onChange={(e) => setShippingAddress({...shippingAddress, zip: e.target.value})}
+                        placeholder="10001"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Country
+                      </label>
+                      <Input
+                        value={shippingAddress.country}
+                        onChange={(e) => setShippingAddress({...shippingAddress, country: e.target.value})}
+                        disabled
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Order Summary */}
@@ -228,20 +321,23 @@ export default function CartPage() {
                   <CardTitle className="text-2xl">Order Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-base">
-                      <span className="text-slate-600">Subtotal ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
-                      <span className="font-medium text-slate-900">${subtotal.toFixed(2)}</span>
-                    </div>
-
-                    <div className="flex justify-between text-base">
-                      <span className="text-slate-600">Shipping</span>
-                      <span className="font-medium text-green-600">FREE</span>
-                    </div>
-
-                    <div className="flex justify-between text-base">
-                      <span className="text-slate-600">Tax (estimated)</span>
-                      <span className="font-medium text-slate-900">${tax.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
+                    <span className="font-medium">${subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Shipping</span>
+                    <span className="font-medium">
+                      {shipping === 0 ? (
+                        <span className="text-green-600">FREE</span>
+                      ) : (
+                        `$${shipping.toFixed(2)}`
+                      )}
+                    </span>
+                  </div>
+                  {subtotal < 50 && subtotal > 0 && (
+                    <div className="text-xs text-gray-500 -mt-2">
+                      Add ${(50 - subtotal).toFixed(2)} more for free shipping!
                     </div>
                   </div>
 
@@ -260,34 +356,41 @@ export default function CartPage() {
                     Proceed to Checkout →
                   </Button>
 
-                  <div className="space-y-2 pt-4 border-t border-slate-100">
-                    <p className="text-xs text-center text-slate-500 flex items-center justify-center gap-1">
+                  <div className="space-y-2 pt-4 border-t">
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
                       <span>🔒</span>
-                      Secure 256-bit SSL encryption
-                    </p>
-                    <p className="text-xs text-center text-slate-500 flex items-center justify-center gap-1">
-                      <span>💳</span>
-                      All major credit cards accepted
-                    </p>
+                      <span>Secure checkout</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>💝</span>
+                      <span>30-day money-back guarantee</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>🚚</span>
+                      <span>Ships within 24 hours</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>♾️</span>
+                      <span>Unlimited template generation</span>
+                    </div>
                   </div>
 
-                  {/* Promo Code */}
-                  <div className="pt-4 border-t border-slate-100">
-                    <details>
-                      <summary className="cursor-pointer text-sm font-medium text-primary-600 hover:text-primary-700">
-                        Have a promo code?
-                      </summary>
-                      <div className="mt-3 flex gap-2">
-                        <Input placeholder="Enter code" className="flex-1" />
-                        <Button variant="outline" size="sm">Apply</Button>
-                      </div>
-                    </details>
+                  <div className="border-t pt-4">
+                    <p className="text-xs text-gray-600 mb-2">
+                      <strong>What happens next:</strong>
+                    </p>
+                    <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+                      <li>Complete checkout & payment</li>
+                      <li>Receive order confirmation</li>
+                      <li>Kit ships within 24 hours</li>
+                      <li>Start generating templates!</li>
+                    </ol>
                   </div>
                 </CardContent>
               </Card>
 
               <div className="mt-4 text-center">
-                <Link href="/shop" className="text-sm text-primary-600 hover:underline font-medium">
+                <Link href="/shop" className="text-sm text-primary-600 hover:underline">
                   ← Continue Shopping
                 </Link>
               </div>
