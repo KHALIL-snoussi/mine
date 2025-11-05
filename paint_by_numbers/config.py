@@ -35,9 +35,17 @@ class Config:
     KMEANS_COLOR_SPACE = "lab"     # Color space for clustering (rgb, lab, hsv)
     PALETTE_DISTANCE_METRIC = "lab"  # Metric for palette projection
 
-    # Unified Palette - USE FIXED COLORS, NOT IMAGE COLORS
-    USE_UNIFIED_PALETTE = True     # ALWAYS use predefined fixed color palette
-    UNIFIED_PALETTE_NAME = "classic_18"  # Name of unified palette to use
+    # Unified Palette - BUSINESS MODEL: USE FIXED COLORS FOR REUSABLE PAINT KITS
+    # This allows customers to buy ONE paint kit and paint MULTIPLE templates!
+    USE_UNIFIED_PALETTE = True     # RECOMMENDED: Use predefined fixed color palette
+    UNIFIED_PALETTE_NAME = "classic_18"  # Default: 18-color Creative Kit palette
+
+    # Business Benefits:
+    # - Customers buy standardized paint kits (Starter/Creative/Professional)
+    # - Same kit works for many templates = better value
+    # - Predictable inventory and supply chain
+    # - Recurring revenue through subscriptions
+    # - Lower customer acquisition cost
 
     # Region Detection
     MIN_REGION_SIZE = 100          # Minimum pixels for a region to be numbered
