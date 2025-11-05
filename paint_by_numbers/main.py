@@ -33,6 +33,7 @@ from intelligence.difficulty_analyzer import DifficultyAnalyzer
 from intelligence.quality_scorer import QualityScorer
 from intelligence.color_optimizer import ColorOptimizer
 from models import ModelRegistry, ModelProfile
+from formats import FormatRegistry, ImageFormatter, FitMode
 
 
 class PaintByNumbersGenerator:
@@ -128,7 +129,8 @@ class PaintByNumbersGenerator:
                 add_grid: bool = False, legend_style: str = "grid",
                 use_unified_palette: Optional[bool] = None,
                 palette_name: Optional[str] = None,
-                model: str = "classic") -> dict:
+                model: str = "classic",
+                paper_format: str = "a4") -> dict:
         """
         Generate complete paint-by-numbers package from input image
 
@@ -142,6 +144,7 @@ class PaintByNumbersGenerator:
             use_unified_palette: Use predefined color palette
             palette_name: Name of unified palette to use
             model: Processing model ID (classic, simple, detailed, artistic, vibrant, pastel)
+            paper_format: Paper format (a4, a3, square_medium, etc.)
 
         Returns:
             Dictionary with paths to generated files and model info
@@ -183,6 +186,24 @@ class PaintByNumbersGenerator:
         # Step 1: Load and preprocess image
         logger.info("\n[1/8] Loading and preprocessing image...")
         self.original_image = self.image_processor.load_image(input_path)
+
+        # Apply paper format if specified
+        if paper_format:
+            format_obj = FormatRegistry.get_format(paper_format)
+            if format_obj:
+                logger.info(f"📐 Applying paper format: {format_obj.display_name}")
+                logger.info(f"   Target size: {format_obj.width_mm}x{format_obj.height_mm}mm at {format_obj.dpi}dpi")
+
+                # Fit image to format using CONTAIN mode (keeps aspect ratio)
+                self.original_image = ImageFormatter.fit_image(
+                    self.original_image,
+                    format_obj,
+                    mode=FitMode.CONTAIN
+                )
+                logger.info(f"   Fitted to: {self.original_image.shape[1]}x{self.original_image.shape[0]}px")
+            else:
+                logger.warning(f"Paper format '{paper_format}' not found, using original size")
+
         self.processed_image = self.image_processor.preprocess(
             apply_bilateral=True,
             apply_gaussian=True

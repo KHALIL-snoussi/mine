@@ -9,16 +9,24 @@ import { Input } from '@/components/ui/Input'
 
 interface CartItem {
   templateId: number
-  productId: string
-  product: {
-    id: string
+  kitSku: string
+  kitBundle: {
+    id: number
+    sku: string
     name: string
     price: number
-    description: string
+    description?: string
+    includes_frame: boolean
+    includes_paints: boolean
+    includes_brushes: boolean
+    includes_canvas: boolean
   }
   template: {
+    id?: number
     title: string
     preview_url?: string
+    difficulty_level?: string
+    num_colors?: number
   }
 }
 
@@ -48,8 +56,10 @@ export default function CartPage() {
     localStorage.setItem('cart', JSON.stringify(newCart))
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.product.price, 0)
-  const shipping = cartItems.some(item => item.productId !== 'digital_pdf') ? 9.99 : 0
+  const subtotal = cartItems.reduce((sum, item) => sum + item.kitBundle.price, 0)
+  // Shipping is free for kits with canvas/physical items, no shipping for digital-only
+  const needsShipping = cartItems.some(item => item.kitBundle.includes_canvas)
+  const shipping = needsShipping ? 0 : 0 // Free shipping for all physical kits!
   const tax = subtotal * 0.08 // 8% tax
   const total = subtotal + shipping + tax
 
@@ -60,8 +70,8 @@ export default function CartPage() {
       return
     }
 
-    // Check if shipping address is needed
-    const needsShipping = cartItems.some(item => item.productId !== 'digital_pdf')
+    // Check if shipping address is needed (for physical items)
+    const needsShipping = cartItems.some(item => item.kitBundle.includes_canvas || item.kitBundle.includes_frame)
     if (needsShipping && (!shippingAddress.name || !shippingAddress.address)) {
       alert('Please fill in shipping address')
       return
@@ -136,14 +146,28 @@ export default function CartPage() {
                         )}
                       </div>
                       <div className="flex-grow">
-                        <h3 className="font-semibold text-lg">{item.product.name}</h3>
-                        <p className="text-sm text-gray-600">{item.product.description}</p>
+                        <h3 className="font-semibold text-lg">{item.kitBundle.name}</h3>
+                        <p className="text-sm text-gray-600">{item.kitBundle.description}</p>
                         <p className="text-sm text-gray-500 mt-1">
                           Template: {item.template.title}
                         </p>
+                        <div className="flex gap-2 mt-2">
+                          {item.kitBundle.includes_canvas && (
+                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Canvas</span>
+                          )}
+                          {item.kitBundle.includes_paints && (
+                            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Paints</span>
+                          )}
+                          {item.kitBundle.includes_brushes && (
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Brushes</span>
+                          )}
+                          {item.kitBundle.includes_frame && (
+                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Frame</span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold text-primary-600">${item.product.price}</p>
+                        <p className="text-lg font-bold text-primary-600">${item.kitBundle.price.toFixed(2)}</p>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -191,7 +215,7 @@ export default function CartPage() {
               </Card>
 
               {/* Shipping Address */}
-              {cartItems.some(item => item.productId !== 'digital_pdf') && (
+              {cartItems.some(item => item.kitBundle.includes_canvas || item.kitBundle.includes_frame) && (
                 <Card>
                   <CardHeader>
                     <CardTitle>Shipping Address</CardTitle>
@@ -324,7 +348,7 @@ export default function CartPage() {
                       {cartItems.map((item, idx) => (
                         <li key={idx} className="flex items-start">
                           <span className="text-primary-600 mr-1">•</span>
-                          {item.product.name}
+                          {item.kitBundle.name}
                         </li>
                       ))}
                     </ul>

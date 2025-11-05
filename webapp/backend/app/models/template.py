@@ -22,6 +22,8 @@ class Template(Base):
     # Generation settings
     palette_name = Column(String, default="classic_18")
     num_colors = Column(Integer, default=18)
+    model = Column(String, default="classic")  # Processing model used
+    paper_format = Column(String, default="a4")  # Paper format (a4, a3, etc.)
     difficulty_level = Column(String)  # easy, medium, hard, expert
     difficulty_score = Column(Float)
     quality_score = Column(Float)

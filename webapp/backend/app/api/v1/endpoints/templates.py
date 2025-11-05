@@ -40,6 +40,7 @@ async def generate_template_background(
     palette_name: str,
     num_colors: Optional[int],
     model: str,
+    paper_format: str,
     db: Session
 ):
     """Generate template in background"""
@@ -47,14 +48,15 @@ async def generate_template_background(
         # Create generator with model configuration
         generator = PaintByNumbersGenerator()
 
-        # Generate template with selected model
+        # Generate template with selected model and format
         results = generator.generate(
             input_path=input_path,
             output_dir=output_dir,
             n_colors=num_colors,
             use_unified_palette=True,
             palette_name=palette_name,
-            model=model  # Apply model configuration
+            model=model,  # Apply model configuration
+            paper_format=paper_format  # Apply paper format
         )
 
         # Update template in database
@@ -102,6 +104,7 @@ async def generate_template(
     palette_name: str = "classic_18",
     num_colors: Optional[int] = None,
     model: str = "classic",
+    paper_format: str = "a4",
     title: Optional[str] = "Untitled",
     is_public: bool = False,
     db: Session = Depends(get_db),
@@ -115,6 +118,7 @@ async def generate_template(
         palette_name: Color palette to use
         num_colors: Number of colors (optional, model determines default)
         model: Processing model (classic, simple, detailed, artistic, vibrant, pastel)
+        paper_format: Paper format (a4, a3, square_medium, etc.)
         title: Template title
         is_public: Make template visible in gallery
     """
@@ -139,6 +143,8 @@ async def generate_template(
         title=title,
         palette_name=palette_name,
         num_colors=num_colors or 18,
+        model=model,
+        paper_format=paper_format,
         is_public=is_public,
         original_image_url=str(file_path)
     )
@@ -162,6 +168,7 @@ async def generate_template(
         palette_name,
         num_colors,
         model,  # Pass model to background task
+        paper_format,  # Pass paper format to background task
         db
     )
 
