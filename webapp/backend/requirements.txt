@@ -23,7 +23,7 @@ boto3==1.29.7
 stripe==7.4.0
 
 # Email
-python-email-validator==2.1.0
+email-validator==2.0.0
 emails==0.6
 
 # Image processing (from paint_by_numbers)
