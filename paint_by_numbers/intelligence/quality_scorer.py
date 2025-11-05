@@ -3,23 +3,29 @@ Quality Scorer - Evaluates the quality of paint-by-numbers templates
 """
 
 import numpy as np
-import cv2
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 try:
+    from paint_by_numbers.utils.opencv import require_cv2
+except ImportError:
+    from ..utils.opencv import require_cv2
+
+try:
+    from paint_by_numbers.config import Config
     from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config import Config
     from logger import logger
 
 
 class QualityScorer:
     """Evaluates template quality and paintability"""
 
-    def __init__(self):
-        pass
+    def __init__(self, config: Optional[Config] = None):
+        self.config = config or Config()
 
     def score_template(self, original_image: np.ndarray,
                       quantized_image: np.ndarray,
@@ -114,6 +120,7 @@ class QualityScorer:
         """Score how accurately quantized image represents original"""
         # Resize original to match quantized if needed
         if original.shape != quantized.shape:
+            cv2 = require_cv2()
             original = cv2.resize(original, (quantized.shape[1], quantized.shape[0]))
 
         # Calculate PSNR (Peak Signal-to-Noise Ratio)
@@ -199,6 +206,7 @@ class QualityScorer:
     def _score_edge_clarity(self, quantized_image: np.ndarray) -> float:
         """Score how clear edges are between regions"""
         # Convert to grayscale
+        cv2 = require_cv2()
         gray = cv2.cvtColor(quantized_image, cv2.COLOR_RGB2GRAY)
 
         # Detect edges
@@ -242,6 +250,7 @@ class QualityScorer:
 
         # Factor 3: Regions are compact (not too irregular) - using contour attribute
         compactness_scores = []
+        cv2 = require_cv2()
         for region in regions:
             if hasattr(region, 'contour') and region.contour is not None:
                 contour = region.contour

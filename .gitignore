@@ -4,37 +4,75 @@ __pycache__/
 *$py.class
 *.so
 .Python
+build/
+dist/
+*.egg-info/
 
-# Test outputs
+# Test outputs and generated files
 paint_test_output/
 test_input.png
 my_output/
 *_output/
+paint_by_numbers/output/
+paint_by_numbers/my_output/
+
+# Test images (not source code)
+paint_by_numbers/*.jpg
+paint_by_numbers/*.png
+paint_by_numbers/*.jpeg
+!paint_by_numbers/examples/*.jpg
+!paint_by_numbers/examples/*.png
+
+# Logs
+*.log
+logs/
+paint_by_numbers/*.log
 
 # Virtual environments
 venv/
 env/
 ENV/
+.venv/
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-*
 
 # OS
 .DS_Store
 Thumbs.db
+.Spotlight-V100
+.Trashes
 
-
-# Claude and environment files
-.claude/
-*.env
-*.env.local
-
-# Frontend junk
+# Node modules (webapp frontend)
 webapp/frontend/node_modules/
 webapp/frontend/.next/
-webapp/frontend/package-lock.json
-webapp/frontend/next-env.d.ts
-webapp/frontend/tsconfig.json
+webapp/frontend/out/
+webapp/frontend/build/
+
+# Environment files (may contain secrets)
+.env
+.env.local
+.env.*.local
+webapp/backend/.env
+webapp/frontend/.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+webapp/backend/app.db
+
+# Coverage and testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# MacOS
+*.DS_Store
+.AppleDouble
+.LSOverride

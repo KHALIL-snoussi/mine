@@ -2,18 +2,21 @@
 Template generation and management endpoints
 """
 
-from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import shutil
-import os
 import sys
+import logging
 from pathlib import Path
+from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 # Add paint_by_numbers to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent / "paint_by_numbers"))
 
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.user import User
 from app.models.template import Template
 from app.schemas.template import (
@@ -21,13 +24,13 @@ from app.schemas.template import (
     GenerationStatus, PaletteInfo, DifficultyPreset
 )
 from app.core.config import settings
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_optional_user
 
 # Import paint by numbers generator
 from paint_by_numbers.main import PaintByNumbersGenerator
 from paint_by_numbers.palettes import PaletteManager
-from paint_by_numbers.config import Config
 from paint_by_numbers.models import ModelRegistry
+from paint_by_numbers.intelligence.kit_recommender import KitRecommender
 
 router = APIRouter()
 
@@ -41,7 +44,6 @@ async def generate_template_background(
     num_colors: Optional[int],
     model: str,
     paper_format: str,
-    db: Session
 ):
     """Generate template in background"""
     try:
@@ -59,9 +61,13 @@ async def generate_template_background(
             paper_format=paper_format  # Apply paper format
         )
 
-        # Update template in database
-        template = db.query(Template).filter(Template.id == template_id).first()
-        if template:
+        # Update template in database using context manager
+        with SessionLocal() as db:
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if not template:
+                logger.error(f"Template {template_id} not found in database")
+                return
+
             template.template_url = results.get('template')
             template.legend_url = results.get('legend')
             template.solution_url = results.get('solution')
@@ -87,14 +93,20 @@ async def generate_template_background(
 
             template.num_colors = len(generator.palette)
             db.commit()
+            logger.info(f"Successfully generated template {template_id}")
 
     except Exception as e:
-        print(f"Error generating template: {e}")
-        # Update template with error
-        template = db.query(Template).filter(Template.id == template_id).first()
-        if template:
-            template.difficulty_level = "error"
-            db.commit()
+        logger.error(f"Error generating template {template_id}: {e}", exc_info=True)
+        # Update error status in a separate session
+        try:
+            with SessionLocal() as error_session:
+                template = error_session.query(Template).filter(Template.id == template_id).first()
+                if template:
+                    template.difficulty_level = "error"
+                    template.error_message = str(e)[:500]  # Truncate long error messages
+                    error_session.commit()
+        except Exception as db_error:
+            logger.error(f"Failed to update template error status: {db_error}", exc_info=True)
 
 
 @router.post("/generate", response_model=TemplateResponse)
@@ -108,7 +120,7 @@ async def generate_template(
     title: Optional[str] = "Untitled",
     is_public: bool = False,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """
     Generate a paint-by-numbers template from an uploaded image
@@ -122,15 +134,92 @@ async def generate_template(
         title: Template title
         is_public: Make template visible in gallery
     """
-    # Check user limits
-    if current_user.role == "free" and current_user.templates_used_this_month >= settings.FREE_TEMPLATES_PER_MONTH:
+    # Validate file type
+    allowed_content_types = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/bmp"]
+    if file.content_type not in allowed_content_types:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed types: {', '.join(allowed_content_types)}"
+        )
+
+    # Validate file extension
+    allowed_extensions = [".jpg", ".jpeg", ".png", ".webp", ".bmp"]
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file extension. Allowed extensions: {', '.join(allowed_extensions)}"
+        )
+
+    # Validate num_colors range
+    if num_colors is not None and not (5 <= num_colors <= 30):
+        raise HTTPException(
+            status_code=400,
+            detail="num_colors must be between 5 and 30"
+        )
+
+    # Validate palette exists
+    palette_manager = PaletteManager()
+    available_palettes = palette_manager.list_palettes()
+    if palette_name not in available_palettes:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid palette_name. Available palettes: {', '.join(available_palettes)}"
+        )
+
+    # Validate model exists
+    available_models = [m['id'] for m in ModelRegistry.get_models_list()]
+    if model not in available_models:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model. Available models: {', '.join(available_models)}"
+        )
+
+    # Validate paper format (common formats)
+    valid_paper_formats = ["a4", "a3", "a5", "letter", "square_small", "square_medium", "square_large"]
+    if paper_format not in valid_paper_formats:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid paper_format. Valid formats: {', '.join(valid_paper_formats)}"
+        )
+
+    # Validate title length
+    if title and len(title) > 200:
+        raise HTTPException(
+            status_code=400,
+            detail="Title must be 200 characters or less"
+        )
+
+    # Validate file size (max 50MB)
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
+    file.file.seek(0, 2)  # Seek to end
+    file_size = file.file.tell()
+    file.file.seek(0)  # Reset to beginning
+
+    if file_size > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File size exceeds maximum allowed size of {MAX_FILE_SIZE // (1024 * 1024)}MB"
+        )
+
+    if file_size == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="File is empty"
+        )
+
+    # Check user limits when authenticated
+    if current_user and current_user.role == "free" and current_user.templates_used_this_month >= settings.FREE_TEMPLATES_PER_MONTH:
         raise HTTPException(
             status_code=403,
-            detail="Free plan limit reached. Please upgrade to generate more templates."
+            detail="Free plan limit reached. Please upgrade to generate more templates.",
         )
 
     # Save uploaded file
-    upload_dir = Path(settings.UPLOAD_DIR) / str(current_user.id)
+    owner_folder = str(current_user.id) if current_user else "guest"
+    upload_dir = Path(settings.UPLOAD_DIR) / owner_folder
+    if not current_user:
+        upload_dir = upload_dir / uuid4().hex
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     file_path = upload_dir / file.filename
@@ -139,22 +228,23 @@ async def generate_template(
 
     # Create template record
     template = Template(
-        user_id=current_user.id,
+        user_id=current_user.id if current_user else None,
         title=title,
         palette_name=palette_name,
         num_colors=num_colors or 18,
         model=model,
         paper_format=paper_format,
-        is_public=is_public,
+        is_public=is_public if current_user else True,
         original_image_url=str(file_path)
     )
     db.add(template)
     db.commit()
     db.refresh(template)
 
-    # Update user usage
-    current_user.templates_used_this_month += 1
-    db.commit()
+    # Update user usage counter
+    if current_user:
+        current_user.templates_used_this_month += 1
+        db.commit()
 
     # Start background generation
     output_dir = upload_dir / f"template_{template.id}"
@@ -168,8 +258,7 @@ async def generate_template(
         palette_name,
         num_colors,
         model,  # Pass model to background task
-        paper_format,  # Pass paper format to background task
-        db
+        paper_format  # Pass paper format to background task
     )
 
     return template
@@ -179,17 +268,31 @@ async def generate_template(
 async def list_templates(
     skip: int = 0,
     limit: int = 20,
-    public_only: bool = False,
+    public_only: Optional[bool] = Query(None, alias="public_only"),
+    is_public: Optional[bool] = Query(None, alias="is_public"),
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """List templates"""
     query = db.query(Template)
 
-    if public_only:
-        query = query.filter(Template.is_public == True)
+    public_filter = is_public if is_public is not None else public_only
+
+    if public_filter is True:
+        query = query.filter((Template.is_public == True) | (Template.user_id.is_(None)))
     elif current_user:
-        query = query.filter(Template.user_id == current_user.id)
+        if public_filter is False:
+            query = query.filter(Template.user_id == current_user.id)
+        else:
+            query = query.filter(
+                (Template.user_id == current_user.id) |
+                (Template.user_id.is_(None))
+            )
+    else:
+        query = query.filter(
+            (Template.is_public == True) |
+            (Template.user_id.is_(None))
+        )
 
     total = query.count()
     templates = query.order_by(Template.created_at.desc()).offset(skip).limit(limit).all()
@@ -207,7 +310,7 @@ async def list_templates(
 async def get_template(
     template_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)
+    current_user: Optional[User] = Depends(get_optional_user)
 ):
     """Get template by ID"""
     template = db.query(Template).filter(Template.id == template_id).first()
@@ -215,8 +318,12 @@ async def get_template(
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    # Check access
-    if not template.is_public and (not current_user or template.user_id != current_user.id):
+    # Check access permissions
+    if template.user_id is None:
+        pass
+    elif template.is_public:
+        pass
+    elif not current_user or (template.user_id != current_user.id and current_user.role != "admin"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Increment views
@@ -245,6 +352,96 @@ async def delete_template(
     db.commit()
 
     return {"message": "Template deleted successfully"}
+
+
+@router.post("/recommend-kit")
+async def recommend_kit_for_image(
+    file: UploadFile = File(...)
+):
+    """
+    Analyze uploaded image and recommend the best paint kit
+
+    Args:
+        file: Image file to analyze
+
+    Returns:
+        Kit recommendation with reasoning and all kits ranked
+    """
+    # Save uploaded file temporarily
+    temp_dir = Path(settings.UPLOAD_DIR) / "temp" / uuid4().hex
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = temp_dir / file.filename
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    try:
+        # Run kit recommender
+        recommender = KitRecommender()
+        recommendation = recommender.analyze_image_for_kit(str(file_path))
+
+        # Format response
+        result = {
+            "recommended_kit": {
+                "id": recommendation['recommended_kit'].id,
+                "name": recommendation['recommended_kit'].name,
+                "display_name": recommendation['recommended_kit'].display_name,
+                "description": recommendation['recommended_kit'].description,
+                "palette_name": recommendation['recommended_kit'].palette_name,
+                "num_colors": recommendation['recommended_kit'].num_colors,
+                "price_usd": recommendation['recommended_kit'].price_usd,
+                "sku": recommendation['recommended_kit'].sku,
+                "target_audience": recommendation['recommended_kit'].target_audience,
+                "difficulty_level": recommendation['recommended_kit'].difficulty_level,
+                "best_for": recommendation['recommended_kit'].best_for,
+                "includes": recommendation['recommended_kit'].includes,
+                "estimated_projects": recommendation['recommended_kit'].estimated_projects,
+            },
+            "confidence": recommendation['confidence'],
+            "reasoning": recommendation['reasoning'],
+            "all_kits_ranked": [
+                {
+                    "kit": {
+                        "id": kit_data['kit'].id,
+                        "name": kit_data['kit'].name,
+                        "display_name": kit_data['kit'].display_name,
+                        "palette_name": kit_data['kit'].palette_name,
+                        "num_colors": kit_data['kit'].num_colors,
+                        "price_usd": kit_data['kit'].price_usd,
+                        "sku": kit_data['kit'].sku,
+                        "target_audience": kit_data['kit'].target_audience,
+                        "difficulty_level": kit_data['kit'].difficulty_level,
+                    },
+                    "score": kit_data['score'],
+                    "reasons": kit_data['reasons']
+                }
+                for kit_data in recommendation['all_kits_ranked']
+            ],
+            "analysis": {
+                "subject_type": recommendation['subject_analysis'].get('type', 'general'),
+                "complexity_level": recommendation['complexity_analysis'].get('complexity_level', 'moderate'),
+                "is_portrait": recommendation['subject_analysis'].get('is_portrait', False),
+                "is_pet": recommendation['subject_analysis'].get('is_pet', False),
+                "is_landscape": recommendation['subject_analysis'].get('is_landscape', False),
+                "colors_detected": recommendation['color_analysis'].get('n_colors', 0),
+                "is_vibrant": recommendation['color_analysis'].get('is_vibrant', False),
+                "is_pastel": recommendation['color_analysis'].get('is_pastel', False),
+            }
+        }
+
+        return result
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error analyzing image: {str(e)}"
+        )
+    finally:
+        # Cleanup temporary file
+        try:
+            shutil.rmtree(temp_dir)
+        except OSError as e:
+            logger.warning(f"Failed to cleanup temporary directory {temp_dir}: {e}")
 
 
 @router.get("/palettes/list", response_model=List[PaletteInfo])

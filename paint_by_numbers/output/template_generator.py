@@ -3,16 +3,19 @@ Template Generator Module - Creates the paint-by-numbers template
 """
 
 import numpy as np
-import cv2
 from typing import List, Optional, Tuple
 from pathlib import Path
 
 try:
     from paint_by_numbers.config import Config
+    from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
+    from utils.opencv import require_cv2
+    from logger import logger
 
 
 class TemplateGenerator:
@@ -39,6 +42,7 @@ class TemplateGenerator:
         Returns:
             Combined template
         """
+        cv2 = require_cv2()
         # Start with white background
         template = np.ones_like(contour_image) * 255
 
@@ -94,6 +98,7 @@ class TemplateGenerator:
         grid_color = (200, 200, 200)  # Light gray
         thickness = 1
 
+        cv2 = require_cv2()
         # Draw vertical lines
         for x in range(0, w, spacing):
             cv2.line(result, (x, 0), (x, h), grid_color, thickness)
@@ -122,6 +127,7 @@ class TemplateGenerator:
         """
         result = template.copy()
 
+        cv2 = require_cv2()
         if add_border:
             result = cv2.copyMakeBorder(
                 result,
@@ -178,13 +184,14 @@ class TemplateGenerator:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        cv2 = require_cv2()
         # Convert RGB to BGR for saving
         bgr_template = cv2.cvtColor(template, cv2.COLOR_RGB2BGR)
 
         # Save with high quality
         cv2.imwrite(str(output_path), bgr_template, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
-        print(f"Template saved to: {output_path}")
+        logger.info(f"Template saved to: {output_path}")
 
     def create_coloring_guide(self, quantized_image: np.ndarray,
                              contour_image: np.ndarray,
@@ -205,6 +212,7 @@ class TemplateGenerator:
         faded = faded.astype(np.uint8)
 
         # Add contours
+        cv2 = require_cv2()
         gray_contours = cv2.cvtColor(contour_image, cv2.COLOR_RGB2GRAY)
         contour_mask = gray_contours < 250
 
@@ -228,6 +236,7 @@ class TemplateGenerator:
         result = quantized_image.copy()
 
         # Overlay contours
+        cv2 = require_cv2()
         gray_contours = cv2.cvtColor(contour_image, cv2.COLOR_RGB2GRAY)
         contour_mask = gray_contours < 250
 
@@ -253,6 +262,7 @@ class TemplateGenerator:
         """
         # Ensure all images are same size
         h, w = template.shape[:2]
+        cv2 = require_cv2()
         original_resized = cv2.resize(original, (w, h))
         solution_resized = cv2.resize(solution, (w, h))
 

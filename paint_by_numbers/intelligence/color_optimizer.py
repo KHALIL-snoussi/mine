@@ -3,24 +3,30 @@ Color Optimizer - Optimizes color mapping for best visual results
 """
 
 import numpy as np
-import cv2
 from typing import Tuple, Optional, List
 from scipy.spatial import distance
 
 try:
+    from paint_by_numbers.utils.opencv import require_cv2
+except ImportError:
+    from ..utils.opencv import require_cv2
+
+try:
+    from paint_by_numbers.config import Config
     from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config import Config
     from logger import logger
 
 
 class ColorOptimizer:
     """Optimizes color selection and mapping for superior results"""
 
-    def __init__(self):
-        pass
+    def __init__(self, config: Optional[Config] = None):
+        self.config = config or Config()
 
     def optimize_palette_mapping(self, image: np.ndarray, palette: np.ndarray,
                                  perceptual: bool = True) -> Tuple[np.ndarray, np.ndarray]:
@@ -38,6 +44,7 @@ class ColorOptimizer:
         logger.info("Optimizing color mapping...")
 
         if perceptual:
+            cv2 = require_cv2()
             # Convert to LAB color space for perceptual accuracy
             image_lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB).astype(np.float32)
             palette_lab = cv2.cvtColor(
@@ -182,7 +189,7 @@ class ColorOptimizer:
         recipe_parts = []
 
         # Add white/black for brightness
-        if brightness > 200:
+        if brightness > self.config.BRIGHTNESS_THRESHOLD:
             recipe_parts.append("Start with White")
         elif brightness < 50:
             recipe_parts.append("Start with Black")
@@ -255,6 +262,7 @@ class ColorOptimizer:
             Dictionary with harmony analysis
         """
         # Convert to HSV for harmony analysis
+        cv2 = require_cv2()
         palette_hsv = cv2.cvtColor(
             palette.reshape(1, -1, 3), cv2.COLOR_RGB2HSV
         ).reshape(-1, 3)

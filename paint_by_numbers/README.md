@@ -54,6 +54,69 @@ paint_by_numbers/
    pip install -r requirements.txt
    ```
 
+## OpenCV Dependency Handling 🔧
+
+This project uses **OpenCV (cv2)** as an optional dependency with graceful error handling. Here's how it works:
+
+### How It Works
+
+All modules that need OpenCV use the `require_cv2()` function from `utils/opencv.py`:
+
+```python
+from paint_by_numbers.utils.opencv import require_cv2
+
+def process_image(self, image):
+    cv2 = require_cv2()  # Import cv2 only when needed
+    result = cv2.GaussianBlur(image, (5, 5), 0)
+    return result
+```
+
+### Key Features
+
+1. **Lazy Loading**: OpenCV is only imported when actually needed, not at module import time
+2. **Module Caching**: Once loaded, cv2 is cached and reused (no redundant imports)
+3. **Clear Error Messages**: If OpenCV is missing, you get a helpful error message:
+   ```
+   OpenCV (cv2) could not be imported. Install the 'opencv-python-headless'
+   package and ensure system libraries such as libGL are present.
+   ```
+
+### Available Helper Functions
+
+The `utils/opencv.py` module provides several helper functions:
+
+- **`require_cv2()`**: Import and return cv2, or raise an error if unavailable
+- **`get_cv2(raise_if_missing=False)`**: Get cv2 or return None if unavailable
+- **`cv2_available()`**: Check if OpenCV is available (returns True/False)
+- **`describe_missing_cv2()`**: Get detailed error message about why cv2 failed to load
+
+### Example Usage
+
+```python
+from paint_by_numbers.utils.opencv import cv2_available, require_cv2
+
+# Check availability before processing
+if cv2_available():
+    cv2 = require_cv2()
+    # Use cv2 safely
+else:
+    print("OpenCV not available - using alternative method")
+```
+
+### Files Using OpenCV
+
+The following modules use the `require_cv2()` pattern:
+- `core/image_processor.py` - Image loading and preprocessing
+- `core/color_quantizer.py` - Color reduction
+- `core/region_detector.py` - Region segmentation
+- `core/contour_builder.py` - Contour detection
+- `core/number_placer.py` - Number placement
+- `output/template_generator.py` - Template creation
+- `output/legend_generator.py` - Legend generation
+- `utils/helpers.py` - Helper utilities
+
+All these modules call `require_cv2()` **once** at the beginning of each method that needs OpenCV, ensuring efficient and consistent dependency management.
+
 ## Usage 📖
 
 ### Basic Usage

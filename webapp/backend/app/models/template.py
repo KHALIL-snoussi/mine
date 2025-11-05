@@ -13,7 +13,7 @@ class Template(Base):
     __tablename__ = "templates"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     # Template info
     title = Column(String, default="Untitled")
@@ -51,6 +51,7 @@ class Template(Base):
     views = Column(Integer, default=0)
     likes = Column(Integer, default=0)
     downloads = Column(Integer, default=0)
+    error_message = Column(String, nullable=True)  # Store error details if generation fails
 
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

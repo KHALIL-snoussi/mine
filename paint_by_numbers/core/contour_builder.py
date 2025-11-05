@@ -3,18 +3,19 @@ Contour Building Module - Creates outlines for paint-by-numbers template
 """
 
 import numpy as np
-import cv2
 from typing import List, Optional, Tuple
 
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import smooth_contours
+    from paint_by_numbers.utils.opencv import require_cv2
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import smooth_contours
+    from utils.opencv import require_cv2
 
 
 class ContourBuilder:
@@ -49,6 +50,7 @@ class ContourBuilder:
         contour_img = np.ones((h, w, 3), dtype=np.uint8) * 255
 
         # Convert to grayscale for edge detection
+        cv2 = require_cv2()
         gray = cv2.cvtColor(quantized_image, cv2.COLOR_RGB2GRAY)
 
         # Find edges between different colors
@@ -65,6 +67,7 @@ class ContourBuilder:
 
         self.contours = contours
 
+        cv2 = require_cv2()
         # Draw contours
         cv2.drawContours(
             contour_img,
@@ -104,6 +107,7 @@ class ContourBuilder:
 
         # Dilate edges slightly to make them more visible
         kernel = np.ones((2, 2), dtype=np.uint8)
+        cv2 = require_cv2()
         edges = cv2.dilate(edges, kernel, iterations=1)
 
         return edges
@@ -126,6 +130,7 @@ class ContourBuilder:
         # Create white background
         contour_img = np.ones((h, w, 3), dtype=np.uint8) * 255
 
+        cv2 = require_cv2()
         # Collect all contours
         all_contours = [region.contour for region in regions]
 
@@ -158,6 +163,7 @@ class ContourBuilder:
         Returns:
             Image with border
         """
+        cv2 = require_cv2()
         return cv2.copyMakeBorder(
             image,
             border_size, border_size, border_size, border_size,
@@ -181,6 +187,7 @@ class ContourBuilder:
             return image
 
         # Extract black pixels (contours)
+        cv2 = require_cv2()
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         _, contour_mask = cv2.threshold(gray, 250, 255, cv2.THRESH_BINARY_INV)
 
@@ -207,6 +214,7 @@ class ContourBuilder:
             Outline image
         """
         h, w = image_shape
+        cv2 = require_cv2()
         outline = np.ones((h, w, 3), dtype=np.uint8) * 255
 
         if not self.contours:
@@ -238,6 +246,7 @@ class ContourBuilder:
         if not self.contours:
             return {"total_contours": 0}
 
+        cv2 = require_cv2()
         areas = [cv2.contourArea(c) for c in self.contours]
         perimeters = [cv2.arcLength(c, True) for c in self.contours]
 

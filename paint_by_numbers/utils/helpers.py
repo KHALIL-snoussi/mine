@@ -3,9 +3,13 @@ Utility helper functions for Paint-by-Numbers System
 """
 
 import numpy as np
-import cv2
 from typing import Tuple, List
 from scipy.spatial import distance
+
+try:
+    from paint_by_numbers.utils.opencv import require_cv2
+except ImportError:
+    from .opencv import require_cv2
 
 
 def resize_image(image: np.ndarray, max_size: Tuple[int, int]) -> np.ndarray:
@@ -28,6 +32,7 @@ def resize_image(image: np.ndarray, max_size: Tuple[int, int]) -> np.ndarray:
     if scale < 1.0:
         new_w = int(w * scale)
         new_h = int(h * scale)
+        cv2 = require_cv2()
         return cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
     return image
@@ -71,6 +76,7 @@ def find_region_center(region_mask: np.ndarray) -> Tuple[int, int]:
         (x, y) coordinates of center
     """
     # Use distance transform to find the most interior point
+    cv2 = require_cv2()
     dist_transform = cv2.distanceTransform(region_mask, cv2.DIST_L2, 5)
     min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(dist_transform)
 
@@ -130,6 +136,7 @@ def is_point_inside_region(point: Tuple[int, int], region_mask: np.ndarray,
         return False
 
     # Check distance from edge using distance transform
+    cv2 = require_cv2()
     dist_transform = cv2.distanceTransform(region_mask, cv2.DIST_L2, 5)
 
     return dist_transform[y, x] >= min_distance
@@ -147,6 +154,7 @@ def smooth_contours(contours: List[np.ndarray], epsilon_factor: float = 0.001) -
         List of smoothed contours
     """
     smoothed = []
+    cv2 = require_cv2()
     for contour in contours:
         epsilon = epsilon_factor * cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, epsilon, True)

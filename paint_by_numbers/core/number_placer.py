@@ -3,18 +3,21 @@ Number Placement Module - Intelligently places numbers in regions
 """
 
 import numpy as np
-import cv2
 from typing import List, Tuple, Optional, Dict
 
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import is_point_inside_region, get_contrasting_color
+    from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import is_point_inside_region, get_contrasting_color
+    from utils.opencv import require_cv2
+    from logger import logger
 
 
 class NumberPlacer:
@@ -46,7 +49,7 @@ class NumberPlacer:
         result = image.copy()
         self.placed_positions = []
 
-        print(f"Placing numbers in {len(regions)} regions...")
+        logger.info(f"Placing numbers in {len(regions)} regions...")
 
         for region in regions:
             # Get the color for this region
@@ -69,7 +72,7 @@ class NumberPlacer:
 
             self.placed_positions.append((region, position, number))
 
-        print(f"Placed {len(self.placed_positions)} numbers")
+        logger.info(f"Placed {len(self.placed_positions)} numbers")
         return result
 
     def _find_best_position(self, region, image_shape: Tuple[int, int]) -> Optional[Tuple[int, int]]:
@@ -91,6 +94,7 @@ class NumberPlacer:
 
         # If center doesn't work, try to find alternative positions
         # Use distance transform to find interior points
+        cv2 = require_cv2()
         dist_transform = cv2.distanceTransform(region.mask, cv2.DIST_L2, 5)
 
         # Get multiple candidate positions sorted by distance from edge
@@ -166,6 +170,7 @@ class NumberPlacer:
             color: Text color
         """
         text = str(number)
+        cv2 = require_cv2()
         font = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = self.config.FONT_SCALE
         thickness = self.config.FONT_THICKNESS
@@ -216,6 +221,7 @@ class NumberPlacer:
         Returns:
             Image with color samples
         """
+        cv2 = require_cv2()
         result = image.copy()
 
         for region in regions:

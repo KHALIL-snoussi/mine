@@ -4,17 +4,23 @@ Analyzes images and recommends optimal color palettes
 """
 
 import numpy as np
-import cv2
 from typing import Tuple, List, Optional
 from collections import Counter
 
 try:
+    from paint_by_numbers.utils.opencv import require_cv2
+except ImportError:
+    from ..utils.opencv import require_cv2
+
+try:
+    from paint_by_numbers.config import Config
     from paint_by_numbers.logger import logger
     from paint_by_numbers.palettes import PaletteManager
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config import Config
     from logger import logger
     from palettes import PaletteManager
 
@@ -22,7 +28,8 @@ except ImportError:
 class IntelligentPaletteSelector:
     """Analyzes images and recommends optimal color palettes"""
 
-    def __init__(self):
+    def __init__(self, config: Optional[Config] = None):
+        self.config = config or Config()
         self.palette_manager = PaletteManager()
 
     def analyze_image(self, image: np.ndarray) -> dict:
@@ -36,12 +43,13 @@ class IntelligentPaletteSelector:
             Dictionary with image analysis
         """
         # Convert to different color spaces for analysis
+        cv2 = require_cv2()
         hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
 
         # Sample pixels for analysis
         h, w = image.shape[:2]
-        sample_size = min(10000, h * w)
+        sample_size = min(self.config.ANALYSIS_SAMPLE_SIZE, h * w)
         indices = np.random.choice(h * w, sample_size, replace=False)
 
         pixels_rgb = image.reshape(-1, 3)[indices]
