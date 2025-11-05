@@ -13,7 +13,7 @@ except ImportError:
     from utils.opencv import require_cv2
 
 from main import PaintByNumbersGenerator
-from config import Config
+from .config import Config
 
 
 def create_test_image(filename="test_image.png", size=(600, 600)):
