@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
-import { usePalettes } from '@/lib/hooks'
+import { usePalettes, useModels } from '@/lib/hooks'
 import Link from 'next/link'
 import { apiClient } from '@/lib/api'
 
@@ -14,10 +14,12 @@ export default function CreatePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [selectedPalette, setSelectedPalette] = useState('classic_18')
+  const [selectedModel, setSelectedModel] = useState('classic')
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedTemplateId, setGeneratedTemplateId] = useState<number | null>(null)
 
   const { data: palettesData } = usePalettes()
+  const { data: modelsData } = useModels()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -49,6 +51,7 @@ export default function CreatePage() {
     try {
       const template = await apiClient.generateTemplate(selectedFile, {
         palette_name: selectedPalette,
+        model: selectedModel,
         title: 'Preview Template',
       })
 

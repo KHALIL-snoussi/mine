@@ -60,6 +60,20 @@ export interface DifficultyPreset {
   description: string
 }
 
+export interface ProcessingModel {
+  id: string
+  name: string
+  display_name: string
+  description: string
+  difficulty_level: string
+  recommended_for: string[]
+  color_range: string
+  detail_level: string
+  processing_time: string
+  preview_icon: string
+  style_tags: string[]
+}
+
 export interface GenerationStatus {
   status: 'pending' | 'processing' | 'completed' | 'failed'
   progress: number
@@ -130,6 +144,7 @@ class APIClient {
       description?: string
       palette_name?: string
       num_colors?: number
+      model?: string
       is_public?: boolean
     } = {}
   ): Promise<Template> {
@@ -140,6 +155,7 @@ class APIClient {
     if (options.description) formData.append('description', options.description)
     if (options.palette_name) formData.append('palette_name', options.palette_name)
     if (options.num_colors) formData.append('num_colors', options.num_colors.toString())
+    if (options.model) formData.append('model', options.model)
     if (options.is_public !== undefined) formData.append('is_public', options.is_public.toString())
 
     return this.request<Template>('/api/v1/templates/generate', {
@@ -185,6 +201,14 @@ class APIClient {
 
   async listPresets(): Promise<DifficultyPreset[]> {
     return this.request('/api/v1/templates/presets/list')
+  }
+
+  async listModels(): Promise<ProcessingModel[]> {
+    return this.request('/api/v1/templates/models/list')
+  }
+
+  async getModel(modelId: string): Promise<ProcessingModel> {
+    return this.request(`/api/v1/templates/models/${modelId}`)
   }
 
   // Auth endpoints

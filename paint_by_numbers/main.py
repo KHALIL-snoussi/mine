@@ -32,6 +32,7 @@ from intelligence.palette_selector import IntelligentPaletteSelector
 from intelligence.difficulty_analyzer import DifficultyAnalyzer
 from intelligence.quality_scorer import QualityScorer
 from intelligence.color_optimizer import ColorOptimizer
+from models import ModelRegistry, ModelProfile
 
 
 class PaintByNumbersGenerator:
@@ -84,12 +85,50 @@ class PaintByNumbersGenerator:
         self.difficulty_analysis = None
         self.quality_analysis = None
         self.color_mixing_guide = None
+        self.current_model = None
+
+    def apply_model(self, model_id: str) -> ModelProfile:
+        """
+        Apply a processing model configuration
+
+        Args:
+            model_id: Model identifier (classic, simple, detailed, artistic, vibrant, pastel)
+
+        Returns:
+            ModelProfile that was applied
+        """
+        model_profile = ModelRegistry.get_model(model_id)
+
+        if model_profile is None:
+            logger.warning(f"Model '{model_id}' not found, using default 'classic'")
+            model_profile = ModelRegistry.get_default_model()
+
+        # Apply model configuration to current config
+        self.config = model_profile.to_config()
+
+        # Re-initialize components with new config
+        self.image_processor = ImageProcessor(self.config)
+        self.color_quantizer = ColorQuantizer(self.config)
+        self.region_detector = RegionDetector(self.config)
+        self.contour_builder = ContourBuilder(self.config)
+        self.number_placer = NumberPlacer(self.config)
+        self.template_generator = TemplateGenerator(self.config)
+        self.legend_generator = LegendGenerator(self.config)
+
+        self.current_model = model_profile
+
+        logger.info(f"🎨 Applied model: {model_profile.display_name}")
+        logger.info(f"   {model_profile.description}")
+        logger.info(f"   Colors: {model_profile.color_range} | Detail: {model_profile.detail_level}")
+
+        return model_profile
 
     def generate(self, input_path: str, output_dir: str = "output",
                 n_colors: int = None, merge_similar: bool = True,
                 add_grid: bool = False, legend_style: str = "grid",
                 use_unified_palette: Optional[bool] = None,
-                palette_name: Optional[str] = None) -> dict:
+                palette_name: Optional[str] = None,
+                model: str = "classic") -> dict:
         """
         Generate complete paint-by-numbers package from input image
 
@@ -102,10 +141,21 @@ class PaintByNumbersGenerator:
             legend_style: Style of legend ("grid", "list", or "compact")
             use_unified_palette: Use predefined color palette
             palette_name: Name of unified palette to use
+            model: Processing model ID (classic, simple, detailed, artistic, vibrant, pastel)
 
         Returns:
-            Dictionary with paths to generated files
+            Dictionary with paths to generated files and model info
         """
+        # Apply model configuration
+        model_profile = self.apply_model(model)
+
+        # Model can override some parameters if not explicitly provided
+        if n_colors is None:
+            n_colors = model_profile.num_colors
+        if use_unified_palette is None:
+            use_unified_palette = model_profile.use_unified_palette
+        if palette_name is None:
+            palette_name = model_profile.palette_name
         logger.info("=" * 60)
         logger.info("PAINT BY NUMBERS GENERATOR")
         logger.info("=" * 60)
@@ -309,6 +359,18 @@ class PaintByNumbersGenerator:
         input_name = Path(input_path).stem
 
         result_files = {}
+
+        # Add model information
+        if self.current_model:
+            result_files['model'] = {
+                'id': self.current_model.id,
+                'name': self.current_model.name,
+                'display_name': self.current_model.display_name,
+                'description': self.current_model.description,
+                'difficulty_level': self.current_model.difficulty_level,
+                'color_range': self.current_model.color_range,
+                'detail_level': self.current_model.detail_level,
+            }
 
         # Save main template
         template_path = output_path / f"{input_name}_template.png"

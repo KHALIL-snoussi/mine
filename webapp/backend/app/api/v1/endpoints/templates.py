@@ -27,6 +27,7 @@ from app.api.deps import get_current_user
 from paint_by_numbers.main import PaintByNumbersGenerator
 from paint_by_numbers.palettes import PaletteManager
 from paint_by_numbers.config import Config
+from paint_by_numbers.models import ModelRegistry
 
 router = APIRouter()
 
@@ -38,26 +39,22 @@ async def generate_template_background(
     output_dir: str,
     palette_name: str,
     num_colors: Optional[int],
+    model: str,
     db: Session
 ):
     """Generate template in background"""
     try:
-        # Create generator
-        config = Config()
-        config.USE_UNIFIED_PALETTE = True
-        config.UNIFIED_PALETTE_NAME = palette_name
-        config.GENERATE_SVG = True
-        config.GENERATE_PDF = True
+        # Create generator with model configuration
+        generator = PaintByNumbersGenerator()
 
-        generator = PaintByNumbersGenerator(config)
-
-        # Generate template
+        # Generate template with selected model
         results = generator.generate(
             input_path=input_path,
             output_dir=output_dir,
             n_colors=num_colors,
             use_unified_palette=True,
-            palette_name=palette_name
+            palette_name=palette_name,
+            model=model  # Apply model configuration
         )
 
         # Update template in database
@@ -104,6 +101,7 @@ async def generate_template(
     file: UploadFile = File(...),
     palette_name: str = "classic_18",
     num_colors: Optional[int] = None,
+    model: str = "classic",
     title: Optional[str] = "Untitled",
     is_public: bool = False,
     db: Session = Depends(get_db),
@@ -111,6 +109,14 @@ async def generate_template(
 ):
     """
     Generate a paint-by-numbers template from an uploaded image
+
+    Args:
+        file: Image file to convert
+        palette_name: Color palette to use
+        num_colors: Number of colors (optional, model determines default)
+        model: Processing model (classic, simple, detailed, artistic, vibrant, pastel)
+        title: Template title
+        is_public: Make template visible in gallery
     """
     # Check user limits
     if current_user.role == "free" and current_user.templates_used_this_month >= settings.FREE_TEMPLATES_PER_MONTH:
@@ -155,6 +161,7 @@ async def generate_template(
         str(output_dir),
         palette_name,
         num_colors,
+        model,  # Pass model to background task
         db
     )
 
@@ -288,3 +295,24 @@ async def list_presets():
         }
     ]
     return presets
+
+
+@router.get("/models/list")
+async def list_models():
+    """
+    Get all available processing models
+
+    Returns list of AI models customers can choose from
+    """
+    return ModelRegistry.get_models_list()
+
+
+@router.get("/models/{model_id}")
+async def get_model_details(model_id: str):
+    """
+    Get detailed information about a specific model
+    """
+    model = ModelRegistry.get_model(model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    return model.to_dict()

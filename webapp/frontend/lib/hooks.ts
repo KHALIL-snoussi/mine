@@ -41,6 +41,7 @@ export function useGenerateTemplate() {
         description?: string
         palette_name?: string
         num_colors?: number
+        model?: string
         is_public?: boolean
       }
     }) => apiClient.generateTemplate(file, options),
@@ -72,6 +73,21 @@ export function usePresets() {
   return useQuery({
     queryKey: ['presets'],
     queryFn: () => apiClient.listPresets(),
+  })
+}
+
+export function useModels() {
+  return useQuery({
+    queryKey: ['models'],
+    queryFn: () => apiClient.listModels(),
+  })
+}
+
+export function useModel(modelId: string) {
+  return useQuery({
+    queryKey: ['model', modelId],
+    queryFn: () => apiClient.getModel(modelId),
+    enabled: !!modelId,
   })
 }
 
