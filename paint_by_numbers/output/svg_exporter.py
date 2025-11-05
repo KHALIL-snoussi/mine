@@ -3,7 +3,6 @@ SVG Export Module - Generates scalable vector graphics templates
 """
 
 import numpy as np
-import cv2
 from typing import List, Tuple, Optional
 import svgwrite
 from pathlib import Path

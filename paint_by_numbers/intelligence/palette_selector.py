@@ -4,9 +4,13 @@ Analyzes images and recommends optimal color palettes
 """
 
 import numpy as np
-import cv2
 from typing import Tuple, List, Optional
 from collections import Counter
+
+try:
+    from paint_by_numbers.utils.opencv import require_cv2
+except ImportError:
+    from ..utils.opencv import require_cv2
 
 try:
     from paint_by_numbers.logger import logger
@@ -36,6 +40,7 @@ class IntelligentPaletteSelector:
             Dictionary with image analysis
         """
         # Convert to different color spaces for analysis
+        cv2 = require_cv2()
         hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
 

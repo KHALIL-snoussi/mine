@@ -8,8 +8,12 @@ Ensures all templates output to standard, frameable sizes.
 from enum import Enum
 from dataclasses import dataclass
 from typing import Tuple
-import cv2
 import numpy as np
+
+try:
+    from paint_by_numbers.utils.opencv import require_cv2
+except ImportError:
+    from .utils.opencv import require_cv2
 
 
 class FitMode(Enum):
@@ -265,6 +269,7 @@ class ImageFormatter:
         # Resize image
         new_width = int(img_width * scale)
         new_height = int(img_height * scale)
+        cv2 = require_cv2()
         resized = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
 
         # Create canvas with background color
@@ -298,6 +303,7 @@ class ImageFormatter:
         # Resize image
         new_width = int(img_width * scale)
         new_height = int(img_height * scale)
+        cv2 = require_cv2()
         resized = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
 
         # Center crop
@@ -318,6 +324,7 @@ class ImageFormatter:
         Stretch to fit exactly
         May distort aspect ratio
         """
+        cv2 = require_cv2()
         return cv2.resize(image, (target_width, target_height), interpolation=cv2.INTER_LANCZOS4)
 
     @staticmethod

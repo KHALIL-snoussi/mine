@@ -2,7 +2,6 @@
 Image Processing Module - Handles image loading and preprocessing
 """
 
-import cv2
 import numpy as np
 from typing import Optional, Tuple
 from pathlib import Path
@@ -11,12 +10,16 @@ from pathlib import Path
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import resize_image, ensure_uint8
+    from paint_by_numbers.logger import logger
+    from paint_by_numbers.utils.opencv import require_cv2
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import resize_image, ensure_uint8
+    from logger import logger
+    from utils.opencv import require_cv2
 
 
 class ImageProcessor:
@@ -32,6 +35,85 @@ class ImageProcessor:
         self.config = config or Config()
         self.original_image = None
         self.processed_image = None
+
+    def _apply_white_balance(self, image: np.ndarray) -> np.ndarray:
+        """Apply simple gray-world white balance with optional clipping."""
+        if not getattr(self.config, "AUTO_WHITE_BALANCE", False):
+            return image
+
+        clip = float(getattr(self.config, "WHITE_BALANCE_CLIP", 0.0))
+        float_img = image.astype(np.float32)
+
+        if clip > 0:
+            lower = np.percentile(float_img, clip * 100, axis=(0, 1))
+            upper = np.percentile(float_img, (1.0 - clip) * 100, axis=(0, 1))
+            float_img = np.clip(float_img, lower, upper)
+
+        avg_rgb = float_img.reshape(-1, 3).mean(axis=0)
+        mean_gray = np.mean(avg_rgb)
+        scale = mean_gray / np.maximum(avg_rgb, 1e-6)
+        balanced = float_img * scale
+        return np.clip(balanced, 0, 255).astype(np.uint8)
+
+    def _apply_tone_balance(self, image: np.ndarray) -> np.ndarray:
+        """Normalize image luminance towards configured target."""
+        if not getattr(self.config, "APPLY_TONE_BALANCE", False):
+            return image
+
+        cv2 = require_cv2()
+        target = float(getattr(self.config, "TONE_BALANCE_TARGET", 0.55))
+        target = np.clip(target, 0.05, 0.95)
+
+        lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB).astype(np.float32)
+        l_channel = lab[:, :, 0] / 255.0
+        mean_l = float(np.mean(l_channel))
+
+        if mean_l <= 1e-3:
+            return image
+
+        denominator = np.log(max(mean_l, 1e-3))
+        if abs(denominator) < 1e-6:
+            return image
+
+        gamma = np.log(target) / denominator
+        # Stabilize extremes to prevent NaNs
+        l_channel = np.power(np.clip(l_channel, 1e-4, 1.0), gamma)
+        lab[:, :, 0] = np.clip(l_channel * 255.0, 0, 255)
+
+        balanced = cv2.cvtColor(lab.astype(np.uint8), cv2.COLOR_LAB2RGB)
+        return balanced
+
+    def _apply_local_contrast(self, image: np.ndarray) -> np.ndarray:
+        """Enhance local contrast using CLAHE in LAB space."""
+        if not getattr(self.config, "APPLY_LOCAL_CONTRAST", False):
+            return image
+
+        cv2 = require_cv2()
+        clip_limit = float(getattr(self.config, "CLAHE_CLIP_LIMIT", 2.0))
+        tile_grid = getattr(self.config, "CLAHE_TILE_GRID_SIZE", (8, 8))
+        lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
+        l_channel, a_channel, b_channel = cv2.split(lab)
+
+        clahe = cv2.createCLAHE(clipLimit=max(0.1, clip_limit),
+                                tileGridSize=tuple(tile_grid))
+        l_channel = clahe.apply(l_channel)
+
+        enhanced_lab = cv2.merge([l_channel, a_channel, b_channel])
+        return cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
+
+    def _apply_unsharp_mask(self, image: np.ndarray) -> np.ndarray:
+        """Sharpen image using unsharp masking."""
+        if not getattr(self.config, "APPLY_SHARPENING", False):
+            return image
+
+        cv2 = require_cv2()
+        amount = float(getattr(self.config, "SHARPEN_AMOUNT", 0.5))
+        radius = int(max(1, getattr(self.config, "SHARPEN_RADIUS", 3)))
+
+        kernel_size = radius * 2 + 1
+        blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
+        sharpened = cv2.addWeighted(image, 1.0 + amount, blurred, -amount, 0)
+        return np.clip(sharpened, 0, 255).astype(np.uint8)
 
     def load_image(self, image_path: str) -> np.ndarray:
         """
@@ -52,6 +134,7 @@ class ImageProcessor:
         if not path.exists():
             raise FileNotFoundError(f"Image file not found: {image_path}")
 
+        cv2 = require_cv2()
         # Load image
         image = cv2.imread(str(path))
         if image is None:
@@ -92,30 +175,49 @@ class ImageProcessor:
                 raise ValueError("No image loaded. Call load_image() first.")
             image = self.original_image.copy()
 
+        cv2 = require_cv2()
         # Resize if needed
-        image = resize_image(image, self.config.MAX_IMAGE_SIZE)
+        processed = resize_image(image, self.config.MAX_IMAGE_SIZE)
+        processed = ensure_uint8(processed)
 
-        # Convert to float for processing
-        processed = image.astype(np.float32)
+        # Global color and tone normalization first for stable clustering
+        processed = self._apply_white_balance(processed)
+        processed = self._apply_tone_balance(processed)
 
-        # Apply Gaussian blur for noise reduction
+        # Pre-denoise to avoid fragmenting regions before clustering
+        if getattr(self.config, "APPLY_DENOISE", False):
+            h = float(getattr(self.config, "DENOISE_STRENGTH", 7))
+            h_color = float(getattr(self.config, "DENOISE_COLOR_STRENGTH", 7))
+            try:
+                processed = cv2.fastNlMeansDenoisingColored(
+                    processed, None, h, h_color, 7, 21
+                )
+            except AttributeError:
+                if 'logger' in globals():
+                    logger.warning(
+                        "OpenCV build missing fastNlMeansDenoisingColored; skipping denoise step"
+                    )
+
+        # Apply Gaussian blur for subtle noise smoothing
         if apply_gaussian:
             kernel = self.config.GAUSSIAN_BLUR_KERNEL
             processed = cv2.GaussianBlur(processed, kernel, 0)
 
         # Apply bilateral filter for edge-preserving smoothing
         if apply_bilateral:
-            # Bilateral filter works on uint8, so convert temporarily
-            temp = processed.astype(np.uint8)
-            temp = cv2.bilateralFilter(
-                temp,
+            processed = cv2.bilateralFilter(
+                processed,
                 d=self.config.BILATERAL_FILTER_D,
                 sigmaColor=self.config.BILATERAL_SIGMA_COLOR,
                 sigmaSpace=self.config.BILATERAL_SIGMA_SPACE
             )
-            processed = temp.astype(np.float32)
 
-        # Convert back to uint8
+        # Reinforce local contrast before quantization
+        processed = self._apply_local_contrast(processed)
+
+        # Final sharpening to keep contours crisp
+        processed = self._apply_unsharp_mask(processed)
+
         processed = ensure_uint8(processed)
 
         self.processed_image = processed
@@ -136,12 +238,15 @@ class ImageProcessor:
                 raise ValueError("No processed image. Call preprocess() first.")
             image = self.processed_image
 
+        cv2 = require_cv2()
         # Convert to LAB color space
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
         l_channel, a, b = cv2.split(lab)
 
         # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization) to L channel
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+        clip = float(getattr(self.config, "CLAHE_CLIP_LIMIT", 2.0))
+        tile_grid = getattr(self.config, "CLAHE_TILE_GRID_SIZE", (8, 8))
+        clahe = cv2.createCLAHE(clipLimit=max(0.1, clip), tileGridSize=tuple(tile_grid))
         l_channel = clahe.apply(l_channel)
 
         # Merge channels
@@ -167,6 +272,7 @@ class ImageProcessor:
                 raise ValueError("No processed image. Call preprocess() first.")
             image = self.processed_image
 
+        cv2 = require_cv2()
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 

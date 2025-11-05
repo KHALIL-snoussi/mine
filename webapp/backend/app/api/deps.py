@@ -12,7 +12,10 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.user import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/v1/auth/login",
+    auto_error=False
+)
 
 
 def get_db() -> Generator:
@@ -26,7 +29,7 @@ def get_db() -> Generator:
 
 async def get_current_user(
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: Optional[str] = Depends(oauth2_scheme)
 ) -> User:
     """Get current authenticated user"""
     credentials_exception = HTTPException(
@@ -34,6 +37,9 @@ async def get_current_user(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if not token:
+        raise credentials_exception
 
     try:
         payload = jwt.decode(

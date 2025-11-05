@@ -84,6 +84,9 @@ class LegendGenerator:
         width = cols * cell_width + (cols + 1) * padding
         height = rows * cell_height + (rows + 1) * padding + 60  # Extra for title
 
+        cv2 = require_cv2()
+        cv2 = require_cv2()
+        cv2 = require_cv2()
         legend = np.ones((height, width, 3), dtype=np.uint8) * 255
 
         # Add title
@@ -389,6 +392,7 @@ class LegendGenerator:
 
         # Add title
         title = "Color Mixing Guide"
+        cv2 = require_cv2()
         cv2.putText(
             guide, title,
             (20, 40),
