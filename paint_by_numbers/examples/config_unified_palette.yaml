@@ -1,0 +1,40 @@
+# Unified Palette Configuration
+# Uses consistent color palettes across all images
+# Perfect for creating series or kits with matching colors
+
+# Image Processing
+MAX_IMAGE_SIZE: [1200, 1200]
+MIN_IMAGE_SIZE: [400, 400]
+
+# Color Settings - KEY FEATURE
+USE_UNIFIED_PALETTE: true  # Use fixed palette for all images
+UNIFIED_PALETTE_NAME: classic_18  # Options: classic_12, classic_18, classic_24, pastel_12, earth_tones_12, vibrant_18, nature_15
+DEFAULT_NUM_COLORS: 18  # This is ignored when using unified palette
+
+# Region Detection
+MIN_REGION_SIZE: 100
+MORPHOLOGY_KERNEL_SIZE: 3
+
+# Filtering
+BILATERAL_FILTER_D: 9
+BILATERAL_SIGMA_COLOR: 75
+BILATERAL_SIGMA_SPACE: 75
+
+# Number Placement
+FONT_SCALE: 0.5
+FONT_THICKNESS: 1
+
+# Output
+GENERATE_SVG: true
+GENERATE_PDF: true
+DPI: 300
+
+# Processing
+SHOW_PROGRESS: true
+LOG_LEVEL: INFO
+
+# Notes:
+# With unified palette, ALL images will use the SAME colors
+# This ensures consistency across multiple images
+# Great for creating paint-by-numbers kits or series
+# The system will map image colors to the nearest palette color

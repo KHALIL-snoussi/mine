@@ -2,6 +2,11 @@
 Configuration module for Paint-by-Numbers System
 """
 
+from typing import Optional
+import yaml
+from pathlib import Path
+
+
 class Config:
     """Configuration settings for the paint-by-numbers generator"""
 
@@ -14,6 +19,10 @@ class Config:
     MIN_NUM_COLORS = 5
     MAX_NUM_COLORS = 30
     COLOR_SAMPLE_FRACTION = 0.3    # Fraction of pixels to sample for clustering
+
+    # Unified Palette - USE FIXED COLORS, NOT IMAGE COLORS
+    USE_UNIFIED_PALETTE = True     # ALWAYS use predefined fixed color palette
+    UNIFIED_PALETTE_NAME = "classic_18"  # Name of unified palette to use
 
     # Region Detection
     MIN_REGION_SIZE = 100          # Minimum pixels for a region to be numbered
@@ -39,7 +48,136 @@ class Config:
     LEGEND_SWATCH_SIZE = 40        # Size of color swatches in legend
     LEGEND_PADDING = 20            # Padding in legend
     DPI = 300                      # DPI for saved images
+    GENERATE_SVG = False           # Generate SVG output
+    GENERATE_PDF = False           # Generate PDF kit
+
+    # Logging
+    LOG_LEVEL = "INFO"             # Logging level (DEBUG, INFO, WARNING, ERROR)
+    LOG_FILE = None                # Optional log file path
 
     # Processing
     USE_ANTIALIASING = True        # Use antialiasing for smoother edges
     GAUSSIAN_BLUR_KERNEL = (3, 3)  # Kernel for Gaussian blur preprocessing
+    SHOW_PROGRESS = True           # Show progress bars
+
+    def __init__(self, preset: Optional[str] = None):
+        """
+        Initialize config with optional preset
+
+        Args:
+            preset: Preset name ('beginner', 'intermediate', 'advanced', 'professional')
+        """
+        if preset:
+            self.apply_preset(preset)
+
+    def apply_preset(self, preset_name: str):
+        """
+        Apply a configuration preset
+
+        Args:
+            preset_name: Name of the preset to apply
+        """
+        presets = {
+            "beginner": {
+                "DEFAULT_NUM_COLORS": 10,
+                "MIN_REGION_SIZE": 200,
+                "MAX_IMAGE_SIZE": (800, 800),
+                "FONT_SCALE": 0.6,
+                "USE_UNIFIED_PALETTE": True,
+                "UNIFIED_PALETTE_NAME": "classic_12",
+            },
+            "intermediate": {
+                "DEFAULT_NUM_COLORS": 15,
+                "MIN_REGION_SIZE": 100,
+                "MAX_IMAGE_SIZE": (1200, 1200),
+                "FONT_SCALE": 0.5,
+                "USE_UNIFIED_PALETTE": True,
+                "UNIFIED_PALETTE_NAME": "classic_18",
+            },
+            "advanced": {
+                "DEFAULT_NUM_COLORS": 20,
+                "MIN_REGION_SIZE": 75,
+                "MAX_IMAGE_SIZE": (1500, 1500),
+                "FONT_SCALE": 0.4,
+                "USE_UNIFIED_PALETTE": True,
+                "UNIFIED_PALETTE_NAME": "classic_24",
+            },
+            "professional": {
+                "DEFAULT_NUM_COLORS": 25,
+                "MIN_REGION_SIZE": 50,
+                "MAX_IMAGE_SIZE": (2000, 2000),
+                "FONT_SCALE": 0.35,
+                "USE_UNIFIED_PALETTE": True,
+                "UNIFIED_PALETTE_NAME": "classic_24",
+                "GENERATE_SVG": True,
+                "GENERATE_PDF": True,
+            },
+        }
+
+        if preset_name not in presets:
+            available = ', '.join(presets.keys())
+            raise ValueError(f"Unknown preset '{preset_name}'. Available: {available}")
+
+        preset_config = presets[preset_name]
+        for key, value in preset_config.items():
+            setattr(self, key, value)
+
+    def load_from_yaml(self, filepath: str):
+        """
+        Load configuration from YAML file
+
+        Args:
+            filepath: Path to YAML config file
+        """
+        path = Path(filepath)
+        if not path.exists():
+            raise FileNotFoundError(f"Config file not found: {filepath}")
+
+        with open(filepath, 'r') as f:
+            config_data = yaml.safe_load(f)
+
+        # Apply configuration
+        for key, value in config_data.items():
+            if hasattr(self, key):
+                # Convert tuples from lists
+                if key.endswith('_SIZE') or key.endswith('_KERNEL') or key.endswith('_COLOR') or key == 'TEMPLATE_BACKGROUND':
+                    if isinstance(value, list):
+                        value = tuple(value)
+                setattr(self, key, value)
+
+    def save_to_yaml(self, filepath: str):
+        """
+        Save current configuration to YAML file
+
+        Args:
+            filepath: Path to save config file
+        """
+        config_data = {}
+
+        # Get all uppercase attributes (configuration values)
+        for attr in dir(self):
+            if attr.isupper() and not attr.startswith('_'):
+                value = getattr(self, attr)
+                # Convert tuples to lists for YAML
+                if isinstance(value, tuple):
+                    value = list(value)
+                config_data[attr] = value
+
+        path = Path(filepath)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(filepath, 'w') as f:
+            yaml.dump(config_data, f, default_flow_style=False, sort_keys=False)
+
+    def to_dict(self) -> dict:
+        """
+        Convert configuration to dictionary
+
+        Returns:
+            Dictionary of configuration values
+        """
+        config_data = {}
+        for attr in dir(self):
+            if attr.isupper() and not attr.startswith('_'):
+                config_data[attr] = getattr(self, attr)
+        return config_data

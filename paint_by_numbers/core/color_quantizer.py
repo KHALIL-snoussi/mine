@@ -10,16 +10,20 @@ from sklearn.cluster import KMeans, MiniBatchKMeans
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import sort_colors_by_brightness
+    from paint_by_numbers.palettes import PaletteManager
+    from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import sort_colors_by_brightness
+    from palettes import PaletteManager
+    from logger import logger
 
 
 class ColorQuantizer:
-    """Handles color quantization using K-means clustering"""
+    """Handles color quantization using K-means clustering or unified palettes"""
 
     def __init__(self, config: Optional[Config] = None):
         """
@@ -32,21 +36,39 @@ class ColorQuantizer:
         self.palette = None
         self.quantized_image = None
         self.labels = None
+        self.palette_manager = PaletteManager()
+        self.color_names = []
 
     def quantize(self, image: np.ndarray, n_colors: int = None,
-                 sort_palette: bool = True, random_state: int = 42) -> Tuple[np.ndarray, np.ndarray]:
+                 sort_palette: bool = True, random_state: int = 42,
+                 use_unified_palette: Optional[bool] = None,
+                 palette_name: Optional[str] = None) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Quantize image colors using K-means clustering
+        Quantize image colors using K-means clustering or unified palette
 
         Args:
             image: Input image in RGB format
             n_colors: Number of colors in palette (default from config)
             sort_palette: Sort palette by brightness
             random_state: Random state for reproducibility
+            use_unified_palette: Use predefined palette (overrides config)
+            palette_name: Name of unified palette to use (overrides config)
 
         Returns:
             Tuple of (quantized_image, color_palette)
         """
+        # Determine if we should use unified palette
+        if use_unified_palette is None:
+            use_unified_palette = self.config.USE_UNIFIED_PALETTE
+
+        if palette_name is None:
+            palette_name = self.config.UNIFIED_PALETTE_NAME
+
+        # Use unified palette if requested
+        if use_unified_palette:
+            return self._quantize_with_unified_palette(image, palette_name)
+
+        # Otherwise use K-means clustering
         if n_colors is None:
             n_colors = self.config.DEFAULT_NUM_COLORS
 
@@ -70,7 +92,7 @@ class ColorQuantizer:
             sample_pixels = pixels
 
         # Perform K-means clustering
-        print(f"Performing K-means clustering with {n_colors} colors...")
+        logger.info(f"Performing K-means clustering with {n_colors} colors...")
 
         if len(sample_pixels) > 10000:
             # Use MiniBatchKMeans for large datasets
@@ -122,7 +144,50 @@ class ColorQuantizer:
         quantized = palette[labels].reshape(h, w, 3)
         self.quantized_image = quantized
 
-        print(f"Color quantization complete: {n_colors} colors")
+        logger.info(f"Color quantization complete: {n_colors} colors")
+        return quantized, palette
+
+    def _quantize_with_unified_palette(self, image: np.ndarray,
+                                      palette_name: str) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Quantize image using a unified predefined palette
+
+        Args:
+            image: Input image in RGB format
+            palette_name: Name of the palette to use
+
+        Returns:
+            Tuple of (quantized_image, color_palette)
+        """
+        logger.info(f"Using unified palette: {palette_name}")
+
+        # Get the unified palette
+        palette = self.palette_manager.get_palette(palette_name)
+        self.color_names = self.palette_manager.get_color_names(palette_name)
+
+        # Apply the palette to the image
+        h, w = image.shape[:2]
+        pixels = image.reshape(-1, 3).astype(np.float32)
+        palette_float = palette.astype(np.float32)
+
+        # Find nearest color for each pixel
+        logger.info("Mapping pixels to nearest palette colors...")
+        distances = np.sqrt(((pixels[:, np.newaxis] - palette_float) ** 2).sum(axis=2))
+        labels = np.argmin(distances, axis=1)
+
+        self.labels = labels.reshape(h, w)
+        self.palette = palette
+
+        # Create quantized image
+        quantized = palette[labels].reshape(h, w, 3)
+        self.quantized_image = quantized
+
+        # Filter out unused colors
+        unique_labels = np.unique(labels)
+        if len(unique_labels) < len(palette):
+            logger.info(f"Using {len(unique_labels)} of {len(palette)} available colors")
+
+        logger.info(f"Color quantization complete with unified palette: {len(palette)} colors")
         return quantized, palette
 
     def get_color_counts(self) -> dict:
