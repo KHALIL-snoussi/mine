@@ -142,6 +142,25 @@ class Config:
                 "GENERATE_SVG": True,
                 "GENERATE_PDF": True,
             },
+            "ultra_detailed": {
+                "DEFAULT_NUM_COLORS": 28,
+                "MIN_REGION_SIZE": 40,
+                "MAX_IMAGE_SIZE": (3508, 4960),  # A3 size @ 300 DPI for maximum clarity
+                "FONT_SCALE": 0.3,
+                "EDGE_THRESHOLD_LOW": 35,
+                "EDGE_THRESHOLD_HIGH": 165,
+                "BILATERAL_FILTER_D": 7,
+                "BILATERAL_SIGMA_COLOR": 55,
+                "BILATERAL_SIGMA_SPACE": 55,
+                "MORPHOLOGY_KERNEL_SIZE": 2,
+                "USE_UNIFIED_PALETTE": True,
+                "UNIFIED_PALETTE_NAME": "classic_24",
+                "GENERATE_SVG": True,
+                "GENERATE_PDF": True,
+                "APPLY_SHARPENING": True,
+                "SHARPEN_AMOUNT": 0.8,  # Extra sharpening for face clarity
+                "CLAHE_CLIP_LIMIT": 3.0,  # Enhanced local contrast for faces
+            },
         }
 
         if preset_name not in presets:
