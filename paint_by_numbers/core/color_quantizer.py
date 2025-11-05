@@ -3,23 +3,24 @@ Color Quantization Module - Reduces image to limited color palette
 """
 
 import numpy as np
-import cv2
 from typing import Optional, Tuple
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
 try:
     from paint_by_numbers.config import Config
-    from paint_by_numbers.utils.helpers import sort_colors_by_brightness
+    from paint_by_numbers.utils.helpers import sort_colors_by_brightness, ensure_uint8
     from paint_by_numbers.palettes import PaletteManager
     from paint_by_numbers.logger import logger
+    from paint_by_numbers.utils.opencv import require_cv2
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
-    from utils.helpers import sort_colors_by_brightness
+    from utils.helpers import sort_colors_by_brightness, ensure_uint8
     from palettes import PaletteManager
     from logger import logger
+    from utils.opencv import require_cv2
 
 
 class ColorQuantizer:
@@ -38,6 +39,59 @@ class ColorQuantizer:
         self.labels = None
         self.palette_manager = PaletteManager()
         self.color_names = []
+
+    def _prepare_for_clustering(self, image: np.ndarray) -> Tuple[np.ndarray, str]:
+        """Convert image into selected color space for clustering."""
+        color_space = getattr(self.config, "KMEANS_COLOR_SPACE", "rgb").lower()
+
+        if color_space == "lab":
+            cv2 = require_cv2()
+            converted = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
+        elif color_space == "hsv":
+            cv2 = require_cv2()
+            converted = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+        else:
+            converted = image
+            color_space = "rgb"
+
+        return converted, color_space
+
+    def _restore_palette_to_rgb(self, centers: np.ndarray, color_space: str) -> np.ndarray:
+        """Convert cluster centers from working color space back to RGB."""
+        centers = centers.reshape(-1, 1, 3)
+
+        if color_space == "lab":
+            cv2 = require_cv2()
+            converted = cv2.cvtColor(centers.astype(np.uint8), cv2.COLOR_LAB2RGB)
+        elif color_space == "hsv":
+            cv2 = require_cv2()
+            converted = cv2.cvtColor(centers.astype(np.uint8), cv2.COLOR_HSV2RGB)
+        else:
+            converted = centers.astype(np.uint8)
+
+        return converted.reshape(-1, 3)
+
+    def _convert_to_metric_space(self, image: np.ndarray, palette: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Convert inputs to the configured perceptual space for palette projection."""
+        metric = getattr(self.config, "PALETTE_DISTANCE_METRIC", "lab").lower()
+
+        if metric == "lab":
+            cv2 = require_cv2()
+            image_space = cv2.cvtColor(image, cv2.COLOR_RGB2LAB).astype(np.float32)
+            palette_space = cv2.cvtColor(
+                palette.reshape(1, -1, 3).astype(np.uint8), cv2.COLOR_RGB2LAB
+            ).reshape(-1, 3).astype(np.float32)
+        elif metric == "hsv":
+            cv2 = require_cv2()
+            image_space = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(np.float32)
+            palette_space = cv2.cvtColor(
+                palette.reshape(1, -1, 3).astype(np.uint8), cv2.COLOR_RGB2HSV
+            ).reshape(-1, 3).astype(np.float32)
+        else:
+            image_space = image.astype(np.float32)
+            palette_space = palette.astype(np.float32)
+
+        return image_space, palette_space
 
     def quantize(self, image: np.ndarray, n_colors: int = None,
                  sort_palette: bool = True, random_state: int = 42,
@@ -77,7 +131,9 @@ class ColorQuantizer:
                       min(n_colors, self.config.MAX_NUM_COLORS))
 
         h, w = image.shape[:2]
-        pixels = image.reshape(-1, 3).astype(np.float32)
+
+        clustering_image, color_space = self._prepare_for_clustering(image)
+        pixels = clustering_image.reshape(-1, 3).astype(np.float32)
 
         # Sample pixels if image is large for faster processing
         n_pixels = len(pixels)
@@ -118,7 +174,9 @@ class ColorQuantizer:
         self.labels = labels.reshape(h, w)
 
         # Get color palette (cluster centers)
-        palette = kmeans.cluster_centers_.astype(np.uint8)
+        cluster_centers = kmeans.cluster_centers_.astype(np.float32)
+        palette = self._restore_palette_to_rgb(cluster_centers, color_space)
+        palette = ensure_uint8(palette)
 
         # Sort palette by brightness if requested
         if sort_palette:
@@ -142,7 +200,7 @@ class ColorQuantizer:
 
         # Create quantized image
         quantized = palette[labels].reshape(h, w, 3)
-        self.quantized_image = quantized
+        self.quantized_image = ensure_uint8(quantized)
 
         logger.info(f"Color quantization complete: {n_colors} colors")
         return quantized, palette
@@ -162,17 +220,19 @@ class ColorQuantizer:
         logger.info(f"Using unified palette: {palette_name}")
 
         # Get the unified palette
-        palette = self.palette_manager.get_palette(palette_name)
+        palette = ensure_uint8(self.palette_manager.get_palette(palette_name))
         self.color_names = self.palette_manager.get_color_names(palette_name)
 
         # Apply the palette to the image
         h, w = image.shape[:2]
-        pixels = image.reshape(-1, 3).astype(np.float32)
-        palette_float = palette.astype(np.float32)
+        metric_image, metric_palette = self._convert_to_metric_space(image, palette)
+        pixels = metric_image.reshape(-1, 3)
+        palette_space = metric_palette
 
-        # Find nearest color for each pixel
+        # Find nearest color for each pixel in perceptual space
         logger.info("Mapping pixels to nearest palette colors...")
-        distances = np.sqrt(((pixels[:, np.newaxis] - palette_float) ** 2).sum(axis=2))
+        diff = pixels[:, np.newaxis, :] - palette_space[np.newaxis, :, :]
+        distances = np.linalg.norm(diff, axis=2)
         labels = np.argmin(distances, axis=1)
 
         self.labels = labels.reshape(h, w)

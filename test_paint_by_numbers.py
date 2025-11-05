@@ -10,7 +10,14 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'paint_by_numbers'))
 
 import numpy as np
-import cv2
+import pytest
+
+from paint_by_numbers.utils.opencv import cv2_available, describe_missing_cv2, require_cv2
+
+if not cv2_available():
+    pytest.skip(describe_missing_cv2(), allow_module_level=True)
+
+cv2 = require_cv2()
 
 def create_simple_test_image(filename="test_input.png"):
     """Create a simple test image"""

@@ -23,7 +23,7 @@ class TemplateUpdate(BaseModel):
 
 class TemplateResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: Optional[int]
     title: str
     description: Optional[str]
     palette_name: str

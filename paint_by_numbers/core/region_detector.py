@@ -3,18 +3,19 @@ Region Detection Module - Detects and segments color regions
 """
 
 import numpy as np
-import cv2
 from typing import List, Tuple, Dict, Optional
 
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import calculate_region_area, find_region_center
+    from paint_by_numbers.utils.opencv import require_cv2
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import calculate_region_area, find_region_center
+    from utils.opencv import require_cv2
 
 
 class Region:
@@ -72,6 +73,8 @@ class RegionDetector:
 
         print("Detecting regions...")
 
+        cv2 = require_cv2()
+
         for color_idx in range(len(palette)):
             # Create mask for this color
             mask = (labels == color_idx).astype(np.uint8) * 255
@@ -85,11 +88,14 @@ class RegionDetector:
                 (self.config.MORPHOLOGY_KERNEL_SIZE, self.config.MORPHOLOGY_KERNEL_SIZE)
             )
 
-            # Close small holes
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            close_iterations = max(0, getattr(self.config, "MORPH_CLOSE_ITERATIONS", 1))
+            open_iterations = max(0, getattr(self.config, "MORPH_OPEN_ITERATIONS", 1))
 
-            # Open to remove small noise
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            if close_iterations > 0:
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=close_iterations)
+
+            if open_iterations > 0:
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=open_iterations)
 
             # Find contours
             contours, hierarchy = cv2.findContours(
@@ -192,6 +198,7 @@ class RegionDetector:
         Returns:
             List of merged regions
         """
+        cv2 = require_cv2()
         if same_color:
             # Merge regions color by color
             merged_regions = []

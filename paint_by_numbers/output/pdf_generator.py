@@ -3,7 +3,6 @@ PDF Generation Module - Creates complete paint-by-numbers kits as PDF
 """
 
 import numpy as np
-import cv2
 from typing import List, Optional
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib.units import inch

@@ -13,12 +13,27 @@ class Config:
     # Image Processing
     MAX_IMAGE_SIZE = (1200, 1200)  # Maximum dimensions for processing
     MIN_IMAGE_SIZE = (400, 400)    # Minimum dimensions for good results
+    AUTO_WHITE_BALANCE = True      # Apply gray-world white balance correction
+    WHITE_BALANCE_CLIP = 0.01      # Clip percentile for white balance scaling
+    APPLY_DENOISE = True           # Run fast denoising prior to clustering
+    DENOISE_STRENGTH = 7           # Strength for luminance denoising
+    DENOISE_COLOR_STRENGTH = 7     # Strength for chroma denoising
+    APPLY_LOCAL_CONTRAST = True    # Use CLAHE based local contrast enhancement
+    CLAHE_CLIP_LIMIT = 2.5         # Clip limit for CLAHE
+    CLAHE_TILE_GRID_SIZE = (8, 8)  # Tile grid for CLAHE (must be tuple)
+    APPLY_TONE_BALANCE = True      # Normalize global brightness before clustering
+    TONE_BALANCE_TARGET = 0.55     # Desired normalized luminance (0-1)
+    APPLY_SHARPENING = True        # Apply unsharp masking for edge clarity
+    SHARPEN_RADIUS = 3             # Radius for Gaussian blur in unsharp mask
+    SHARPEN_AMOUNT = 0.6           # Sharpening amount (0-1 suggested)
 
     # Color Quantization
     DEFAULT_NUM_COLORS = 15        # Default number of colors
     MIN_NUM_COLORS = 5
     MAX_NUM_COLORS = 30
     COLOR_SAMPLE_FRACTION = 0.3    # Fraction of pixels to sample for clustering
+    KMEANS_COLOR_SPACE = "lab"     # Color space for clustering (rgb, lab, hsv)
+    PALETTE_DISTANCE_METRIC = "lab"  # Metric for palette projection
 
     # Unified Palette - USE FIXED COLORS, NOT IMAGE COLORS
     USE_UNIFIED_PALETTE = True     # ALWAYS use predefined fixed color palette
@@ -27,6 +42,8 @@ class Config:
     # Region Detection
     MIN_REGION_SIZE = 100          # Minimum pixels for a region to be numbered
     MORPHOLOGY_KERNEL_SIZE = 3     # Kernel size for morphological operations
+    MORPH_CLOSE_ITERATIONS = 1     # Closing passes for mask cleanup
+    MORPH_OPEN_ITERATIONS = 1      # Opening passes for mask cleanup
     BILATERAL_FILTER_D = 9         # Bilateral filter diameter
     BILATERAL_SIGMA_COLOR = 75     # Bilateral filter sigma color
     BILATERAL_SIGMA_SPACE = 75     # Bilateral filter sigma space
