@@ -14,27 +14,27 @@ import numpy as np
 from typing import Optional
 from tqdm import tqdm
 
-from config import Config
-from logger import setup_logger, logger
-from palettes import PaletteManager
-from paint_kits import PaintKitManager
-from core.image_processor import ImageProcessor
-from core.color_quantizer import ColorQuantizer
-from core.region_detector import RegionDetector
-from core.contour_builder import ContourBuilder
-from core.number_placer import NumberPlacer
-from output.template_generator import TemplateGenerator
-from output.legend_generator import LegendGenerator
-from output.svg_exporter import SVGExporter
-from output.pdf_generator import PDFGenerator
-from batch_processor import BatchProcessor
-from intelligence.palette_selector import IntelligentPaletteSelector
-from intelligence.difficulty_analyzer import DifficultyAnalyzer
-from intelligence.quality_scorer import QualityScorer
-from intelligence.color_optimizer import ColorOptimizer
-from models import ModelRegistry, ModelProfile
-from formats import FormatRegistry, ImageFormatter, FitMode
-from utils.opencv import require_cv2
+from .config import Config
+from .logger import setup_logger, logger
+from .palettes import PaletteManager
+from .paint_kits import PaintKitManager
+from .core.image_processor import ImageProcessor
+from .core.color_quantizer import ColorQuantizer
+from .core.region_detector import RegionDetector
+from .core.contour_builder import ContourBuilder
+from .core.number_placer import NumberPlacer
+from .output.template_generator import TemplateGenerator
+from .output.legend_generator import LegendGenerator
+from .output.svg_exporter import SVGExporter
+from .output.pdf_generator import PDFGenerator
+from .batch_processor import BatchProcessor
+from .intelligence.palette_selector import IntelligentPaletteSelector
+from .intelligence.difficulty_analyzer import DifficultyAnalyzer
+from .intelligence.quality_scorer import QualityScorer
+from .intelligence.color_optimizer import ColorOptimizer
+from .models import ModelRegistry, ModelProfile
+from .formats import FormatRegistry, ImageFormatter, FitMode
+from .utils.opencv import require_cv2
 
 
 class PaintByNumbersGenerator:
