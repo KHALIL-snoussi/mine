@@ -85,11 +85,14 @@ class RegionDetector:
                 (self.config.MORPHOLOGY_KERNEL_SIZE, self.config.MORPHOLOGY_KERNEL_SIZE)
             )
 
-            # Close small holes
-            mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+            close_iterations = max(0, getattr(self.config, "MORPH_CLOSE_ITERATIONS", 1))
+            open_iterations = max(0, getattr(self.config, "MORPH_OPEN_ITERATIONS", 1))
 
-            # Open to remove small noise
-            mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+            if close_iterations > 0:
+                mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=close_iterations)
+
+            if open_iterations > 0:
+                mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=open_iterations)
 
             # Find contours
             contours, hierarchy = cv2.findContours(
