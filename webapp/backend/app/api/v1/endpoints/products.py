@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
-from ....database import get_db
-from ....models.product import (
+from app.core.database import get_db
+from app.models.product import (
     Product, KitBundle, InventoryItem, ProductType, FrameType, PaintSetType,
     STANDARD_PRODUCTS, STANDARD_KIT_BUNDLES
 )
