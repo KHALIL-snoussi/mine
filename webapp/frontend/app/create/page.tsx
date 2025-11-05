@@ -1,80 +1,130 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { useDropzone } from 'react-dropzone'
-import { Button } from '@/components/ui/Button'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
-import { useModels } from '@/lib/hooks'
-import ModelSelector from '@/components/ModelSelector'
 import Link from 'next/link'
+import { useDropzone } from 'react-dropzone'
+
+import { Button } from '@/components/ui/Button'
+import ModelSelector from '@/components/ModelSelector'
 import { apiClient } from '@/lib/api'
-import { validateImage, getImageInfo, getImageQualityAdvice, recommendModel, type ValidationResult, type ImageInfo } from '@/lib/imageValidator'
+import { useModels, usePalettes } from '@/lib/hooks'
+import {
+  validateImage,
+  getImageInfo,
+  getImageQualityAdvice,
+  recommendModel,
+  type ImageInfo,
+  type ValidationResult,
+} from '@/lib/imageValidator'
+
+function rgbToHex([r, g, b]: number[]) {
+  const toHex = (value: number) => value.toString(16).padStart(2, '0')
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
+}
+
+function formatFileSize(bytes: number) {
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
 
 export default function CreatePage() {
   const router = useRouter()
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [selectedPalette, setSelectedPalette] = useState('classic_18')
   const [selectedModel, setSelectedModel] = useState('classic')
+  const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
+
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generationMessage, setGenerationMessage] = useState('')
 
-  // Validation states
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [imageInfo, setImageInfo] = useState<ImageInfo | null>(null)
   const [showValidation, setShowValidation] = useState(false)
 
   const { data: modelsData } = useModels()
+  const { data: palettesData } = usePalettes()
+
+  const selectedPaletteInfo = useMemo(
+    () => palettesData?.find((palette) => palette.name === selectedPalette),
+    [palettesData, selectedPalette]
+  )
+
+  const hasValidImage = Boolean(selectedFile && validation?.valid)
+
+  const steps = useMemo(() => {
+    return [
+      {
+        id: 1,
+        label: 'Upload',
+        state: selectedFile ? 'done' : showValidation ? 'active' : 'idle',
+      },
+      {
+        id: 2,
+        label: 'Style',
+        state: isGenerating
+          ? 'active'
+          : hasValidImage
+            ? 'ready'
+            : 'idle',
+      },
+      {
+        id: 3,
+        label: 'Preview',
+        state: isGenerating ? 'active' : hasValidImage ? 'ready' : 'idle',
+      },
+    ]
+  }, [selectedFile, showValidation, hasValidImage, isGenerating])
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
-    if (file) {
-      // Reset states
-      setSelectedFile(null)
-      setPreview(null)
-      setValidation(null)
-      setImageInfo(null)
-      setShowValidation(false)
+    if (!file) return
 
-      // Validate image
-      const validationResult = await validateImage(file)
-      setValidation(validationResult)
-      setShowValidation(true)
+    setSelectedFile(null)
+    setPreview(null)
+    setValidation(null)
+    setImageInfo(null)
+    setRecommendedModel(null)
+    setShowValidation(false)
 
-      if (validationResult.valid) {
-        setSelectedFile(file)
+    const validationResult = await validateImage(file)
+    setValidation(validationResult)
+    setShowValidation(true)
 
-        // Get image info
-        try {
-          const info = await getImageInfo(file)
-          setImageInfo(info)
+    if (!validationResult.valid) {
+      return
+    }
 
-          // Auto-recommend model based on image
-          const recommendation = recommendModel(info)
-          setSelectedModel(recommendation.modelId)
+    setSelectedFile(file)
 
-          // Create preview
-          const reader = new FileReader()
-          reader.onloadend = () => {
-            setPreview(reader.result as string)
-          }
-          reader.readAsDataURL(file)
-        } catch (error) {
-          console.error('Error loading image info:', error)
-        }
+    try {
+      const info = await getImageInfo(file)
+      setImageInfo(info)
+
+      const recommendation = recommendModel(info)
+      setSelectedModel(recommendation.modelId)
+      setRecommendedModel(recommendation)
+
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setPreview(reader.result as string)
       }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('Error loading image info:', error)
     }
   }, [])
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.webp']
+      'image/*': ['.png', '.jpg', '.jpeg', '.webp'],
     },
+    multiple: false,
     maxFiles: 1,
-    maxSize: 10 * 1024 * 1024, // 10MB
+    maxSize: 10 * 1024 * 1024,
   })
 
   const handleGenerate = async () => {
@@ -84,381 +134,443 @@ export default function CreatePage() {
     setGenerationProgress(0)
     setGenerationMessage('Uploading image...')
 
-    try {
-      // Simulate progress (real progress would come from websocket/polling)
-      const progressInterval = setInterval(() => {
-        setGenerationProgress(prev => {
-          if (prev >= 90) return prev
-          return prev + 10
-        })
-      }, 3000)
+    let progressInterval: ReturnType<typeof setInterval> | null = null
 
-      setGenerationMessage('AI is analyzing your image...')
+    try {
+      progressInterval = setInterval(() => {
+        setGenerationProgress((prev) => {
+          if (prev >= 92) return prev
+          return prev + 8
+        })
+      }, 2000)
+
+      setGenerationMessage('Analyzing colors and balancing detail...')
 
       const template = await apiClient.generateTemplate(selectedFile, {
         palette_name: selectedPalette,
         model: selectedModel,
-        title: 'Preview Template',
+        title: selectedFile.name || 'Preview Template',
         is_public: !apiClient.isAuthenticated(),
       })
 
-      clearInterval(progressInterval)
       setGenerationProgress(100)
-      setGenerationMessage('Complete! Redirecting...')
+      setGenerationMessage('Complete! Opening your preview...')
 
-      // Redirect to preview page
       setTimeout(() => {
         router.push(`/preview/${template.id}`)
-      }, 500)
+      }, 600)
     } catch (error: any) {
       console.error('Generation failed:', error)
+      const message = error?.message ?? 'Generation failed'
       setGenerationMessage('')
       setGenerationProgress(0)
 
-      // Show user-friendly error
-      const errorMsg = error.message || 'Generation failed'
       alert(
         `😔 Oops! Something went wrong.\n\n` +
-        `${errorMsg}\n\n` +
-        `💡 Try:\n` +
-        `• Using a different image\n` +
-        `• Reducing image size if very large\n` +
-        `• Checking your internet connection\n\n` +
-        `Still having issues? Contact support.`
+          `${message}\n\n` +
+          `💡 Try:\n` +
+          `• Choosing a different image\n` +
+          `• Reducing image size if it's very large\n` +
+          `• Checking your internet connection\n\n` +
+          `Still having issues? Contact support.`
       )
     } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval)
+      }
       setIsGenerating(false)
     }
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.2),_transparent_60%)]" />
-      <div className="pointer-events-none absolute -top-40 right-[-8%] h-96 w-96 rounded-full bg-primary-500/30 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-20%] left-[-10%] h-[32rem] w-[32rem] rounded-full bg-secondary-500/20 blur-3xl" />
-
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/">
-            <h1 className="text-2xl font-semibold text-white transition-colors hover:text-secondary-200">
-              🎨 Paint by Numbers AI
-            </h1>
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-100">
+      <header className="border-b border-slate-200/60 bg-white/70 backdrop-blur">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="font-semibold text-slate-900 transition-colors hover:text-primary-600">
+            🎨 Paint by Numbers AI
           </Link>
-          <div className="flex items-center gap-3 text-sm">
-            <Link href="/gallery">
-              <Button variant="ghost" className="text-slate-200 hover:text-white">
-                Gallery
-              </Button>
+          <nav className="flex items-center gap-2 text-sm text-slate-600">
+            <Link href="/gallery" className="rounded-full px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              Gallery
             </Link>
-            <Link href="/cart">
-              <Button variant="outline" className="border-white/20 text-white hover:border-white/40 hover:bg-white/10">
-                🛒 Cart
-              </Button>
+            <Link href="/cart" className="rounded-full px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              Cart
             </Link>
-          </div>
+          </nav>
         </div>
-      </nav>
+      </header>
 
-      <main className="relative z-10 pb-24">
-        {/* Hero */}
-        <section className="mx-auto flex max-w-5xl flex-col items-center gap-6 px-4 pt-16 text-center sm:px-6 lg:px-8">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-secondary-100">
-            No account required · Instant preview
-          </span>
-          <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">
-            Design your custom paint-by-numbers kit in minutes
-          </h1>
-          <p className="max-w-3xl text-lg text-slate-200">
-            Upload a photo, let our AI balance colors and detail, and preview a print-ready template before you ever checkout. Switch models freely until it feels perfect.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-slate-200">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2">
-              ⚡ Preview in ~45 seconds
+      <main className="relative z-10">
+        <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-16 sm:px-6 lg:px-8">
+          <section className="text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-1 text-xs font-semibold uppercase tracking-widest text-primary-600">
+              No login needed · Unlimited previews
             </span>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2">
-              🎯 AI palette & difficulty guidance
-            </span>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2">
-              🖨️ Ready-to-print downloads
-            </span>
-          </div>
-        </section>
+            <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+              Turn any photo into a paint-by-numbers masterpiece
+            </h1>
+            <p className="mx-auto mt-4 max-w-2xl text-base text-slate-600 sm:text-lg">
+              Upload, tune, and preview in minutes. Shareable previews are ready for guests, and you can order a full kit whenever you love the result.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-600">
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2">⚡ Preview in ~45 seconds</span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2">🎯 Smart palette guidance</span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2">🖨️ Print-ready downloads</span>
+            </div>
+          </section>
 
-        <section className="mx-auto mt-12 max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
-            {/* Upload Section */}
-            <Card className="border-white/40 bg-white/95 text-slate-900 shadow-2xl">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-2xl">Step 1 · Upload your photo</CardTitle>
-                <CardDescription className="text-slate-500">
-                  Crisp, well-lit images between 800×800 and 4000×4000 pixels work best.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div
-                  {...getRootProps()}
-                  className={`group relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed bg-slate-50 p-12 text-center transition-all ${
-                    isDragActive
-                      ? 'border-secondary-400 bg-secondary-50/70'
-                      : validation?.errors.length
-                        ? 'border-red-300 bg-red-50/80'
-                        : 'border-slate-200 hover:border-secondary-300 hover:bg-slate-100'
-                  }`}
-                >
-                  <input {...getInputProps()} />
-                  {preview ? (
-                    <div className="space-y-4">
-                      <img
-                        src={preview}
-                        alt="Preview"
-                        className="mx-auto max-h-64 rounded-xl border border-white/60 shadow-lg"
-                      />
-                      <div className="text-sm text-slate-600">
-                        {selectedFile?.name}
-                        {imageInfo && (
-                          <div className="mt-1 text-xs text-slate-500">
-                            {imageInfo.width}x{imageInfo.height} • {(imageInfo.fileSize / (1024 * 1024)).toFixed(2)}MB
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+            <div className="space-y-8">
+              <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
+                <div className="flex flex-col gap-6 border-b border-slate-200/70 p-8 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-slate-900">Step 1 · Upload your photo</h2>
+                    <p className="mt-1 text-sm text-slate-500">Crisp, well-lit images between 800×800 and 4000×4000 pixels work best.</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
+                    {steps.map((step, idx) => {
+                      const stateClass =
+                        step.state === 'done'
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : step.state === 'active'
+                            ? 'border-primary-500 text-primary-600'
+                            : step.state === 'ready'
+                              ? 'border-primary-300 text-primary-500'
+                              : 'border-slate-200 text-slate-400'
+
+                      return (
+                        <div key={step.id} className="flex items-center gap-2">
+                          <span className={`flex h-7 w-7 items-center justify-center rounded-full border ${stateClass}`}>
+                            {step.id}
+                          </span>
+                          <span className="hidden text-xs font-medium sm:block">{step.label}</span>
+                          {idx < steps.length - 1 && <span className="hidden h-px w-8 bg-slate-200 sm:block" />}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="p-8">
+                  <div
+                    {...getRootProps()}
+                    className={`group relative flex min-h-[260px] flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed bg-slate-50 p-8 text-center transition-all ${
+                      isDragActive
+                        ? 'border-primary-400 bg-primary-50/70'
+                        : validation?.errors?.length
+                          ? 'border-red-300 bg-red-50/80'
+                          : 'border-slate-200 hover:border-primary-200 hover:bg-white'
+                    }`}
+                  >
+                    <input {...getInputProps()} />
+                    {preview ? (
+                      <div className="flex w-full flex-col items-center gap-4">
+                        <img
+                          src={preview}
+                          alt="Preview"
+                          className="max-h-64 rounded-2xl border border-slate-200 object-contain shadow-md"
+                        />
+                        <div className="text-sm text-slate-600">
+                          <p className="font-medium">{selectedFile?.name}</p>
+                          {imageInfo && (
+                            <p className="text-xs text-slate-500">
+                              {imageInfo.width} × {imageInfo.height} · {formatFileSize(imageInfo.fileSize)}
+                            </p>
+                          )}
+                        </div>
+                        <Button variant="outline" size="sm" type="button" onClick={() => open()}>
+                          Change image
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-primary-500">
+                          <svg className="h-8 w-8" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path
+                              d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                              strokeWidth={2}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                        <p className="text-sm font-medium text-slate-700">
+                          {isDragActive ? 'Drop the image to start' : 'Drag & drop an image, or click to browse'}
+                        </p>
+                        <p className="text-xs text-slate-500">JPG, PNG, or WebP · up to 10MB · we never store without your consent</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {showValidation && validation && (
+                    <div className="mt-6 space-y-4">
+                      {validation.errors.length > 0 && (
+                        <div className="rounded-2xl border border-red-200 bg-red-50/80 p-4 text-left text-sm text-red-700 shadow-sm">
+                          <p className="font-semibold">We need a different image:</p>
+                          <ul className="mt-1 space-y-1">
+                            {validation.errors.map((error, idx) => (
+                              <li key={idx}>• {error}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {validation.warnings.length > 0 && (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-left text-sm text-amber-700 shadow-sm">
+                          <p className="font-semibold">Heads up:</p>
+                          <ul className="mt-1 space-y-1">
+                            {validation.warnings.map((warning, idx) => (
+                              <li key={idx}>• {warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {validation.suggestions.length > 0 && (
+                        <div className="rounded-2xl border border-sky-200 bg-sky-50/80 p-4 text-left text-sm text-sky-700 shadow-sm">
+                          <ul className="space-y-1">
+                            {validation.suggestions.map((suggestion, idx) => (
+                              <li key={idx}>{suggestion}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {imageInfo && validation.valid && (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-left text-sm text-emerald-700 shadow-sm">
+                            <p className="font-semibold">AI guidance</p>
+                            <ul className="mt-2 space-y-1">
+                              {getImageQualityAdvice(imageInfo).map((advice, idx) => (
+                                <li key={idx}>{advice}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          {recommendedModel && (
+                            <div className="rounded-2xl border border-primary-200 bg-primary-50/80 p-4 text-left text-sm text-primary-700 shadow-sm">
+                              <p className="font-semibold">Recommended style</p>
+                              <p className="mt-2 text-base font-semibold text-primary-700">
+                                {recommendedModel.modelId.charAt(0).toUpperCase() + recommendedModel.modelId.slice(1)} model
+                              </p>
+                              <p className="mt-1 text-xs text-primary-600">{recommendedModel.reason}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {imageInfo && (
+                    <div className="mt-6 grid gap-4 rounded-2xl border border-slate-200/70 bg-slate-50 p-4 text-left text-xs text-slate-600 sm:grid-cols-2">
+                      <div>
+                        <p className="text-[0.75rem] font-semibold uppercase tracking-widest text-slate-500">Image details</p>
+                        <ul className="mt-2 space-y-1">
+                          <li>Resolution: {imageInfo.width} × {imageInfo.height}</li>
+                          <li>Aspect ratio: {imageInfo.aspectRatio.toFixed(2)}:1</li>
+                          <li>File size: {formatFileSize(imageInfo.fileSize)}</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-[0.75rem] font-semibold uppercase tracking-widest text-slate-500">Quick tips</p>
+                        <ul className="mt-2 space-y-1">
+                          <li>Best on matte or canvas stock</li>
+                          <li>Keep the subject well lit</li>
+                          <li>Use painter's tape for crisp edges</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {hasValidImage && (
+                <div className="space-y-8">
+                  <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
+                    <div className="border-b border-slate-200/70 p-8">
+                      <h2 className="text-2xl font-semibold text-slate-900">Step 2 · Fine-tune the look</h2>
+                      <p className="mt-1 text-sm text-slate-500">Swap AI models or palettes until the preview matches your style. Every run stays free.</p>
+                    </div>
+                    <div className="flex flex-col gap-8 p-8 lg:flex-row">
+                      <div className="flex-1">
+                        <ModelSelector
+                          models={modelsData}
+                          selectedModel={selectedModel}
+                          onSelectModel={setSelectedModel}
+                          isLoading={!modelsData}
+                        />
+                      </div>
+                      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-slate-50 p-6">
+                        <h3 className="text-lg font-semibold text-slate-800">Palette</h3>
+                        <p className="mt-1 text-xs text-slate-500">Pick a curated palette designed for acrylic paint sets.</p>
+                        <select
+                          value={selectedPalette}
+                          onChange={(event) => setSelectedPalette(event.target.value)}
+                          className="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
+                        >
+                          {palettesData
+                            ? palettesData.map((palette) => (
+                                <option key={palette.name} value={palette.name}>
+                                  {palette.display_name} · {palette.num_colors} colors
+                                </option>
+                              ))
+                            : (
+                                <option value={selectedPalette}>Loading palettes...</option>
+                              )}
+                        </select>
+
+                        {selectedPaletteInfo && (
+                          <div className="mt-4 space-y-3 text-xs text-slate-600">
+                            <p className="text-[0.75rem] font-semibold uppercase tracking-widest text-slate-500">
+                              Swatch preview
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedPaletteInfo.colors.slice(0, 10).map((color, idx) => (
+                                <div key={idx} className="flex flex-col items-center gap-1 text-[0.65rem]">
+                                  <span
+                                    className="h-10 w-10 rounded-full border border-slate-200"
+                                    style={{ backgroundColor: rgbToHex(color) }}
+                                  />
+                                  <span className="text-slate-500">{selectedPaletteInfo.color_names?.[idx] ?? rgbToHex(color)}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-xs text-slate-500">{selectedPaletteInfo.description}</p>
                           </div>
                         )}
                       </div>
-                      <Button variant="outline" size="sm">
-                        Change image
-                      </Button>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-secondary-100 text-secondary-600">
-                        <svg className="h-8 w-8" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                          <path
-                            d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                            strokeWidth={2}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-sm font-medium text-slate-700">
-                        {isDragActive ? 'Drop the image to start' : 'Drag and drop an image, or click to browse'}
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        JPG, PNG, or WebP · up to 10MB · we never store without your consent
-                      </p>
+                  </div>
+
+                  <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
+                    <div className="border-b border-slate-200/70 p-8">
+                      <h2 className="text-2xl font-semibold text-slate-900">Step 3 · Generate your preview</h2>
+                      <p className="mt-1 text-sm text-slate-500">We’ll build the template, legend, guide, and comparison image automatically.</p>
                     </div>
-                  )}
+                    <div className="p-8">
+                      {!isGenerating ? (
+                        <div className="space-y-4">
+                          <Button
+                            onClick={handleGenerate}
+                            disabled={!selectedFile || !validation?.valid}
+                            className="h-12 w-full text-base"
+                          >
+                            ✨ Generate free preview
+                          </Button>
+                          <p className="text-sm text-slate-500">
+                            Guests receive a public preview link for easy sharing. We only store files while your preview stays active.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between text-sm text-slate-600">
+                            <span>{generationMessage}</span>
+                            <span>{generationProgress}%</span>
+                          </div>
+                          <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className="h-3 rounded-full bg-primary-500 transition-all duration-500 ease-out"
+                              style={{ width: `${generationProgress}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-slate-500">
+                            We trace contours, balance palette colors, and package download files. This usually takes less than a minute.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-
-                {/* Validation Messages */}
-                {showValidation && validation && (
-                  <div className="mt-5 space-y-3">
-                    {validation.errors.length > 0 && (
-                      <div className="rounded-lg border border-red-200 bg-red-50/90 p-3 text-left text-sm text-red-700 shadow-sm">
-                        <p className="font-semibold">We need a different image:</p>
-                        {validation.errors.map((error, idx) => (
-                          <p key={idx} className="mt-1">
-                            • {error}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {validation.warnings.length > 0 && (
-                      <div className="rounded-lg border border-yellow-200 bg-yellow-50/90 p-3 text-left text-sm text-yellow-700 shadow-sm">
-                        <p className="font-semibold">Heads up:</p>
-                        {validation.warnings.map((warning, idx) => (
-                          <p key={idx} className="mt-1">
-                            • {warning}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {validation.suggestions.length > 0 && (
-                      <div className="rounded-lg border border-blue-200 bg-blue-50/90 p-3 text-left text-sm text-blue-700 shadow-sm">
-                        {validation.suggestions.map((suggestion, idx) => (
-                          <p key={idx}>{suggestion}</p>
-                        ))}
-                      </div>
-                    )}
-
-                    {imageInfo && validation.valid && (
-                      <div className="rounded-lg border border-emerald-200 bg-emerald-50/90 p-3 text-left text-sm text-emerald-700 shadow-sm">
-                        <p className="font-semibold">AI guidance</p>
-                        {getImageQualityAdvice(imageInfo).map((advice, idx) => (
-                          <p key={idx} className="mt-1">
-                            {advice}
-                          </p>
-                        ))}
-                        <p className="mt-2 text-xs text-emerald-600">
-                          🤖 Suggested model: <strong>{recommendModel(imageInfo).modelId}</strong>
-                          <br />
-                          <span>{recommendModel(imageInfo).reason}</span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Guidance Section */}
-            <div className="space-y-6">
-              <Card className="border-white/10 bg-slate-900/60 text-slate-100 shadow-xl backdrop-blur">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xl text-white">Creative success checklist</CardTitle>
-                  <CardDescription className="text-slate-300">
-                    Follow these quick wins to get a crisp, satisfying paintable template.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-slate-200">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 text-emerald-400">✓</span>
-                    <span><strong>High resolution:</strong> Aim for 800px or larger on the shortest side.</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 text-emerald-400">✓</span>
-                    <span><strong>Even lighting:</strong> Natural daylight removes harsh shadows.</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 text-emerald-400">✓</span>
-                    <span><strong>Single subject focus:</strong> Keep your star centered and in focus.</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="mt-0.5 text-rose-400">✗</span>
-                    <span>Avoid screenshots, heavy filters, or dark/blurry images.</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="border-white/40 bg-white/95 text-slate-900 shadow-2xl">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xl">What you'll receive</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm text-slate-600">
-                  <div className="flex items-start gap-3">
-                    <span className="mt-1 text-primary-600">✓</span>
-                    <span>AI-optimized numbered template and matching color legend.</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="mt-1 text-primary-600">✓</span>
-                    <span>Difficulty rating, time estimate, and quality insights.</span>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <span className="mt-1 text-primary-600">✓</span>
-                    <span>Step-by-step painting guide, reference solution, and optional SVG/PDF downloads.</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="rounded-2xl border border-white/10 bg-slate-900/50 p-6 text-left shadow-xl backdrop-blur">
-                <h3 className="text-lg font-semibold text-white">Preview is always free</h3>
-                <p className="mt-2 text-sm text-slate-300">
-                  Generate unlimited previews without logging in. When you love the result you can order a kit—or download the digital files instantly.
-                </p>
-                <p className="mt-4 text-xs uppercase tracking-widest text-secondary-200">~30-60 seconds to generate</p>
-              </div>
+              )}
             </div>
+
+            <aside className="space-y-6">
+              <div className="rounded-3xl bg-white/80 p-8 shadow-lg ring-1 ring-slate-200/70">
+                <h3 className="text-lg font-semibold text-slate-900">What you’ll receive</h3>
+                <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 text-primary-500">✓</span>
+                    <span>Numbered template in high resolution plus printable legend.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 text-primary-500">✓</span>
+                    <span>Difficulty score, estimated painting time, and quality guidance.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 text-primary-500">✓</span>
+                    <span>Reference solution, painting tips, and optional SVG/PDF exports.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="rounded-3xl bg-gradient-to-br from-primary-500/10 via-secondary-500/10 to-primary-500/10 p-8 shadow-lg ring-1 ring-primary-200/40">
+                <h3 className="text-lg font-semibold text-slate-900">Pro tips for a stunning kit</h3>
+                <ul className="mt-4 space-y-3 text-sm text-slate-600">
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 text-primary-500">•</span>
+                    <span>Zoom in on your subject — a single focal point paints beautifully.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 text-primary-500">•</span>
+                    <span>Try different AI models to balance detail and simplicity.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <span className="mt-1 text-primary-500">•</span>
+                    <span>Pick palettes that match your décor or the subject’s mood.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="rounded-3xl bg-white/90 p-8 shadow-lg ring-1 ring-slate-200/70">
+                <h3 className="text-lg font-semibold text-slate-900">How it works</h3>
+                <div className="mt-6 space-y-4 text-sm text-slate-600">
+                  {[
+                    {
+                      title: 'Smart validation',
+                      description: 'We check size, clarity, and aspect ratio before processing.',
+                    },
+                    {
+                      title: 'AI-powered segmentation',
+                      description: 'Colors are clustered into painter-friendly palettes while keeping detail.',
+                    },
+                    {
+                      title: 'Ready to paint outputs',
+                      description: 'Template, legend, and guides are packaged for download automatically.',
+                    },
+                  ].map((item) => (
+                    <div key={item.title} className="rounded-2xl border border-slate-200/70 bg-slate-50 p-4">
+                      <p className="font-semibold text-slate-800">{item.title}</p>
+                      <p className="mt-1 text-xs text-slate-500">{item.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
           </div>
-        </section>
 
-        {/* Model Selection - Only show if image is valid */}
-        {validation?.valid && selectedFile && (
-          <section className="mx-auto mt-16 max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 shadow-xl backdrop-blur">
-              <div className="flex flex-col gap-4 pb-6 text-left lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-3xl font-semibold text-white">Step 2 · Choose your AI style</h2>
-                  <p className="mt-2 text-sm text-slate-300">
-                    Toggle between detailed, vibrant, or minimalist looks—every preview is on us.
-                  </p>
-                </div>
-                <div className="flex flex-col items-start gap-1 text-xs text-slate-300 sm:flex-row sm:items-center sm:gap-4">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1">
-                    🎨 Palette locked to paintable colors
-                  </span>
-                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1">
-                    🔁 Switch models anytime
-                  </span>
-                </div>
-              </div>
-              <ModelSelector
-                models={modelsData}
-                selectedModel={selectedModel}
-                onSelectModel={setSelectedModel}
-                isLoading={!modelsData}
-              />
-            </div>
-
-            {/* Generate Button */}
-            <div className="mt-10 flex justify-center">
-              <Card className="w-full max-w-2xl border-white/40 bg-white/95 text-slate-900 shadow-2xl">
-                <CardContent className="pt-6">
-                  {!isGenerating ? (
-                    <>
-                      <Button
-                        onClick={handleGenerate}
-                        disabled={!selectedFile || !validation?.valid}
-                        className="w-full"
-                        size="lg"
-                      >
-                        ✨ Generate preview (always free)
-                      </Button>
-                      <p className="mt-3 text-center text-sm text-slate-500">
-                        Your files stay private. Guests get public preview links so you can share instantly.
-                      </p>
-                    </>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>{generationMessage}</span>
-                        <span>{generationProgress}%</span>
-                      </div>
-                      <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
-                        <div
-                          className="h-3 rounded-full bg-secondary-500 transition-all duration-500 ease-out"
-                          style={{ width: `${generationProgress}%` }}
-                        />
-                      </div>
-                      <p className="text-center text-xs text-slate-500">
-                        We render smart contours, balance colors, and package downloads—hang tight!
-                      </p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-        )}
-
-        {/* How it works */}
-        {!selectedFile && (
-          <section className="mx-auto mt-20 max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-10 text-center shadow-xl backdrop-blur">
-              <h2 className="text-3xl font-semibold text-white">How your preview comes together</h2>
-              <p className="mt-3 text-slate-300">
-                A guided pipeline that keeps things simple while our AI handles the complex bits.
+          {!selectedFile && (
+            <section className="mt-4 rounded-3xl bg-white/80 p-10 text-center shadow-xl ring-1 ring-slate-200/70">
+              <h2 className="text-3xl font-semibold text-slate-900">Why creators love the workflow</h2>
+              <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600">
+                Our generator handles the heavy lifting while you stay in control. Upload a photo, validate quality instantly, explore AI styles, and download professional outputs without logging in.
               </p>
-              <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                  { step: '1', title: 'Upload & validate', description: 'We inspect dimensions, lighting, and focus before processing.' },
-                  { step: '2', title: 'Palette intelligence', description: 'Smart clustering keeps colors mixable and painter-friendly.' },
-                  { step: '3', title: 'Detail balancing', description: 'Regions are merged or simplified to match your chosen difficulty.' },
-                  { step: '4', title: 'Preview & deliver', description: 'Download the template, legend, guide, and comparison images.' },
-                ].map(({ step, title, description }) => (
-                  <div key={step} className="rounded-xl border border-white/10 bg-white/5 p-6 text-left shadow-lg">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary-500/20 text-lg font-semibold text-secondary-100">
-                      {step}
-                    </div>
-                    <h3 className="mt-4 text-lg font-semibold text-white">{title}</h3>
-                    <p className="mt-2 text-sm text-slate-300">{description}</p>
+                  { icon: '🧼', title: 'Clean contours', description: 'Automatic smoothing keeps paint regions neat and traceable.' },
+                  { icon: '🧠', title: 'Palette intelligence', description: 'Palettes are optimized for real paint sets—no muddy colors.' },
+                  { icon: '🪄', title: 'Detail control', description: 'Swap between simple, classic, or detailed looks anytime.' },
+                  { icon: '📦', title: 'Instant kit-ready files', description: 'Print templates, legends, and guides with one click.' },
+                ].map((feature) => (
+                  <div key={feature.title} className="rounded-2xl border border-slate-200/70 bg-slate-50 p-6 text-left">
+                    <div className="text-2xl">{feature.icon}</div>
+                    <h3 className="mt-3 text-lg font-semibold text-slate-900">{feature.title}</h3>
+                    <p className="mt-1 text-sm text-slate-600">{feature.description}</p>
                   </div>
                 ))}
               </div>
-            </div>
-          </section>
-        )}
+            </section>
+          )}
+        </div>
       </main>
     </div>
   )
-
 }

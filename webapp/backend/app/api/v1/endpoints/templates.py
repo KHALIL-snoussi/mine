@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, Backgro
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import shutil
-import os
 import sys
 from pathlib import Path
 from uuid import uuid4
@@ -14,7 +13,7 @@ from uuid import uuid4
 # Add paint_by_numbers to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.parent.parent / "paint_by_numbers"))
 
-from app.core.database import get_db
+from app.core.database import get_db, SessionLocal
 from app.models.user import User
 from app.models.template import Template
 from app.schemas.template import (
@@ -27,7 +26,6 @@ from app.api.deps import get_current_user, get_optional_user
 # Import paint by numbers generator
 from paint_by_numbers.main import PaintByNumbersGenerator
 from paint_by_numbers.palettes import PaletteManager
-from paint_by_numbers.config import Config
 from paint_by_numbers.models import ModelRegistry
 
 router = APIRouter()
@@ -42,9 +40,9 @@ async def generate_template_background(
     num_colors: Optional[int],
     model: str,
     paper_format: str,
-    db: Session
 ):
     """Generate template in background"""
+    db: Optional[Session] = None
     try:
         # Create generator with model configuration
         generator = PaintByNumbersGenerator()
@@ -61,6 +59,7 @@ async def generate_template_background(
         )
 
         # Update template in database
+        db = SessionLocal()
         template = db.query(Template).filter(Template.id == template_id).first()
         if template:
             template.template_url = results.get('template')
@@ -91,11 +90,17 @@ async def generate_template_background(
 
     except Exception as e:
         print(f"Error generating template: {e}")
-        # Update template with error
-        template = db.query(Template).filter(Template.id == template_id).first()
-        if template:
-            template.difficulty_level = "error"
-            db.commit()
+        error_session = SessionLocal()
+        try:
+            template = error_session.query(Template).filter(Template.id == template_id).first()
+            if template:
+                template.difficulty_level = "error"
+                error_session.commit()
+        finally:
+            error_session.close()
+    finally:
+        if db:
+            db.close()
 
 
 @router.post("/generate", response_model=TemplateResponse)
@@ -173,8 +178,7 @@ async def generate_template(
         palette_name,
         num_colors,
         model,  # Pass model to background task
-        paper_format,  # Pass paper format to background task
-        db
+        paper_format  # Pass paper format to background task
     )
 
     return template
