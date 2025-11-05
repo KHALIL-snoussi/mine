@@ -10,7 +10,6 @@ and number placement.
 import sys
 import argparse
 from pathlib import Path
-import cv2
 import numpy as np
 from typing import Optional
 from tqdm import tqdm
@@ -34,6 +33,7 @@ from intelligence.quality_scorer import QualityScorer
 from intelligence.color_optimizer import ColorOptimizer
 from models import ModelRegistry, ModelProfile
 from formats import FormatRegistry, ImageFormatter, FitMode
+from utils.opencv import require_cv2
 
 
 class PaintByNumbersGenerator:
@@ -409,6 +409,7 @@ class PaintByNumbersGenerator:
             self.contour_image
         )
         solution_path = output_path / f"{input_name}_solution.png"
+        cv2 = require_cv2()
         cv2.imwrite(str(solution_path), cv2.cvtColor(solution, cv2.COLOR_RGB2BGR))
         logger.info(f"  Solution saved to: {solution_path}")
         result_files['solution'] = str(solution_path)

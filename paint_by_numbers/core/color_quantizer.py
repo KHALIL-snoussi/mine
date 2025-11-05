@@ -3,7 +3,6 @@ Color Quantization Module - Reduces image to limited color palette
 """
 
 import numpy as np
-import cv2
 from typing import Optional, Tuple
 from sklearn.cluster import KMeans, MiniBatchKMeans
 
@@ -12,6 +11,7 @@ try:
     from paint_by_numbers.utils.helpers import sort_colors_by_brightness, ensure_uint8
     from paint_by_numbers.palettes import PaletteManager
     from paint_by_numbers.logger import logger
+    from paint_by_numbers.utils.opencv import require_cv2
 except ImportError:
     import sys
     from pathlib import Path
@@ -20,6 +20,7 @@ except ImportError:
     from utils.helpers import sort_colors_by_brightness, ensure_uint8
     from palettes import PaletteManager
     from logger import logger
+    from utils.opencv import require_cv2
 
 
 class ColorQuantizer:
@@ -44,8 +45,10 @@ class ColorQuantizer:
         color_space = getattr(self.config, "KMEANS_COLOR_SPACE", "rgb").lower()
 
         if color_space == "lab":
+            cv2 = require_cv2()
             converted = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
         elif color_space == "hsv":
+            cv2 = require_cv2()
             converted = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
         else:
             converted = image
@@ -58,8 +61,10 @@ class ColorQuantizer:
         centers = centers.reshape(-1, 1, 3)
 
         if color_space == "lab":
+            cv2 = require_cv2()
             converted = cv2.cvtColor(centers.astype(np.uint8), cv2.COLOR_LAB2RGB)
         elif color_space == "hsv":
+            cv2 = require_cv2()
             converted = cv2.cvtColor(centers.astype(np.uint8), cv2.COLOR_HSV2RGB)
         else:
             converted = centers.astype(np.uint8)
@@ -71,11 +76,13 @@ class ColorQuantizer:
         metric = getattr(self.config, "PALETTE_DISTANCE_METRIC", "lab").lower()
 
         if metric == "lab":
+            cv2 = require_cv2()
             image_space = cv2.cvtColor(image, cv2.COLOR_RGB2LAB).astype(np.float32)
             palette_space = cv2.cvtColor(
                 palette.reshape(1, -1, 3).astype(np.uint8), cv2.COLOR_RGB2LAB
             ).reshape(-1, 3).astype(np.float32)
         elif metric == "hsv":
+            cv2 = require_cv2()
             image_space = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(np.float32)
             palette_space = cv2.cvtColor(
                 palette.reshape(1, -1, 3).astype(np.uint8), cv2.COLOR_RGB2HSV

@@ -5,8 +5,12 @@ This script shows various ways to use the system with different configurations.
 """
 
 import numpy as np
-import cv2
 from pathlib import Path
+
+try:
+    from paint_by_numbers.utils.opencv import require_cv2
+except ImportError:
+    from utils.opencv import require_cv2
 
 from main import PaintByNumbersGenerator
 from config import Config
@@ -27,6 +31,7 @@ def create_test_image(filename="test_image.png", size=(600, 600)):
 
     w, h = size
     image = np.zeros((h, w, 3), dtype=np.uint8)
+    cv2 = require_cv2()
 
     # Create colorful geometric shapes
 

@@ -2,7 +2,6 @@
 Image Processing Module - Handles image loading and preprocessing
 """
 
-import cv2
 import numpy as np
 from typing import Optional, Tuple
 from pathlib import Path
@@ -12,6 +11,7 @@ try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import resize_image, ensure_uint8
     from paint_by_numbers.logger import logger
+    from paint_by_numbers.utils.opencv import require_cv2
 except ImportError:
     import sys
     from pathlib import Path
@@ -19,6 +19,7 @@ except ImportError:
     from config import Config
     from utils.helpers import resize_image, ensure_uint8
     from logger import logger
+    from utils.opencv import require_cv2
 
 
 class ImageProcessor:
@@ -59,6 +60,7 @@ class ImageProcessor:
         if not getattr(self.config, "APPLY_TONE_BALANCE", False):
             return image
 
+        cv2 = require_cv2()
         target = float(getattr(self.config, "TONE_BALANCE_TARGET", 0.55))
         target = np.clip(target, 0.05, 0.95)
 
@@ -86,6 +88,7 @@ class ImageProcessor:
         if not getattr(self.config, "APPLY_LOCAL_CONTRAST", False):
             return image
 
+        cv2 = require_cv2()
         clip_limit = float(getattr(self.config, "CLAHE_CLIP_LIMIT", 2.0))
         tile_grid = getattr(self.config, "CLAHE_TILE_GRID_SIZE", (8, 8))
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
@@ -103,6 +106,7 @@ class ImageProcessor:
         if not getattr(self.config, "APPLY_SHARPENING", False):
             return image
 
+        cv2 = require_cv2()
         amount = float(getattr(self.config, "SHARPEN_AMOUNT", 0.5))
         radius = int(max(1, getattr(self.config, "SHARPEN_RADIUS", 3)))
 
@@ -130,6 +134,7 @@ class ImageProcessor:
         if not path.exists():
             raise FileNotFoundError(f"Image file not found: {image_path}")
 
+        cv2 = require_cv2()
         # Load image
         image = cv2.imread(str(path))
         if image is None:
@@ -170,6 +175,7 @@ class ImageProcessor:
                 raise ValueError("No image loaded. Call load_image() first.")
             image = self.original_image.copy()
 
+        cv2 = require_cv2()
         # Resize if needed
         processed = resize_image(image, self.config.MAX_IMAGE_SIZE)
         processed = ensure_uint8(processed)
@@ -232,6 +238,7 @@ class ImageProcessor:
                 raise ValueError("No processed image. Call preprocess() first.")
             image = self.processed_image
 
+        cv2 = require_cv2()
         # Convert to LAB color space
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
         l_channel, a, b = cv2.split(lab)
@@ -265,6 +272,7 @@ class ImageProcessor:
                 raise ValueError("No processed image. Call preprocess() first.")
             image = self.processed_image
 
+        cv2 = require_cv2()
         # Convert to grayscale
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
