@@ -190,6 +190,9 @@ export default function CreatePage() {
             🎨 Paint by Numbers AI
           </Link>
           <nav className="flex items-center gap-2 text-sm text-slate-600">
+            <Link href="/shop" className="rounded-full px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              Shop Kits
+            </Link>
             <Link href="/gallery" className="rounded-full px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900">
               Gallery
             </Link>
@@ -401,7 +404,16 @@ export default function CreatePage() {
                       </div>
                       <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-slate-50 p-6">
                         <h3 className="text-lg font-semibold text-slate-800">Palette</h3>
-                        <p className="mt-1 text-xs text-slate-500">Pick a curated palette designed for acrylic paint sets.</p>
+                        <p className="mt-1 text-xs text-slate-500">Pick a palette that matches your paint kit!</p>
+
+                        <div className="mt-3 rounded-lg bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-200 p-3">
+                          <p className="text-xs font-semibold text-primary-800 mb-1">💡 Smart System:</p>
+                          <p className="text-xs text-primary-700">Choose a palette once, generate unlimited templates with the same paint kit!</p>
+                          <Link href="/shop" className="inline-block mt-2">
+                            <span className="text-xs font-semibold text-primary-600 hover:text-primary-700 underline">View Paint Kits →</span>
+                          </Link>
+                        </div>
+
                         <select
                           value={selectedPalette}
                           onChange={(event) => setSelectedPalette(event.target.value)}
@@ -435,6 +447,62 @@ export default function CreatePage() {
                               ))}
                             </div>
                             <p className="text-xs text-slate-500">{selectedPaletteInfo.description}</p>
+
+                            {/* Paint Kit Recommendation */}
+                            {selectedPalette && (
+                              <div className="mt-3 pt-3 border-t border-slate-200">
+                                <p className="text-[0.75rem] font-semibold uppercase tracking-widest text-slate-500 mb-2">
+                                  Recommended Paint Kit
+                                </p>
+                                {selectedPalette === 'classic_12' && (
+                                  <div className="rounded-lg bg-white border border-primary-200 p-3">
+                                    <p className="font-semibold text-sm text-slate-800">Starter Kit</p>
+                                    <p className="text-xs text-primary-600 font-bold">$24.99 · 12 colors</p>
+                                    <p className="text-xs text-slate-600 mt-1">Perfect for beginners & kids</p>
+                                  </div>
+                                )}
+                                {selectedPalette === 'classic_18' && (
+                                  <div className="rounded-lg bg-gradient-to-br from-primary-50 to-secondary-50 border border-primary-300 p-3">
+                                    <p className="font-semibold text-sm text-slate-800">Creative Kit ⭐</p>
+                                    <p className="text-xs text-primary-600 font-bold">$39.99 · 18 colors</p>
+                                    <p className="text-xs text-slate-700 mt-1">Most popular choice!</p>
+                                  </div>
+                                )}
+                                {selectedPalette === 'classic_24' && (
+                                  <div className="rounded-lg bg-white border border-secondary-300 p-3">
+                                    <p className="font-semibold text-sm text-slate-800">Professional Kit</p>
+                                    <p className="text-xs text-secondary-600 font-bold">$59.99 · 24 colors</p>
+                                    <p className="text-xs text-slate-600 mt-1">For serious artists</p>
+                                  </div>
+                                )}
+                                {selectedPalette === 'pastel_12' && (
+                                  <div className="rounded-lg bg-pink-50 border border-pink-200 p-3">
+                                    <p className="font-semibold text-sm text-slate-800">Pastel Dreams Kit</p>
+                                    <p className="text-xs text-pink-600 font-bold">$29.99 · 12 colors</p>
+                                    <p className="text-xs text-slate-600 mt-1">Soft, beautiful pastels</p>
+                                  </div>
+                                )}
+                                {selectedPalette === 'nature_15' && (
+                                  <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                                    <p className="font-semibold text-sm text-slate-800">Nature Collection Kit</p>
+                                    <p className="text-xs text-green-600 font-bold">$34.99 · 15 colors</p>
+                                    <p className="text-xs text-slate-600 mt-1">Earth tones & landscapes</p>
+                                  </div>
+                                )}
+                                {selectedPalette === 'vibrant_18' && (
+                                  <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
+                                    <p className="font-semibold text-sm text-slate-800">Vibrant Artist Kit</p>
+                                    <p className="text-xs text-orange-600 font-bold">$42.99 · 18 colors</p>
+                                    <p className="text-xs text-slate-600 mt-1">Bold, vivid colors</p>
+                                  </div>
+                                )}
+                                <Link href="/shop">
+                                  <Button size="sm" variant="outline" className="w-full mt-2 text-xs">
+                                    Buy This Kit
+                                  </Button>
+                                </Link>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

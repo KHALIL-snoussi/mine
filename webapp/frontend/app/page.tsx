@@ -14,6 +14,9 @@ export default function LandingPage() {
               </h1>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/shop">
+                <Button variant="ghost">Shop Kits</Button>
+              </Link>
               <Link href="/gallery">
                 <Button variant="ghost">Gallery</Button>
               </Link>
@@ -43,7 +46,7 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="text-xl sm:text-2xl text-gray-600 mb-8 max-w-3xl mx-auto animate-slide-up">
-              Upload your photo, preview it instantly, and order your personalized painting kit.
+              Buy ONE paint kit, paint UNLIMITED templates! Our smart color system means your paints work for every image.
               No experience needed - perfect for relaxation, gifts, or creating lasting memories.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up">
@@ -52,15 +55,104 @@ export default function LandingPage() {
                   🎨 Create & Preview Free
                 </Button>
               </Link>
-              <Link href="/gallery">
+              <Link href="/shop">
                 <Button size="lg" variant="outline" className="text-lg px-8 py-4">
-                  View Examples
+                  Shop Paint Kits
                 </Button>
               </Link>
             </div>
             <p className="mt-4 text-sm text-gray-500">
-              Free preview • No account needed • Kits from $19.99
+              Free preview • No account needed • Paint Kits from $24.99
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Value Proposition Section */}
+      <section className="py-20 bg-gradient-to-br from-gray-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Why Our System Works Better
+            </h2>
+            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+              Stop wasting money on custom paints for every single image!
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            {/* Old Way */}
+            <div className="bg-white p-8 rounded-2xl border-2 border-red-200 relative">
+              <div className="absolute -top-4 left-6 bg-red-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                ❌ The Old Way
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 mt-2">Random Colors Every Time</h3>
+              <ul className="space-y-3">
+                <li className="flex items-start text-gray-600">
+                  <span className="text-red-500 mr-2 mt-1">✗</span>
+                  <span>Need 23 custom colors for THIS image</span>
+                </li>
+                <li className="flex items-start text-gray-600">
+                  <span className="text-red-500 mr-2 mt-1">✗</span>
+                  <span>Buy completely different paints for NEXT image</span>
+                </li>
+                <li className="flex items-start text-gray-600">
+                  <span className="text-red-500 mr-2 mt-1">✗</span>
+                  <span>Leftover paints are useless</span>
+                </li>
+                <li className="flex items-start text-gray-600">
+                  <span className="text-red-500 mr-2 mt-1">✗</span>
+                  <span>Expensive and wasteful</span>
+                </li>
+                <li className="flex items-start text-gray-600">
+                  <span className="text-red-500 mr-2 mt-1">✗</span>
+                  <span>Can't build a collection</span>
+                </li>
+              </ul>
+              <div className="mt-6 p-4 bg-red-50 rounded-lg">
+                <p className="text-sm font-semibold text-red-800">Cost: $40-60 per template 💸</p>
+              </div>
+            </div>
+
+            {/* New Way */}
+            <div className="bg-gradient-to-br from-primary-50 to-secondary-50 p-8 rounded-2xl border-2 border-primary-500 relative shadow-xl">
+              <div className="absolute -top-4 left-6 bg-gradient-to-r from-primary-600 to-secondary-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                ✓ Our Smart System
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4 mt-2">Fixed Color Palettes</h3>
+              <ul className="space-y-3">
+                <li className="flex items-start text-gray-700">
+                  <span className="text-primary-600 mr-2 mt-1">✓</span>
+                  <span className="font-medium">Buy ONE paint kit (12-24 colors)</span>
+                </li>
+                <li className="flex items-start text-gray-700">
+                  <span className="text-primary-600 mr-2 mt-1">✓</span>
+                  <span className="font-medium">Generate UNLIMITED templates</span>
+                </li>
+                <li className="flex items-start text-gray-700">
+                  <span className="text-primary-600 mr-2 mt-1">✓</span>
+                  <span className="font-medium">Same paints work for everything</span>
+                </li>
+                <li className="flex items-start text-gray-700">
+                  <span className="text-primary-600 mr-2 mt-1">✓</span>
+                  <span className="font-medium">AI adapts images to your kit</span>
+                </li>
+                <li className="flex items-start text-gray-700">
+                  <span className="text-primary-600 mr-2 mt-1">✓</span>
+                  <span className="font-medium">Build your collection!</span>
+                </li>
+              </ul>
+              <div className="mt-6 p-4 bg-primary-600 text-white rounded-lg">
+                <p className="text-sm font-semibold">Cost: $25-60 ONE TIME for unlimited templates! 🎉</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-12 text-center">
+            <div className="inline-block bg-gradient-to-r from-primary-600 to-secondary-600 text-white px-8 py-4 rounded-2xl shadow-lg">
+              <p className="text-lg font-bold mb-1">💰 Save $1000+ per year!</p>
+              <p className="text-sm opacity-90">Average customer paints 20+ templates with one kit</p>
+            </div>
           </div>
         </div>
       </section>
@@ -193,134 +285,176 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Paint Kit Showcase Section */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Choose Your Perfect Format
+              Buy Once, Paint Forever! 🎨
             </h2>
-            <p className="text-xl text-gray-600">
-              From digital downloads to premium painted canvas kits
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-6">
+              Choose your paint kit once, then generate unlimited templates that work with the SAME colors.
+              No more buying custom paints for each project!
             </p>
+            <Link href="/shop">
+              <Button size="lg" variant="outline">
+                View All 6 Paint Kits
+              </Button>
+            </Link>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Digital PDF */}
-            <div className="p-8 rounded-lg border-2 border-gray-200 hover:border-primary-500 transition-colors">
-              <h3 className="text-2xl font-bold mb-2">Digital PDF</h3>
-              <div className="mb-4">
-                <span className="text-4xl font-bold">$19.99</span>
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {/* Starter Kit */}
+            <div className="group p-8 rounded-3xl bg-white border-2 border-gray-200 hover:border-primary-400 hover:shadow-2xl transition-all duration-300">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold mb-2">Starter Kit</h3>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-4xl font-bold text-primary-600">$24.99</span>
+                </div>
+                <p className="text-gray-600">Perfect for beginners & kids</p>
               </div>
-              <p className="text-gray-600 mb-6">Perfect for DIY enthusiasts</p>
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center">
+
+              <div className="mb-6">
+                <div className="inline-block bg-primary-100 text-primary-700 px-3 py-1 rounded-full text-sm font-semibold mb-4">
+                  12 Colors
+                </div>
+                <p className="text-sm text-gray-600 mb-4">Paint 3+ beautiful templates</p>
+              </div>
+
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  High-resolution PDF kit
+                  <span className="text-sm">12 premium acrylic paints</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Print on any size
+                  <span className="text-sm">3 quality brushes</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Color legend & guide
+                  <span className="text-sm">Color reference card</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Instant download
+                  <span className="text-sm">Bonus digital templates</span>
                 </li>
               </ul>
-              <Link href="/create">
-                <Button variant="outline" className="w-full">
-                  Create Now
+
+              <Link href="/shop">
+                <Button variant="outline" className="w-full group-hover:bg-primary-600 group-hover:text-white transition-colors">
+                  Learn More
                 </Button>
               </Link>
             </div>
 
-            {/* Printed Canvas Kit */}
-            <div className="p-8 rounded-lg border-2 border-primary-600 relative hover:shadow-xl transition-shadow">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-primary-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
-                Most Popular
+            {/* Creative Kit - MOST POPULAR */}
+            <div className="group p-8 rounded-3xl bg-gradient-to-br from-primary-50 to-secondary-50 border-2 border-primary-500 relative hover:shadow-2xl transition-all duration-300 scale-105">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-primary-600 to-secondary-600 text-white px-6 py-2 rounded-full text-sm font-bold shadow-lg">
+                ⭐ Most Popular
               </div>
-              <h3 className="text-2xl font-bold mb-2">Canvas Kit</h3>
-              <div className="mb-4">
-                <span className="text-4xl font-bold">$49.99</span>
+
+              <div className="mb-6 mt-2">
+                <h3 className="text-2xl font-bold mb-2">Creative Kit</h3>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-4xl font-bold text-primary-600">$39.99</span>
+                </div>
+                <p className="text-gray-700 font-medium">For hobbyists & enthusiasts</p>
               </div>
-              <p className="text-gray-600 mb-6">Everything you need to paint</p>
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center">
+
+              <div className="mb-6">
+                <div className="inline-block bg-primary-600 text-white px-3 py-1 rounded-full text-sm font-semibold mb-4">
+                  18 Colors
+                </div>
+                <p className="text-sm text-gray-700 mb-4">Paint 5+ detailed templates</p>
+              </div>
+
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Pre-printed canvas (16x20")
+                  <span className="text-sm font-medium">18 premium acrylic paints</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Complete paint set
+                  <span className="text-sm font-medium">5 professional brushes</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  3 professional brushes
+                  <span className="text-sm font-medium">Color mixing guide</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Free shipping
+                  <span className="text-sm font-medium">Palette tray included</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Color legend included
+                  <span className="text-sm font-medium">10 template credits</span>
                 </li>
               </ul>
-              <Link href="/create">
-                <Button className="w-full">
-                  Order Kit
+
+              <Link href="/shop">
+                <Button className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700">
+                  Get Started
                 </Button>
               </Link>
             </div>
 
-            {/* Premium Kit */}
-            <div className="p-8 rounded-lg border-2 border-gray-200 hover:border-primary-500 transition-colors">
-              <h3 className="text-2xl font-bold mb-2">Premium Kit</h3>
-              <div className="mb-4">
-                <span className="text-4xl font-bold">$89.99</span>
+            {/* Professional Kit */}
+            <div className="group p-8 rounded-3xl bg-white border-2 border-gray-200 hover:border-primary-400 hover:shadow-2xl transition-all duration-300">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold mb-2">Professional Kit</h3>
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-4xl font-bold text-primary-600">$59.99</span>
+                </div>
+                <p className="text-gray-600">For serious artists</p>
               </div>
-              <p className="text-gray-600 mb-6">Gift-ready deluxe package</p>
-              <ul className="space-y-3 mb-6">
-                <li className="flex items-center">
+
+              <div className="mb-6">
+                <div className="inline-block bg-secondary-600 text-white px-3 py-1 rounded-full text-sm font-semibold mb-4">
+                  24 Colors
+                </div>
+                <p className="text-sm text-gray-600 mb-4">Paint 10+ complex templates</p>
+              </div>
+
+              <ul className="space-y-3 mb-8">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Large canvas (24x30")
+                  <span className="text-sm">24 professional-grade paints (50ml)</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Premium paint set
+                  <span className="text-sm">8 premium brushes (complete range)</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  5 artist-grade brushes
+                  <span className="text-sm">Advanced mixing guide</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Wooden display frame
+                  <span className="text-sm">Paint storage organizer</span>
                 </li>
-                <li className="flex items-center">
+                <li className="flex items-start">
                   <span className="text-primary-600 mr-2">✓</span>
-                  Express shipping
-                </li>
-                <li className="flex items-center">
-                  <span className="text-primary-600 mr-2">✓</span>
-                  Gift box packaging
+                  <span className="text-sm">1 year unlimited templates</span>
                 </li>
               </ul>
-              <Link href="/create">
-                <Button variant="secondary" className="w-full">
-                  Order Premium
+
+              <Link href="/shop">
+                <Button variant="secondary" className="w-full group-hover:bg-secondary-600 group-hover:text-white transition-colors">
+                  Go Professional
                 </Button>
               </Link>
             </div>
           </div>
 
-          <p className="text-center mt-8 text-gray-600">
-            🎁 Perfect for gifts • 💝 30-day satisfaction guarantee • 🚚 Fast delivery
-          </p>
+          <div className="mt-12 text-center">
+            <p className="text-gray-600 mb-6">
+              🎁 30-day money-back guarantee • 🚚 Free shipping on orders over $50 • 💝 Perfect for gifts
+            </p>
+            <div className="inline-block bg-gradient-to-r from-primary-100 to-secondary-100 px-8 py-4 rounded-2xl">
+              <p className="text-sm font-semibold text-gray-800 mb-1">💰 Save Even More with Subscriptions!</p>
+              <p className="text-sm text-gray-600">Get monthly templates + paint refills from <span className="font-bold text-primary-600">$29.99/month</span></p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -354,6 +488,7 @@ export default function LandingPage() {
             <div>
               <h4 className="text-white font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm">
+                <li><Link href="/shop" className="hover:text-white">Paint Kits</Link></li>
                 <li><Link href="/features" className="hover:text-white">Features</Link></li>
                 <li><Link href="/pricing" className="hover:text-white">Pricing</Link></li>
                 <li><Link href="/gallery" className="hover:text-white">Gallery</Link></li>
