@@ -8,15 +8,32 @@ export interface Palette {
   colors: number[][]
 }
 
+export interface PreviewOptions {
+  maxSize?: number // Maximum dimension (width or height) in pixels
+  quality?: 'low' | 'medium' | 'high' | 'ultra' // Quality preset
+  blurRadius?: number // Custom blur radius (overrides quality preset)
+  edgeIntensity?: number // Edge darkness (0-100)
+}
+
+// Quality presets
+const QUALITY_PRESETS = {
+  low: { maxSize: 400, blurRadius: 2, edgeIntensity: 20 },
+  medium: { maxSize: 600, blurRadius: 3, edgeIntensity: 30 },
+  high: { maxSize: 900, blurRadius: 4, edgeIntensity: 40 },
+  ultra: { maxSize: 1200, blurRadius: 5, edgeIntensity: 50 },
+}
+
 /**
  * Generate a paint-by-numbers preview from an image
  * @param imageUrl - Data URL or URL of the original image
  * @param palette - Color palette to use for the preview
+ * @param options - Preview generation options (size, quality, etc.)
  * @returns Promise<string> - Data URL of the preview image
  */
 export async function generatePaintPreview(
   imageUrl: string,
-  palette: Palette
+  palette: Palette,
+  options: PreviewOptions = {}
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     // Validate inputs
@@ -42,6 +59,13 @@ export async function generatePaintPreview(
       try {
         clearTimeout(timeout)
 
+        // Apply quality preset or use custom options
+        const quality = options.quality || 'medium'
+        const preset = QUALITY_PRESETS[quality]
+        const maxSize = options.maxSize || preset.maxSize
+        const blurRadius = options.blurRadius !== undefined ? options.blurRadius : preset.blurRadius
+        const edgeIntensity = options.edgeIntensity !== undefined ? options.edgeIntensity : preset.edgeIntensity
+
         // Create canvas
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
@@ -51,9 +75,7 @@ export async function generatePaintPreview(
           return
         }
 
-        // Set canvas size (scale down for performance)
-        // Limit to 600px for better performance
-        const maxSize = 600
+        // Set canvas size (scale down based on maxSize)
         let width = img.width
         let height = img.height
 
@@ -75,14 +97,17 @@ export async function generatePaintPreview(
         const imageData = ctx.getImageData(0, 0, width, height)
         const data = imageData.data
 
-        // Apply paint-by-numbers effect
-        applyPaintEffect(data, palette.colors, width, height)
+        // Apply paint-by-numbers effect with custom parameters
+        applyPaintEffect(data, palette.colors, width, height, blurRadius)
 
         // Put modified image data back
         ctx.putImageData(imageData, 0, 0)
 
-        // Add subtle edge effect to simulate regions
-        addEdgeEffect(ctx, width, height)
+        // Add paint texture for realism
+        addPaintTexture(ctx, width, height)
+
+        // Add edge effect to simulate numbered regions
+        addEdgeEffect(ctx, width, height, edgeIntensity)
 
         // Convert to data URL
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
@@ -114,10 +139,10 @@ function applyPaintEffect(
   data: Uint8ClampedArray,
   paletteColors: number[][],
   width: number,
-  height: number
+  height: number,
+  blurRadius: number
 ) {
-  // Apply slight blur for smoother regions (simulates paint blending)
-  const blurRadius = 2
+  // Apply blur for smoother regions (simulates paint blending)
   const blurred = applyBoxBlur(data, width, height, blurRadius)
 
   // Quantize colors to palette
@@ -211,12 +236,36 @@ function applyBoxBlur(
 }
 
 /**
- * Add subtle edge effect to simulate numbered regions
+ * Add paint texture for realistic appearance
+ */
+function addPaintTexture(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number
+) {
+  const imageData = ctx.getImageData(0, 0, width, height)
+  const data = imageData.data
+
+  // Add subtle noise/grain to simulate paint texture
+  for (let i = 0; i < data.length; i += 4) {
+    // Random variation within ±3 for subtle texture
+    const noise = (Math.random() - 0.5) * 6
+    data[i] = Math.max(0, Math.min(255, data[i] + noise))
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + noise))
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + noise))
+  }
+
+  ctx.putImageData(imageData, 0, 0)
+}
+
+/**
+ * Add edge effect to simulate numbered regions
  */
 function addEdgeEffect(
   ctx: CanvasRenderingContext2D,
   width: number,
-  height: number
+  height: number,
+  edgeIntensity: number
 ) {
   const imageData = ctx.getImageData(0, 0, width, height)
   const data = imageData.data
@@ -241,27 +290,73 @@ function addEdgeEffect(
                         Math.abs(data[idx + 2] - data[bottom + 2])
 
       // If significant color difference, it's an edge
-      const threshold = 60
+      const threshold = 50 // Slightly more sensitive
       if (diffRight > threshold || diffBottom > threshold) {
-        edges[idx] = 80     // Dark gray edge
-        edges[idx + 1] = 80
-        edges[idx + 2] = 80
+        edges[idx] = 60     // Dark gray edge
+        edges[idx + 1] = 60
+        edges[idx + 2] = 60
         edges[idx + 3] = 255
       }
     }
   }
 
-  // Blend edges with original image
+  // Blend edges with original image based on intensity
   for (let i = 0; i < data.length; i += 4) {
     if (edges[i + 3] > 0) {
-      // Darken edge pixels slightly
-      data[i] = Math.max(0, data[i] - 30)
-      data[i + 1] = Math.max(0, data[i + 1] - 30)
-      data[i + 2] = Math.max(0, data[i + 2] - 30)
+      // Darken edge pixels based on edgeIntensity (0-100)
+      const darken = edgeIntensity * 0.6 // Scale to 0-60
+      data[i] = Math.max(0, data[i] - darken)
+      data[i + 1] = Math.max(0, data[i + 1] - darken)
+      data[i + 2] = Math.max(0, data[i + 2] - darken)
     }
   }
 
   ctx.putImageData(imageData, 0, 0)
+}
+
+/**
+ * Estimate real-world painting size based on pixel dimensions
+ * @param pixels - Pixel dimension (width or height)
+ * @param dpi - Dots per inch (default: 150 for good quality print)
+ * @returns Object with inches and centimeters
+ */
+export function estimatePaintingSize(pixels: number, dpi: number = 150) {
+  const inches = pixels / dpi
+  const cm = inches * 2.54
+  return {
+    inches: Math.round(inches * 10) / 10,
+    cm: Math.round(cm * 10) / 10,
+  }
+}
+
+/**
+ * Get quality preset information
+ * @param quality - Quality level
+ * @returns Preset configuration
+ */
+export function getQualityPreset(quality: 'low' | 'medium' | 'high' | 'ultra') {
+  return QUALITY_PRESETS[quality]
+}
+
+/**
+ * Calculate estimated processing time based on image size
+ * @param width - Image width
+ * @param height - Image height
+ * @param quality - Quality preset
+ * @returns Estimated time in seconds
+ */
+export function estimateProcessingTime(
+  width: number,
+  height: number,
+  quality: 'low' | 'medium' | 'high' | 'ultra'
+): number {
+  const preset = QUALITY_PRESETS[quality]
+  const pixels = width * height
+  const blurComplexity = preset.blurRadius * preset.blurRadius
+
+  // Rough estimate: 0.3 microseconds per pixel per blur radius squared
+  const seconds = (pixels * blurComplexity * 0.0000003)
+  return Math.max(0.1, Math.round(seconds * 10) / 10)
 }
 
 /**
@@ -275,5 +370,5 @@ export async function generateThumbnailPreview(
   palette: Palette
 ): Promise<string> {
   // Same as generatePaintPreview but smaller size for performance
-  return generatePaintPreview(imageUrl, palette)
+  return generatePaintPreview(imageUrl, palette, { quality: 'low' })
 }
