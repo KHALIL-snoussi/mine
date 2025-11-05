@@ -3,19 +3,19 @@ Legend Generator Module - Creates color legend/key for paint-by-numbers
 """
 
 import numpy as np
-from typing import Optional, List, Tuple
+from typing import Optional
 from pathlib import Path
 
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import rgb_to_hex, get_contrasting_color
-    from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.utils.import_utils import require_cv2
 except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import rgb_to_hex, get_contrasting_color
-    from utils.opencv import require_cv2
+    from utils.import_utils import require_cv2
 
 
 class LegendGenerator:
@@ -67,6 +67,7 @@ class LegendGenerator:
         Returns:
             Legend image
         """
+        cv2 = require_cv2()
         n_colors = len(palette)
         swatch_size = self.config.LEGEND_SWATCH_SIZE
         padding = self.config.LEGEND_PADDING
@@ -189,6 +190,7 @@ class LegendGenerator:
         Returns:
             Legend image
         """
+        cv2 = require_cv2()
         n_colors = len(palette)
         swatch_size = self.config.LEGEND_SWATCH_SIZE
         padding = self.config.LEGEND_PADDING
@@ -289,6 +291,7 @@ class LegendGenerator:
         Returns:
             Compact legend image
         """
+        cv2 = require_cv2()
         n_colors = len(palette)
         swatch_size = self.config.LEGEND_SWATCH_SIZE - 10  # Smaller swatches
         padding = 10
@@ -378,6 +381,7 @@ class LegendGenerator:
         Returns:
             Color mixing guide image
         """
+        cv2 = require_cv2()
         # This is a simplified version - in reality, color mixing is complex
         n_colors = len(palette)
 
