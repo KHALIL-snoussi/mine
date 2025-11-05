@@ -3,7 +3,7 @@ Quality Scorer - Evaluates the quality of paint-by-numbers templates
 """
 
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 try:
     from paint_by_numbers.utils.opencv import require_cv2
@@ -11,19 +11,21 @@ except ImportError:
     from ..utils.opencv import require_cv2
 
 try:
+    from paint_by_numbers.config import Config
     from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config import Config
     from logger import logger
 
 
 class QualityScorer:
     """Evaluates template quality and paintability"""
 
-    def __init__(self):
-        pass
+    def __init__(self, config: Optional[Config] = None):
+        self.config = config or Config()
 
     def score_template(self, original_image: np.ndarray,
                       quantized_image: np.ndarray,

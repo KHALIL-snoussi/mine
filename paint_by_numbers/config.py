@@ -77,6 +77,11 @@ class Config:
     GAUSSIAN_BLUR_KERNEL = (3, 3)  # Kernel for Gaussian blur preprocessing
     SHOW_PROGRESS = True           # Show progress bars
 
+    # Intelligence & Analysis
+    ANALYSIS_SAMPLE_SIZE = 10000   # Number of pixels to sample for analysis
+    SMALL_REGION_THRESHOLD = 200   # Pixel threshold for small region detection
+    BRIGHTNESS_THRESHOLD = 200     # Brightness value (0-255) for light color detection
+
     def __init__(self, preset: Optional[str] = None):
         """
         Initialize config with optional preset

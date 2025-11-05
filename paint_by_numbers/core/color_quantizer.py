@@ -335,7 +335,7 @@ class ColorQuantizer:
 
         new_image = new_pixels.reshape(h, w, 3)
 
-        print(f"Reduced palette from {n_colors} to {len(new_palette)} colors")
+        logger.info(f"Reduced palette from {n_colors} to {len(new_palette)} colors")
         return new_image, new_palette
 
     def apply_palette(self, image: np.ndarray, palette: np.ndarray) -> np.ndarray:

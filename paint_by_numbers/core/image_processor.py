@@ -134,11 +134,22 @@ class ImageProcessor:
         if not path.exists():
             raise FileNotFoundError(f"Image file not found: {image_path}")
 
+        # Validate file extension
+        valid_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
+        if path.suffix.lower() not in valid_extensions:
+            logger.warning(f"File extension '{path.suffix}' may not be a supported image format. "
+                          f"Supported: {', '.join(valid_extensions)}")
+
+        # Check if it's actually a file (not a directory)
+        if not path.is_file():
+            raise ValueError(f"Path is not a file: {image_path}")
+
         cv2 = require_cv2()
         # Load image
         image = cv2.imread(str(path))
         if image is None:
-            raise ValueError(f"Failed to load image: {image_path}")
+            raise ValueError(f"Failed to load image: {image_path}. "
+                           f"This may not be a valid image file or the format is not supported.")
 
         # Convert BGR to RGB
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)

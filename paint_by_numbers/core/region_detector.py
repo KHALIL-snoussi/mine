@@ -9,6 +9,7 @@ try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import calculate_region_area, find_region_center
     from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
@@ -16,6 +17,7 @@ except ImportError:
     from config import Config
     from utils.helpers import calculate_region_area, find_region_center
     from utils.opencv import require_cv2
+    from logger import logger
 
 
 class Region:
@@ -71,7 +73,7 @@ class RegionDetector:
         self.regions = []
         self.color_regions = {i: [] for i in range(len(palette))}
 
-        print("Detecting regions...")
+        logger.info("Detecting regions...")
 
         cv2 = require_cv2()
 
@@ -129,7 +131,7 @@ class RegionDetector:
                 self.regions.append(region)
                 self.color_regions[color_idx].append(region)
 
-        print(f"Detected {len(self.regions)} regions")
+        logger.info(f"Detected {len(self.regions)} regions")
         return self.regions
 
     def get_region_statistics(self) -> Dict:
@@ -173,7 +175,7 @@ class RegionDetector:
 
         filtered = [r for r in self.regions if r.area >= min_area]
 
-        print(f"Filtered {len(self.regions) - len(filtered)} small regions")
+        logger.info(f"Filtered {len(self.regions) - len(filtered)} small regions")
 
         self.regions = filtered
 
@@ -266,7 +268,7 @@ class RegionDetector:
             for region in self.regions:
                 self.color_regions[region.color_idx].append(region)
 
-            print(f"After merging: {len(self.regions)} regions")
+            logger.info(f"After merging: {len(self.regions)} regions")
 
         return self.regions
 
