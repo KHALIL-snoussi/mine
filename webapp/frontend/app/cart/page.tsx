@@ -7,32 +7,20 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 
-interface CartItem {
-  templateId: number
-  kitSku: string
-  kitBundle: {
-    id: number
-    sku: string
-    name: string
-    price: number
-    description?: string
-    includes_frame: boolean
-    includes_paints: boolean
-    includes_brushes: boolean
-    includes_canvas: boolean
-  }
-  template: {
-    id?: number
-    title: string
-    preview_url?: string
-    difficulty_level?: string
-    num_colors?: number
-  }
+interface PaintKit {
+  id: string
+  name: string
+  displayName: string
+  price: number
+  numColors: number
+  palette: string
+  sku: string
+  quantity: number
 }
 
 export default function CartPage() {
   const router = useRouter()
-  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [cartItems, setCartItems] = useState<PaintKit[]>([])
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [shippingAddress, setShippingAddress] = useState({
@@ -45,35 +33,43 @@ export default function CartPage() {
   })
 
   useEffect(() => {
-    // Load cart from localStorage
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]')
+    // Load cart from localStorage (paintKitsCart from shop page)
+    const cart = JSON.parse(localStorage.getItem('paintKitsCart') || '[]')
     setCartItems(cart)
   }, [])
 
-  const removeItem = (index: number) => {
-    const newCart = cartItems.filter((_, i) => i !== index)
+  const removeItem = (kitId: string) => {
+    const newCart = cartItems.filter(item => item.id !== kitId)
     setCartItems(newCart)
-    localStorage.setItem('cart', JSON.stringify(newCart))
+    localStorage.setItem('paintKitsCart', JSON.stringify(newCart))
   }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.kitBundle.price, 0)
-  // Shipping is free for kits with canvas/physical items, no shipping for digital-only
-  const needsShipping = cartItems.some(item => item.kitBundle.includes_canvas)
-  const shipping = needsShipping ? 0 : 0 // Free shipping for all physical kits!
+  const updateQuantity = (kitId: string, newQuantity: number) => {
+    if (newQuantity < 1) {
+      removeItem(kitId)
+      return
+    }
+    const newCart = cartItems.map(item =>
+      item.id === kitId ? { ...item, quantity: newQuantity } : item
+    )
+    setCartItems(newCart)
+    localStorage.setItem('paintKitsCart', JSON.stringify(newCart))
+  }
+
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const shipping = subtotal >= 50 ? 0 : 7.99 // Free shipping over $50
   const tax = subtotal * 0.08 // 8% tax
   const total = subtotal + shipping + tax
 
   const handleCheckout = () => {
     // Validate inputs
     if (!email || cartItems.length === 0) {
-      alert('Please fill in all required fields')
+      alert('Please fill in your email address')
       return
     }
 
-    // Check if shipping address is needed (for physical items)
-    const needsShipping = cartItems.some(item => item.kitBundle.includes_canvas || item.kitBundle.includes_frame)
-    if (needsShipping && (!shippingAddress.name || !shippingAddress.address)) {
-      alert('Please fill in shipping address')
+    if (!shippingAddress.name || !shippingAddress.address || !shippingAddress.city || !shippingAddress.state || !shippingAddress.zip) {
+      alert('Please fill in complete shipping address')
       return
     }
 
@@ -83,14 +79,17 @@ export default function CartPage() {
       customer: {
         email,
         phone,
-        shipping: needsShipping ? shippingAddress : null
+        shipping: shippingAddress
       },
       total,
       date: new Date().toISOString()
     }
 
     localStorage.setItem('pending_order', JSON.stringify(order))
-    router.push('/checkout')
+
+    // For now, show success message (until Stripe integration)
+    alert('Order placed! (Checkout integration coming soon)')
+    // router.push('/checkout')
   }
 
   return (
@@ -105,11 +104,11 @@ export default function CartPage() {
               </h1>
             </Link>
             <div className="flex items-center gap-4">
-              <Link href="/create">
-                <Button variant="ghost">Create New</Button>
+              <Link href="/shop">
+                <Button variant="ghost">Shop Kits</Button>
               </Link>
-              <Link href="/gallery">
-                <Button variant="ghost">Gallery</Button>
+              <Link href="/create">
+                <Button variant="ghost">Create Template</Button>
               </Link>
             </div>
           </div>
@@ -120,63 +119,85 @@ export default function CartPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Shopping Cart</h1>
 
         {cartItems.length === 0 ? (
-          <div className="text-center py-12">
+          <div className="text-center py-16">
             <div className="text-6xl mb-4">🛒</div>
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">Your cart is empty</h2>
-            <p className="text-gray-600 mb-6">Start creating your custom paint by numbers!</p>
-            <Link href="/create">
-              <Button size="lg">Create Your First Template</Button>
+            <p className="text-gray-600 mb-6">Add paint kits to get started!</p>
+            <Link href="/shop">
+              <Button size="lg" className="text-lg px-8">
+                Browse Paint Kits
+              </Button>
             </Link>
           </div>
         ) : (
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Cart Items */}
             <div className="lg:col-span-2 space-y-4">
-              {cartItems.map((item, index) => (
-                <Card key={index}>
+              {cartItems.map((item) => (
+                <Card key={item.id}>
                   <CardContent className="p-6">
-                    <div className="flex gap-4">
-                      <div className="w-24 h-24 bg-gray-200 rounded-lg flex-shrink-0">
-                        {item.template.preview_url && (
-                          <img
-                            src={item.template.preview_url}
-                            alt="Template"
-                            className="w-full h-full object-cover rounded-lg"
-                          />
-                        )}
+                    <div className="flex gap-6 items-start">
+                      {/* Icon/Image */}
+                      <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-secondary-100 rounded-xl flex items-center justify-center text-3xl flex-shrink-0">
+                        🎨
                       </div>
+
+                      {/* Details */}
                       <div className="flex-grow">
-                        <h3 className="font-semibold text-lg">{item.kitBundle.name}</h3>
-                        <p className="text-sm text-gray-600">{item.kitBundle.description}</p>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Template: {item.template.title}
-                        </p>
-                        <div className="flex gap-2 mt-2">
-                          {item.kitBundle.includes_canvas && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Canvas</span>
-                          )}
-                          {item.kitBundle.includes_paints && (
-                            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Paints</span>
-                          )}
-                          {item.kitBundle.includes_brushes && (
-                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Brushes</span>
-                          )}
-                          {item.kitBundle.includes_frame && (
-                            <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">Frame</span>
-                          )}
+                        <h3 className="font-bold text-lg text-gray-900 mb-1">{item.displayName}</h3>
+                        <p className="text-sm text-gray-600 mb-2">{item.numColors} premium acrylic colors</p>
+                        <p className="text-xs text-gray-500">SKU: {item.sku}</p>
+
+                        {/* Quantity Selector */}
+                        <div className="flex items-center gap-3 mt-3">
+                          <span className="text-sm font-medium text-gray-700">Quantity:</span>
+                          <div className="flex items-center border border-gray-300 rounded-lg">
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                              className="px-3 py-1 hover:bg-gray-100 text-gray-600 font-semibold"
+                            >
+                              −
+                            </button>
+                            <span className="px-4 py-1 border-x border-gray-300 font-semibold">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              className="px-3 py-1 hover:bg-gray-100 text-gray-600 font-semibold"
+                            >
+                              +
+                            </button>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Price & Remove */}
                       <div className="text-right">
-                        <p className="text-lg font-bold text-primary-600">${item.kitBundle.price.toFixed(2)}</p>
+                        <p className="text-2xl font-bold text-primary-600 mb-2">
+                          ${(item.price * item.quantity).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-gray-500 mb-3">
+                          ${item.price.toFixed(2)} each
+                        </p>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeItem(index)}
-                          className="text-red-600 hover:bg-red-50 mt-2"
+                          onClick={() => removeItem(item.id)}
+                          className="text-red-600 hover:bg-red-50 text-sm"
                         >
                           Remove
                         </Button>
                       </div>
+                    </div>
+
+                    {/* Benefits Banner */}
+                    <div className="mt-4 p-3 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-lg border border-primary-200">
+                      <p className="text-sm font-semibold text-primary-900">
+                        ✨ Includes: Unlimited Template Generation Forever!
+                      </p>
+                      <p className="text-xs text-primary-700 mt-1">
+                        Generate as many custom templates as you want with this kit
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -199,6 +220,7 @@ export default function CartPage() {
                       placeholder="your@email.com"
                       required
                     />
+                    <p className="text-xs text-gray-500 mt-1">For order confirmation and template access</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -215,84 +237,82 @@ export default function CartPage() {
               </Card>
 
               {/* Shipping Address */}
-              {cartItems.some(item => item.kitBundle.includes_canvas || item.kitBundle.includes_frame) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Shipping Address</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Shipping Address</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Full Name *
+                    </label>
+                    <Input
+                      value={shippingAddress.name}
+                      onChange={(e) => setShippingAddress({...shippingAddress, name: e.target.value})}
+                      placeholder="John Doe"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Street Address *
+                    </label>
+                    <Input
+                      value={shippingAddress.address}
+                      onChange={(e) => setShippingAddress({...shippingAddress, address: e.target.value})}
+                      placeholder="123 Main St, Apt 4B"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Full Name *
+                        City *
                       </label>
                       <Input
-                        value={shippingAddress.name}
-                        onChange={(e) => setShippingAddress({...shippingAddress, name: e.target.value})}
-                        placeholder="John Doe"
+                        value={shippingAddress.city}
+                        onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
+                        placeholder="New York"
                         required
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Street Address *
+                        State *
                       </label>
                       <Input
-                        value={shippingAddress.address}
-                        onChange={(e) => setShippingAddress({...shippingAddress, address: e.target.value})}
-                        placeholder="123 Main St, Apt 4B"
+                        value={shippingAddress.state}
+                        onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
+                        placeholder="NY"
                         required
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          City *
-                        </label>
-                        <Input
-                          value={shippingAddress.city}
-                          onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
-                          placeholder="New York"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          State *
-                        </label>
-                        <Input
-                          value={shippingAddress.state}
-                          onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
-                          placeholder="NY"
-                          required
-                        />
-                      </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        ZIP Code *
+                      </label>
+                      <Input
+                        value={shippingAddress.zip}
+                        onChange={(e) => setShippingAddress({...shippingAddress, zip: e.target.value})}
+                        placeholder="10001"
+                        required
+                      />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          ZIP Code *
-                        </label>
-                        <Input
-                          value={shippingAddress.zip}
-                          onChange={(e) => setShippingAddress({...shippingAddress, zip: e.target.value})}
-                          placeholder="10001"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Country
-                        </label>
-                        <Input
-                          value={shippingAddress.country}
-                          onChange={(e) => setShippingAddress({...shippingAddress, country: e.target.value})}
-                          disabled
-                        />
-                      </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Country
+                      </label>
+                      <Input
+                        value={shippingAddress.country}
+                        onChange={(e) => setShippingAddress({...shippingAddress, country: e.target.value})}
+                        disabled
+                      />
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Order Summary */}
@@ -303,13 +323,22 @@ export default function CartPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Subtotal ({cartItems.length} items)</span>
+                    <span className="text-gray-600">Subtotal ({cartItems.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
                     <span className="font-medium">${subtotal.toFixed(2)}</span>
                   </div>
-                  {shipping > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Shipping</span>
-                      <span className="font-medium">${shipping.toFixed(2)}</span>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Shipping</span>
+                    <span className="font-medium">
+                      {shipping === 0 ? (
+                        <span className="text-green-600">FREE</span>
+                      ) : (
+                        `$${shipping.toFixed(2)}`
+                      )}
+                    </span>
+                  </div>
+                  {subtotal < 50 && subtotal > 0 && (
+                    <div className="text-xs text-gray-500 -mt-2">
+                      Add ${(50 - subtotal).toFixed(2)} more for free shipping!
                     </div>
                   )}
                   <div className="flex justify-between text-sm">
@@ -331,33 +360,41 @@ export default function CartPage() {
                     Proceed to Checkout
                   </Button>
 
-                  <div className="text-center space-y-2">
-                    <p className="text-xs text-gray-500">
-                      🔒 Secure checkout powered by Stripe
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      💝 30-day money-back guarantee
-                    </p>
+                  <div className="space-y-2 pt-4 border-t">
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>🔒</span>
+                      <span>Secure checkout</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>💝</span>
+                      <span>30-day money-back guarantee</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>🚚</span>
+                      <span>Ships within 24 hours</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-600">
+                      <span>♾️</span>
+                      <span>Unlimited template generation</span>
+                    </div>
                   </div>
 
                   <div className="border-t pt-4">
                     <p className="text-xs text-gray-600 mb-2">
-                      <strong>What's included:</strong>
+                      <strong>What happens next:</strong>
                     </p>
-                    <ul className="text-xs text-gray-600 space-y-1">
-                      {cartItems.map((item, idx) => (
-                        <li key={idx} className="flex items-start">
-                          <span className="text-primary-600 mr-1">•</span>
-                          {item.kitBundle.name}
-                        </li>
-                      ))}
-                    </ul>
+                    <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+                      <li>Complete checkout & payment</li>
+                      <li>Receive order confirmation</li>
+                      <li>Kit ships within 24 hours</li>
+                      <li>Start generating templates!</li>
+                    </ol>
                   </div>
                 </CardContent>
               </Card>
 
               <div className="mt-4 text-center">
-                <Link href="/create" className="text-sm text-primary-600 hover:underline">
+                <Link href="/shop" className="text-sm text-primary-600 hover:underline">
                   ← Continue Shopping
                 </Link>
               </div>
