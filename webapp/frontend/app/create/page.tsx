@@ -7,7 +7,7 @@ import { useDropzone } from 'react-dropzone'
 
 import { Button } from '@/components/ui/Button'
 import ModelSelector from '@/components/ModelSelector'
-import { apiClient } from '@/lib/api'
+import { apiClient, type KitRecommendation } from '@/lib/api'
 import { useModels, usePalettes } from '@/lib/hooks'
 import {
   validateImage,
@@ -43,6 +43,10 @@ export default function CreatePage() {
   const [validation, setValidation] = useState<ValidationResult | null>(null)
   const [imageInfo, setImageInfo] = useState<ImageInfo | null>(null)
   const [showValidation, setShowValidation] = useState(false)
+
+  const [kitRecommendation, setKitRecommendation] = useState<KitRecommendation | null>(null)
+  const [isLoadingRecommendation, setIsLoadingRecommendation] = useState(false)
+  const [showAllKits, setShowAllKits] = useState(false)
 
   const { data: modelsData } = useModels()
   const { data: palettesData } = usePalettes()
@@ -88,6 +92,8 @@ export default function CreatePage() {
     setImageInfo(null)
     setRecommendedModel(null)
     setShowValidation(false)
+    setKitRecommendation(null)
+    setShowAllKits(false)
 
     const validationResult = await validateImage(file)
     setValidation(validationResult)
@@ -112,6 +118,19 @@ export default function CreatePage() {
         setPreview(reader.result as string)
       }
       reader.readAsDataURL(file)
+
+      // Get kit recommendation from AI
+      setIsLoadingRecommendation(true)
+      try {
+        const kitRec = await apiClient.getKitRecommendation(file)
+        setKitRecommendation(kitRec)
+        // Auto-select the recommended palette
+        setSelectedPalette(kitRec.recommended_kit.palette_name)
+      } catch (error) {
+        console.error('Error getting kit recommendation:', error)
+      } finally {
+        setIsLoadingRecommendation(false)
+      }
     } catch (error) {
       console.error('Error loading image info:', error)
     }
@@ -381,6 +400,160 @@ export default function CreatePage() {
                           <li>Use painter's tape for crisp edges</li>
                         </ul>
                       </div>
+                    </div>
+                  )}
+
+                  {/* AI Kit Recommendation */}
+                  {isLoadingRecommendation && (
+                    <div className="mt-6 rounded-2xl border border-primary-200 bg-primary-50/50 p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-600 border-t-transparent"></div>
+                        <p className="text-sm font-medium text-primary-800">AI is analyzing your image to recommend the perfect paint kit...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {kitRecommendation && !isLoadingRecommendation && (
+                    <div className="mt-6 rounded-2xl border-2 border-primary-300 bg-gradient-to-br from-primary-50 to-secondary-50 p-6 shadow-lg">
+                      <div className="flex items-start gap-3 mb-4">
+                        <span className="text-3xl">🎯</span>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-slate-900 mb-1">AI Recommendation for Your Image</h3>
+                          <p className="text-sm text-slate-600">
+                            We analyzed your {kitRecommendation.analysis.subject_type} photo
+                          </p>
+                        </div>
+                        <div className="rounded-full bg-primary-600 px-3 py-1 text-xs font-bold text-white">
+                          {Math.round(kitRecommendation.confidence)}% Match
+                        </div>
+                      </div>
+
+                      {/* Analysis Summary */}
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {kitRecommendation.analysis.is_portrait && (
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                            ✓ Portrait detected
+                          </span>
+                        )}
+                        {kitRecommendation.analysis.is_pet && (
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                            ✓ Pet photo
+                          </span>
+                        )}
+                        {kitRecommendation.analysis.is_landscape && (
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                            ✓ Landscape scene
+                          </span>
+                        )}
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                          {kitRecommendation.analysis.complexity_level} complexity
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                          {kitRecommendation.analysis.colors_detected} colors detected
+                        </span>
+                      </div>
+
+                      {/* Recommended Kit */}
+                      <div className="rounded-xl bg-white p-5 shadow-md border-2 border-primary-200">
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-primary-600 mb-1">Best Match</p>
+                            <h4 className="text-xl font-bold text-slate-900">{kitRecommendation.recommended_kit.display_name}</h4>
+                            <p className="text-2xl font-bold text-primary-600 mt-1">${kitRecommendation.recommended_kit.price_usd}</p>
+                          </div>
+                          <div className="text-right">
+                            <div className="inline-block rounded-lg bg-primary-100 px-3 py-1 text-sm font-semibold text-primary-700">
+                              {kitRecommendation.recommended_kit.num_colors} Colors
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">{kitRecommendation.recommended_kit.sku}</p>
+                          </div>
+                        </div>
+
+                        {/* Reasons */}
+                        <div className="space-y-2 mb-4">
+                          {kitRecommendation.reasoning.map((reason, idx) => (
+                            <div key={idx} className="flex items-start gap-2">
+                              <span className="text-primary-600 mt-0.5">✓</span>
+                              <span className="text-sm text-slate-700">{reason}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Button className="flex-1 bg-gradient-to-r from-primary-600 to-secondary-600">
+                            Use This Kit
+                          </Button>
+                          <Link href="/shop">
+                            <Button variant="outline" size="sm">
+                              Shop Now
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+
+                      {/* Show All Kits Button */}
+                      <button
+                        onClick={() => setShowAllKits(!showAllKits)}
+                        className="mt-4 w-full rounded-lg border-2 border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-all hover:border-primary-300 hover:bg-primary-50"
+                      >
+                        {showAllKits ? '↑ Hide' : '↓ Compare All 6 Paint Kits Side-by-Side'}
+                      </button>
+
+                      {/* All Kits Comparison */}
+                      {showAllKits && (
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {kitRecommendation.all_kits_ranked.map((kitData, idx) => (
+                            <div
+                              key={kitData.kit.id}
+                              className={`rounded-xl border-2 p-4 transition-all ${
+                                kitData.kit.id === kitRecommendation.recommended_kit.id
+                                  ? 'border-primary-500 bg-primary-50/50 shadow-md'
+                                  : 'border-slate-200 bg-white hover:border-primary-200 hover:shadow'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <p className="text-xs font-semibold text-slate-500">#{idx + 1}</p>
+                                  <h5 className="text-sm font-bold text-slate-900">{kitData.kit.name}</h5>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-bold text-primary-600">${kitData.kit.price_usd}</p>
+                                  <p className="text-xs text-slate-500">{kitData.kit.num_colors} colors</p>
+                                </div>
+                              </div>
+
+                              <div className="mb-3 rounded bg-slate-100 p-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-2 flex-1 rounded-full bg-slate-200">
+                                    <div
+                                      className="h-2 rounded-full bg-primary-500"
+                                      style={{ width: `${kitData.score}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-semibold text-slate-600">{Math.round(kitData.score)}%</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1">
+                                {kitData.reasons.slice(0, 2).map((reason, ridx) => (
+                                  <p key={ridx} className="text-xs text-slate-600">• {reason}</p>
+                                ))}
+                              </div>
+
+                              <button
+                                onClick={() => setSelectedPalette(kitData.kit.palette_name)}
+                                className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
+                                  selectedPalette === kitData.kit.palette_name
+                                    ? 'bg-primary-600 text-white'
+                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                }`}
+                              >
+                                {selectedPalette === kitData.kit.palette_name ? '✓ Selected' : 'Select This Kit'}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
