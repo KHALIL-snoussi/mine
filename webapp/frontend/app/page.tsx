@@ -17,16 +17,13 @@ export default function LandingPage() {
               <Link href="/shop">
                 <Button variant="ghost">Shop Kits</Button>
               </Link>
-              <Link href="/gallery">
-                <Button variant="ghost">Gallery</Button>
-              </Link>
-              <Link href="/pricing">
-                <Button variant="ghost">Pricing</Button>
+              <Link href="/create">
+                <Button variant="ghost">Try Free</Button>
               </Link>
               <Link href="/login">
                 <Button variant="outline">Log In</Button>
               </Link>
-              <Link href="/signup">
+              <Link href="/shop">
                 <Button>Get Started</Button>
               </Link>
             </div>
@@ -64,6 +61,30 @@ export default function LandingPage() {
             <p className="mt-4 text-sm text-gray-500">
               Free preview • No account needed • Paint Kits from $24.99
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Social Proof Section */}
+      <section className="py-12 bg-white border-y border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+            <div>
+              <div className="text-4xl font-bold text-primary-600 mb-2">10,000+</div>
+              <p className="text-sm text-gray-600">Happy Customers</p>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-primary-600 mb-2">50,000+</div>
+              <p className="text-sm text-gray-600">Templates Created</p>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-primary-600 mb-2">4.9★</div>
+              <p className="text-sm text-gray-600">Average Rating</p>
+            </div>
+            <div>
+              <div className="text-4xl font-bold text-primary-600 mb-2">30-Day</div>
+              <p className="text-sm text-gray-600">Money-Back Guarantee</p>
+            </div>
           </div>
         </div>
       </section>
@@ -472,6 +493,95 @@ export default function LandingPage() {
               Start Creating Now
             </Button>
           </Link>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-xl text-gray-600">
+              Everything you need to know about our paint kits and templates
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            {/* FAQ Item */}
+            <details className="group bg-gray-50 rounded-xl p-6 cursor-pointer">
+              <summary className="flex justify-between items-center font-semibold text-lg text-gray-900 list-none">
+                <span>🎨 Do I really get unlimited templates with one kit?</span>
+                <span className="transition group-open:rotate-180">⌄</span>
+              </summary>
+              <p className="mt-4 text-gray-600">
+                <strong>Yes! 100% unlimited.</strong> When you buy a paint kit (e.g., Creative Kit with 18 colors), you can generate and download as many PDF templates as you want, forever. The templates are free - you're just paying for the physical paints once. The paint itself lasts for approximately 3-5 large canvas projects depending on kit size.
+              </p>
+            </details>
+
+            <details className="group bg-gray-50 rounded-xl p-6 cursor-pointer">
+              <summary className="flex justify-between items-center font-semibold text-lg text-gray-900 list-none">
+                <span>💰 What exactly am I paying for?</span>
+                <span className="transition group-open:rotate-180">⌄</span>
+              </summary>
+              <p className="mt-4 text-gray-600">
+                You're paying <strong>once</strong> for the physical paint kit (paints, brushes, mixing tray, guides). This includes <strong>lifetime access</strong> to our template generation system. Upload any photo, generate a custom template that uses your kit's colors, download the PDF for free, and paint it!
+              </p>
+            </details>
+
+            <details className="group bg-gray-50 rounded-xl p-6 cursor-pointer">
+              <summary className="flex justify-between items-center font-semibold text-lg text-gray-900 list-none">
+                <span>🚚 How long does shipping take?</span>
+                <span className="transition group-open:rotate-180">⌄</span>
+              </summary>
+              <p className="mt-4 text-gray-600">
+                Physical paint kits ship within 24 hours and typically arrive in 3-5 business days in the US. <strong>Free shipping on orders over $50!</strong> Once you receive your kit, you can start generating and downloading templates immediately.
+              </p>
+            </details>
+
+            <details className="group bg-gray-50 rounded-xl p-6 cursor-pointer">
+              <summary className="flex justify-between items-center font-semibold text-lg text-gray-900 list-none">
+                <span>🎯 Can I try before I buy?</span>
+                <span className="transition group-open:rotate-180">⌄</span>
+              </summary>
+              <p className="mt-4 text-gray-600">
+                <strong>Absolutely!</strong> You can upload a photo and see a free preview of how it will look as a paint-by-numbers template. Our AI will even recommend which kit works best for your image. No credit card required for the preview.
+              </p>
+            </details>
+
+            <details className="group bg-gray-50 rounded-xl p-6 cursor-pointer">
+              <summary className="flex justify-between items-center font-semibold text-lg text-gray-900 list-none">
+                <span>🔄 What if I'm not satisfied?</span>
+                <span className="transition group-open:rotate-180">⌄</span>
+              </summary>
+              <p className="mt-4 text-gray-600">
+                We offer a <strong>30-day money-back guarantee</strong> on all paint kits. If you're not completely satisfied, return it for a full refund - no questions asked!
+              </p>
+            </details>
+
+            <details className="group bg-gray-50 rounded-xl p-6 cursor-pointer">
+              <summary className="flex justify-between items-center font-semibold text-lg text-gray-900 list-none">
+                <span>🖌️ Which kit should I choose?</span>
+                <span className="transition group-open:rotate-180">⌄</span>
+              </summary>
+              <p className="mt-4 text-gray-600">
+                <strong>Starter Kit ($24.99):</strong> 12 colors, perfect for beginners and simple projects.<br />
+                <strong>Creative Kit ($39.99):</strong> 18 colors, our most popular choice for detailed portraits and landscapes.<br />
+                <strong>Professional Kit ($59.99):</strong> 24 colors, for advanced painters who want maximum detail and color range.<br />
+                Try our free preview tool - our AI will recommend the best kit for your specific image!
+              </p>
+            </details>
+          </div>
+
+          <div className="mt-12 text-center p-6 bg-gradient-to-r from-primary-50 to-secondary-50 rounded-2xl">
+            <p className="text-lg font-semibold text-gray-900 mb-2">
+              Still have questions?
+            </p>
+            <p className="text-gray-600 mb-4">
+              We're here to help! Email us at <a href="mailto:support@paintbynumbersai.com" className="text-primary-600 font-semibold hover:underline">support@paintbynumbersai.com</a>
+            </p>
+          </div>
         </div>
       </section>
 

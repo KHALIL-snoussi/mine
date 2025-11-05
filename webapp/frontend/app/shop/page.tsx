@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 
@@ -146,6 +146,38 @@ const PAINT_KITS = [
 
 export default function ShopPage() {
   const [selectedKit, setSelectedKit] = useState<string | null>(null)
+  const [cartCount, setCartCount] = useState(0)
+  const [addedKit, setAddedKit] = useState<string | null>(null)
+
+  // Load cart count on mount
+  useEffect(() => {
+    const cart = JSON.parse(localStorage.getItem('paintKitsCart') || '[]')
+    setCartCount(cart.length)
+  }, [])
+
+  const addToCart = (kit: typeof PAINT_KITS[0]) => {
+    // Get existing cart
+    const cart = JSON.parse(localStorage.getItem('paintKitsCart') || '[]')
+
+    // Check if kit already in cart
+    const existingIndex = cart.findIndex((item: any) => item.id === kit.id)
+
+    if (existingIndex >= 0) {
+      // Update quantity
+      cart[existingIndex].quantity = (cart[existingIndex].quantity || 1) + 1
+    } else {
+      // Add new item
+      cart.push({ ...kit, quantity: 1 })
+    }
+
+    // Save to localStorage
+    localStorage.setItem('paintKitsCart', JSON.stringify(cart))
+    setCartCount(cart.length)
+
+    // Show feedback
+    setAddedKit(kit.id)
+    setTimeout(() => setAddedKit(null), 2000)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100">
@@ -161,8 +193,13 @@ export default function ShopPage() {
                 <Button variant="ghost" size="sm">Create Template</Button>
               </Link>
               <Link href="/cart">
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" className="relative">
                   🛒 Cart
+                  {cartCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {cartCount}
+                    </span>
+                  )}
                 </Button>
               </Link>
               <Link href="/login">
@@ -299,8 +336,11 @@ export default function ShopPage() {
                     <div className="text-5xl font-bold text-slate-900">
                       ${kit.price}
                     </div>
-                    <p className="text-sm text-slate-600 mt-2">
-                      Paint {kit.estimatedProjects}+ templates
+                    <p className="text-sm font-bold text-primary-600 mt-2">
+                      + Unlimited Template Generation
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      (Paint lasts ~{kit.estimatedProjects} large projects)
                     </p>
                   </div>
 
@@ -330,15 +370,30 @@ export default function ShopPage() {
                     </ul>
                   </div>
 
-                  {/* CTA Button */}
-                  <Link href={`/create?kit=${kit.id}`}>
+                  {/* CTA Buttons */}
+                  <div className="space-y-2">
                     <Button
+                      onClick={() => addToCart(kit)}
                       className="w-full h-12 text-base font-semibold"
                       variant={kit.badge ? 'default' : 'outline'}
+                      disabled={addedKit === kit.id}
                     >
-                      Choose {kit.name}
+                      {addedKit === kit.id ? (
+                        <>✓ Added to Cart!</>
+                      ) : (
+                        <>🛒 Add to Cart - ${kit.price}</>
+                      )}
                     </Button>
-                  </Link>
+
+                    <Link href={`/create?kit=${kit.id}`} className="block">
+                      <Button
+                        variant="ghost"
+                        className="w-full text-sm"
+                      >
+                        Try with This Kit First →
+                      </Button>
+                    </Link>
+                  </div>
 
                   {/* SKU */}
                   <p className="text-center text-xs text-slate-400 mt-3">
@@ -383,10 +438,13 @@ export default function ShopPage() {
                   <td className="p-4 text-center">$59.99</td>
                 </tr>
                 <tr>
-                  <td className="p-4 text-slate-600">Est. Templates</td>
-                  <td className="p-4 text-center">3</td>
-                  <td className="p-4 text-center font-semibold text-primary-600">5</td>
-                  <td className="p-4 text-center">10+</td>
+                  <td className="p-4 text-slate-600">
+                    Paint Lasts For
+                    <div className="text-xs text-slate-500">(Templates: Unlimited)</div>
+                  </td>
+                  <td className="p-4 text-center">~3 projects</td>
+                  <td className="p-4 text-center font-semibold text-primary-600">~5 projects</td>
+                  <td className="p-4 text-center">~10 projects</td>
                 </tr>
                 <tr className="bg-slate-50">
                   <td className="p-4 text-slate-600">Paint Volume</td>
