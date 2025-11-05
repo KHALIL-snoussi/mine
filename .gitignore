@@ -8,7 +8,8 @@ __pycache__/
 # Test outputs
 paint_test_output/
 test_input.png
-output/
+my_output/
+*_output/
 
 # Virtual environments
 venv/
