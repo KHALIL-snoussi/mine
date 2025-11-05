@@ -560,39 +560,14 @@ export default function CreatePage() {
 
                   {/* Before/After Comparison Slider */}
                   {preview && selectedPaletteInfo && !isLoadingRecommendation && (
-                    <div className="mt-6">
-                      <div className="mb-4 text-center">
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">
-                          ✨ See Your Paint-by-Numbers Preview
-                        </h3>
-                        <p className="text-sm text-slate-600">
-                          Drag the slider to compare your original photo with the paint-by-numbers version
-                        </p>
-                      </div>
-
+                    <div className="mt-8">
                       <BeforeAfterSlider
                         originalImage={preview}
                         palette={{
                           name: selectedPalette,
                           colors: selectedPaletteInfo.colors
                         }}
-                        className="h-96"
                       />
-
-                      <div className="mt-4 rounded-xl bg-gradient-to-r from-primary-50 to-secondary-50 p-4 border border-primary-200">
-                        <div className="flex items-start gap-3">
-                          <span className="text-2xl">💡</span>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-slate-800 mb-1">
-                              This is a simulated preview
-                            </p>
-                            <p className="text-xs text-slate-600">
-                              Your actual paint-by-numbers template will include numbered regions, a detailed color legend,
-                              and painting guide. The final result may vary slightly based on your painting technique.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
                     </div>
                   )}
                 </div>
