@@ -6,7 +6,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export interface Template {
   id: number
-  user_id: number
+  user_id?: number | null
   title: string
   description?: string
   palette_name: string
@@ -152,6 +152,10 @@ class APIClient {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token')
     }
+  }
+
+  isAuthenticated() {
+    return Boolean(this.token)
   }
 
   private async request<T>(
