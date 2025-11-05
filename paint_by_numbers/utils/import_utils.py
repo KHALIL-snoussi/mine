@@ -1,6 +1,8 @@
 """Utilities for optional dependency imports."""
 from importlib import import_module
 
+__all__ = ["require_cv2"]
+
 
 def require_cv2():
     """Import and return the :mod:`cv2` module.

@@ -3,7 +3,7 @@ Legend Generator Module - Creates color legend/key for paint-by-numbers
 """
 
 import numpy as np
-from typing import Optional, List, Tuple
+from typing import Optional
 from pathlib import Path
 
 try:
