@@ -333,7 +333,7 @@ export default function CartPage() {
                     <div className="text-xs text-gray-500 -mt-2">
                       Add ${(50 - subtotal).toFixed(2)} more for free shipping!
                     </div>
-                  </div>
+                  )}
 
                   <div className="border-t border-slate-200 pt-4">
                     <div className="flex justify-between items-center">
