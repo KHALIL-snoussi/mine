@@ -25,3 +25,16 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+
+# Claude and environment files
+.claude/
+*.env
+*.env.local
+
+# Frontend junk
+webapp/frontend/node_modules/
+webapp/frontend/.next/
+webapp/frontend/package-lock.json
+webapp/frontend/next-env.d.ts
+webapp/frontend/tsconfig.json
