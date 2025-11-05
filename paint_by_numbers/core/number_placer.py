@@ -9,6 +9,7 @@ try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import is_point_inside_region, get_contrasting_color
     from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
@@ -16,6 +17,7 @@ except ImportError:
     from config import Config
     from utils.helpers import is_point_inside_region, get_contrasting_color
     from utils.opencv import require_cv2
+    from logger import logger
 
 
 class NumberPlacer:
@@ -47,7 +49,7 @@ class NumberPlacer:
         result = image.copy()
         self.placed_positions = []
 
-        print(f"Placing numbers in {len(regions)} regions...")
+        logger.info(f"Placing numbers in {len(regions)} regions...")
 
         for region in regions:
             # Get the color for this region
@@ -70,7 +72,7 @@ class NumberPlacer:
 
             self.placed_positions.append((region, position, number))
 
-        print(f"Placed {len(self.placed_positions)} numbers")
+        logger.info(f"Placed {len(self.placed_positions)} numbers")
         return result
 
     def _find_best_position(self, region, image_shape: Tuple[int, int]) -> Optional[Tuple[int, int]]:

@@ -10,12 +10,14 @@ try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.helpers import rgb_to_hex, get_contrasting_color
     from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.helpers import rgb_to_hex, get_contrasting_color
     from utils.opencv import require_cv2
+    from logger import logger
 
 
 class LegendGenerator:
@@ -366,7 +368,7 @@ class LegendGenerator:
 
         cv2.imwrite(str(output_path), bgr_legend, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
-        print(f"Legend saved to: {output_path}")
+        logger.info(f"Legend saved to: {output_path}")
 
     def create_color_mixing_guide(self, palette: np.ndarray) -> np.ndarray:
         """

@@ -67,10 +67,10 @@ class PaintByNumbersGenerator:
         self.palette_manager = PaletteManager()
 
         # Initialize intelligence modules
-        self.palette_selector = IntelligentPaletteSelector()
-        self.difficulty_analyzer = DifficultyAnalyzer()
-        self.quality_scorer = QualityScorer()
-        self.color_optimizer = ColorOptimizer()
+        self.palette_selector = IntelligentPaletteSelector(self.config)
+        self.difficulty_analyzer = DifficultyAnalyzer(self.config)
+        self.quality_scorer = QualityScorer(self.config)
+        self.color_optimizer = ColorOptimizer(self.config)
 
         # Storage for intermediate results
         self.original_image = None

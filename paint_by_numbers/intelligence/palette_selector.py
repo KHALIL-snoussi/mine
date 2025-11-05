@@ -13,12 +13,14 @@ except ImportError:
     from ..utils.opencv import require_cv2
 
 try:
+    from paint_by_numbers.config import Config
     from paint_by_numbers.logger import logger
     from paint_by_numbers.palettes import PaletteManager
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config import Config
     from logger import logger
     from palettes import PaletteManager
 
@@ -26,7 +28,8 @@ except ImportError:
 class IntelligentPaletteSelector:
     """Analyzes images and recommends optimal color palettes"""
 
-    def __init__(self):
+    def __init__(self, config: Optional[Config] = None):
+        self.config = config or Config()
         self.palette_manager = PaletteManager()
 
     def analyze_image(self, image: np.ndarray) -> dict:
@@ -46,7 +49,7 @@ class IntelligentPaletteSelector:
 
         # Sample pixels for analysis
         h, w = image.shape[:2]
-        sample_size = min(10000, h * w)
+        sample_size = min(self.config.ANALYSIS_SAMPLE_SIZE, h * w)
         indices = np.random.choice(h * w, sample_size, replace=False)
 
         pixels_rgb = image.reshape(-1, 3)[indices]

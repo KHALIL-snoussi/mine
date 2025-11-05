@@ -9,11 +9,13 @@ from pathlib import Path
 try:
     from paint_by_numbers.config import Config
     from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from config import Config
     from utils.opencv import require_cv2
+    from logger import logger
 
 
 class TemplateGenerator:
@@ -189,7 +191,7 @@ class TemplateGenerator:
         # Save with high quality
         cv2.imwrite(str(output_path), bgr_template, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
-        print(f"Template saved to: {output_path}")
+        logger.info(f"Template saved to: {output_path}")
 
     def create_coloring_guide(self, quantized_image: np.ndarray,
                              contour_image: np.ndarray,

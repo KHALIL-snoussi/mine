@@ -3,22 +3,24 @@ Difficulty Analyzer - Rates the difficulty of paint-by-numbers templates
 """
 
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 try:
+    from paint_by_numbers.config import Config
     from paint_by_numbers.logger import logger
 except ImportError:
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
+    from config import Config
     from logger import logger
 
 
 class DifficultyAnalyzer:
     """Analyzes and rates the difficulty of paint-by-numbers templates"""
 
-    def __init__(self):
-        pass
+    def __init__(self, config: Optional[Config] = None):
+        self.config = config or Config()
 
     def analyze_difficulty(self, regions: List[dict], palette: np.ndarray,
                           image_shape: tuple) -> Dict:
@@ -47,7 +49,7 @@ class DifficultyAnalyzer:
         std_region_size = np.std(region_areas)
 
         # Small region penalty (harder to paint)
-        small_region_count = sum(1 for area in region_areas if area < 200)
+        small_region_count = sum(1 for area in region_areas if area < self.config.SMALL_REGION_THRESHOLD)
         small_region_ratio = small_region_count / region_count
 
         # Color similarity (similar colors are harder to distinguish)
@@ -55,7 +57,7 @@ class DifficultyAnalyzer:
 
         # Region density (regions per area)
         total_pixels = image_shape[0] * image_shape[1]
-        region_density = region_count / (total_pixels / 10000)  # regions per 10k pixels
+        region_density = region_count / (total_pixels / self.config.ANALYSIS_SAMPLE_SIZE)  # regions per sample size
 
         # Calculate difficulty scores (0-100)
         scores = {
@@ -201,7 +203,7 @@ class DifficultyAnalyzer:
 
         # Adjust for region size
         size_multiplier = 1.0
-        if avg_size < 200:
+        if avg_size < self.config.SMALL_REGION_THRESHOLD:
             size_multiplier = 1.5  # Small regions take longer
         elif avg_size > 1000:
             size_multiplier = 0.8  # Large regions are faster
