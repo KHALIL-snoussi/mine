@@ -7,17 +7,18 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY webapp/backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy paint_by_numbers module
-COPY ../paint_by_numbers /app/paint_by_numbers
+COPY paint_by_numbers /app/paint_by_numbers
 
 # Copy application code
-COPY . .
+COPY webapp/backend .
 
 # Create directories for file storage
 RUN mkdir -p /app/uploads /app/output

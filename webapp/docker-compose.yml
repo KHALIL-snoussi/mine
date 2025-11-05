@@ -36,8 +36,8 @@ services:
   # Backend API
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: webapp/backend/Dockerfile
     container_name: paintbynumbers-backend
     environment:
       DATABASE_URL: postgresql://paintuser:${DB_PASSWORD:-changeme}@db:5432/paintbynumbers
@@ -52,6 +52,7 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
     volumes:
       - ./backend:/app
+      - ../paint_by_numbers:/app/paint_by_numbers
       - backend_uploads:/app/uploads
       - backend_output:/app/output
     ports:
@@ -70,8 +71,8 @@ services:
   # Celery Worker for Background Tasks
   celery_worker:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: ../
+      dockerfile: webapp/backend/Dockerfile
     container_name: paintbynumbers-celery
     command: celery -A app.core.celery_app worker --loglevel=info
     environment:
@@ -84,6 +85,7 @@ services:
       S3_BUCKET_NAME: ${S3_BUCKET_NAME}
     volumes:
       - ./backend:/app
+      - ../paint_by_numbers:/app/paint_by_numbers
       - backend_uploads:/app/uploads
       - backend_output:/app/output
     depends_on:
