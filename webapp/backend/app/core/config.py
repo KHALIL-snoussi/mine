@@ -2,9 +2,10 @@
 Application configuration
 """
 
-from typing import List
+from typing import List, Union
 import os
 import logging
+import json
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 
@@ -29,10 +30,25 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://redis:6379/0"
 
     # CORS
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[str, List[str]] = [
         "http://localhost:3000",
         "http://localhost:3001",
     ]
+
+    @field_validator('CORS_ORIGINS', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        """Parse CORS_ORIGINS from JSON string or return as list"""
+        if isinstance(v, str):
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+                return [v]
+            except json.JSONDecodeError:
+                # If it's a single URL, return it as a list
+                return [v]
+        return v
 
     # File Storage
     AWS_ACCESS_KEY_ID: str = ""
