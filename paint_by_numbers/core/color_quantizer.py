@@ -93,6 +93,42 @@ class ColorQuantizer:
 
         return image_space, palette_space
 
+    def apply_color_style(self, image: np.ndarray) -> np.ndarray:
+        """
+        Apply color style adjustments (saturation boost, warmth adjustment)
+        for Vintage and Pop-Art effects
+
+        Args:
+            image: Input RGB image
+
+        Returns:
+            Styled RGB image
+        """
+        # Get style settings from config
+        saturation_boost = getattr(self.config, 'SATURATION_BOOST', 1.0)
+        warmth_adjustment = getattr(self.config, 'WARMTH_ADJUSTMENT', 0)
+
+        # If no adjustments needed, return original
+        if saturation_boost == 1.0 and warmth_adjustment == 0:
+            return image
+
+        cv2 = require_cv2()
+        styled = image.copy().astype(np.float32)
+
+        # Apply saturation boost (works in HSV space)
+        if saturation_boost != 1.0:
+            hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(np.float32)
+            hsv[:, :, 1] = np.clip(hsv[:, :, 1] * saturation_boost, 0, 255)
+            styled = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2RGB).astype(np.float32)
+
+        # Apply warmth adjustment (shift red/blue channels)
+        if warmth_adjustment != 0:
+            # Positive = warmer (more red/yellow), Negative = cooler (more blue)
+            styled[:, :, 0] = np.clip(styled[:, :, 0] + warmth_adjustment, 0, 255)  # Red
+            styled[:, :, 2] = np.clip(styled[:, :, 2] - warmth_adjustment * 0.5, 0, 255)  # Blue
+
+        return styled.astype(np.uint8)
+
     def quantize(self, image: np.ndarray, n_colors: int = None,
                  sort_palette: bool = True, random_state: int = 42,
                  use_unified_palette: Optional[bool] = None,
