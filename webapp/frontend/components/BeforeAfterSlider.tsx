@@ -18,6 +18,7 @@ interface BeforeAfterSliderProps {
     name: string
     colors: number[][]
   }
+  model: string  // 'original', 'vintage', 'pop_art', 'full_color_hd'
   className?: string
 }
 
@@ -26,6 +27,7 @@ type QualityLevel = 'low' | 'medium' | 'high' | 'ultra'
 export default function BeforeAfterSlider({
   originalImage,
   palette,
+  model,
   className = '',
 }: BeforeAfterSliderProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -43,7 +45,7 @@ export default function BeforeAfterSlider({
     img.src = originalImage
   }, [originalImage])
 
-  // Generate preview when image, palette, or quality changes
+  // Generate preview when image, palette, model, or quality changes
   useEffect(() => {
     const generatePreview = async () => {
       setIsGenerating(true)
@@ -51,7 +53,7 @@ export default function BeforeAfterSlider({
       setPreviewImage(null)
 
       try {
-        const options: PreviewOptions = { quality }
+        const options: PreviewOptions = { quality, model }
         const preview = await generatePaintPreview(originalImage, palette, options)
         setPreviewImage(preview)
       } catch (err) {
@@ -63,14 +65,14 @@ export default function BeforeAfterSlider({
     }
 
     generatePreview()
-  }, [originalImage, palette, quality])
+  }, [originalImage, palette, model, quality])
 
   const retryGeneration = async () => {
     setIsGenerating(true)
     setError(null)
 
     try {
-      const options: PreviewOptions = { quality }
+      const options: PreviewOptions = { quality, model }
       const preview = await generatePaintPreview(originalImage, palette, options)
       setPreviewImage(preview)
     } catch (err) {
