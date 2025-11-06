@@ -212,6 +212,68 @@ STANDARD_PALETTES = {
         (255, 230, 100),  # Sunshine Yellow
         (200, 50, 50),    # Deep Red
     ],
+
+    # FULL COLOR HD MODEL - QBRIX Premium 38-Color Palette
+    # Optimized for maximum realism, smooth gradients, and professional portraits
+    "full_color_hd_38": [
+        # Whites and very light tones (4)
+        (255, 255, 255),  # Pure White
+        (248, 248, 245),  # Cream White
+        (240, 240, 238),  # Light Gray White
+        (235, 230, 225),  # Warm Off-White
+
+        # Blacks and dark tones (4)
+        (10, 10, 10),     # Near Black
+        (35, 35, 35),     # Charcoal
+        (55, 55, 55),     # Dark Gray
+        (80, 80, 80),     # Medium Dark Gray
+
+        # Mid grays (3)
+        (120, 120, 120),  # Medium Gray
+        (160, 160, 160),  # Light Medium Gray
+        (200, 200, 200),  # Light Gray
+
+        # Skin tones - expanded range (6)
+        (240, 210, 190),  # Very Light Skin
+        (225, 190, 170),  # Light Skin
+        (210, 170, 145),  # Fair Skin
+        (185, 145, 115),  # Medium Skin
+        (160, 115, 85),   # Tan Skin
+        (120, 80, 60),    # Dark Skin
+
+        # Reds and warm tones (4)
+        (200, 70, 60),    # Deep Red
+        (220, 100, 80),   # Coral Red
+        (240, 140, 110),  # Light Coral
+        (250, 180, 150),  # Peach
+
+        # Oranges and browns (3)
+        (200, 120, 60),   # Burnt Orange
+        (140, 90, 60),    # Natural Brown
+        (100, 65, 45),    # Dark Brown
+
+        # Yellows and golds (3)
+        (250, 235, 140),  # Soft Yellow
+        (240, 210, 100),  # Golden Yellow
+        (220, 180, 80),   # Ochre
+
+        # Greens (4)
+        (70, 110, 70),    # Dark Forest Green
+        (90, 130, 90),    # Forest Green
+        (130, 160, 110),  # Sage Green
+        (180, 200, 150),  # Light Green
+
+        # Blues (4)
+        (60, 90, 130),    # Deep Blue
+        (80, 120, 160),   # Medium Blue
+        (110, 150, 190),  # Sky Blue
+        (160, 190, 220),  # Light Sky Blue
+
+        # Purples and magentas (3)
+        (100, 70, 110),   # Deep Purple
+        (140, 110, 140),  # Mauve
+        (200, 160, 180),  # Light Mauve
+    ],
 }
 
 
@@ -269,6 +331,29 @@ COLOR_NAMES = {
         "Bright White", "Pure Black", "Electric Red", "Hot Pink", "Golden Yellow", "Vivid Orange",
         "Cyan Blue", "Bold Blue", "Purple", "Magenta", "Neon Green", "Lime Green",
         "Bright Pink", "Sky Cyan", "Sunshine Yellow", "Deep Red"
+    ],
+
+    "full_color_hd_38": [
+        # Whites (4)
+        "Pure White", "Cream White", "Light Gray White", "Warm Off-White",
+        # Blacks (4)
+        "Near Black", "Charcoal", "Dark Gray", "Medium Dark Gray",
+        # Grays (3)
+        "Medium Gray", "Light Medium Gray", "Light Gray",
+        # Skin tones (6)
+        "Very Light Skin", "Light Skin", "Fair Skin", "Medium Skin", "Tan Skin", "Dark Skin",
+        # Reds (4)
+        "Deep Red", "Coral Red", "Light Coral", "Peach",
+        # Browns (3)
+        "Burnt Orange", "Natural Brown", "Dark Brown",
+        # Yellows (3)
+        "Soft Yellow", "Golden Yellow", "Ochre",
+        # Greens (4)
+        "Dark Forest", "Forest Green", "Sage Green", "Light Green",
+        # Blues (4)
+        "Deep Blue", "Medium Blue", "Sky Blue", "Light Sky",
+        # Purples (3)
+        "Deep Purple", "Mauve", "Light Mauve"
     ],
 }
 
