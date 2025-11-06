@@ -36,6 +36,9 @@ export default function CreatePage() {
 <<<<<<< Updated upstream
 =======
   const [selectedPalette, setSelectedPalette] = useState('classic_18')
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   const [selectedModel, setSelectedModel] = useState('original')
   const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
