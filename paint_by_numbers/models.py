@@ -278,6 +278,39 @@ class ModelRegistry:
             preview_icon='🌸',
             processing_time_estimate='25-40 seconds'
         ),
+
+        # Model 7: Ultra Detailed - Maximum resolution for A4/A3 printing
+        'ultra_detailed': ModelProfile(
+            id='ultra_detailed',
+            name='Ultra Detailed',
+            display_name='Ultra Detailed HD',
+            description='Maximum resolution and detail specifically optimized for A4/A3 printing. ' +
+                       'Crystal-clear faces and fine details. Perfect for large format prints.',
+            difficulty_level='expert',
+            recommended_for=[
+                'A4 and A3 paper printing',
+                'Portrait photography with faces',
+                'Professional gallery prints',
+                'Maximum detail preservation',
+                'Large format wall art'
+            ],
+            num_colors=28,
+            min_region_size=40,
+            max_image_size=(3508, 4960),  # A3 @ 300 DPI - no upscaling needed!
+            edge_threshold_low=35,
+            edge_threshold_high=165,
+            bilateral_filter_d=7,
+            bilateral_sigma_color=55,
+            bilateral_sigma_space=55,
+            morphology_kernel_size=2,
+            font_scale=0.3,
+            palette_name='classic_24',
+            style_tags=['hd', 'professional', 'print-ready', 'ultra-high-detail'],
+            color_range='24-30 colors',
+            detail_level='Ultra High',
+            preview_icon='🖼️',
+            processing_time_estimate='60-120 seconds'
+        ),
     }
 
     @classmethod
