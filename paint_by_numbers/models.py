@@ -283,33 +283,37 @@ class ModelRegistry:
         'ultra_detailed': ModelProfile(
             id='ultra_detailed',
             name='Ultra Detailed',
-            display_name='Ultra Detailed HD',
-            description='Maximum resolution and detail specifically optimized for A4/A3 printing. ' +
-                       'Crystal-clear faces and fine details. Perfect for large format prints.',
+            display_name='Ultra Detailed HD Pro',
+            description='ULTIMATE quality with intelligent upscaling, face detection, and automatic ' +
+                       'enhancement. Crystal-clear faces, fine details, and professional results. ' +
+                       'Automatically upscales small images to optimal resolution. Perfect for A4/A3/A2 printing.',
             difficulty_level='expert',
             recommended_for=[
-                'A4 and A3 paper printing',
-                'Portrait photography with faces',
+                'Portrait photography with faces - BEST QUALITY',
+                'A4, A3, and A2 paper printing',
                 'Professional gallery prints',
+                'Wedding photos and family portraits',
                 'Maximum detail preservation',
-                'Large format wall art'
+                'Small images that need upscaling',
+                'Large format wall art',
+                'Commercial printing projects'
             ],
-            num_colors=28,
-            min_region_size=40,
-            max_image_size=(3508, 4960),  # A3 @ 300 DPI - no upscaling needed!
-            edge_threshold_low=35,
-            edge_threshold_high=165,
-            bilateral_filter_d=7,
-            bilateral_sigma_color=55,
-            bilateral_sigma_space=55,
+            num_colors=30,
+            min_region_size=35,
+            max_image_size=(4960, 7016),  # A2 @ 300 DPI - MAXIMUM QUALITY!
+            edge_threshold_low=30,
+            edge_threshold_high=170,
+            bilateral_filter_d=5,
+            bilateral_sigma_color=50,
+            bilateral_sigma_space=50,
             morphology_kernel_size=2,
-            font_scale=0.3,
+            font_scale=0.28,
             palette_name='classic_24',
-            style_tags=['hd', 'professional', 'print-ready', 'ultra-high-detail'],
+            style_tags=['hd', 'professional', 'print-ready', 'ultra-high-detail', 'ai-enhanced', 'face-optimized'],
             color_range='24-30 colors',
-            detail_level='Ultra High',
-            preview_icon='🖼️',
-            processing_time_estimate='60-120 seconds'
+            detail_level='Ultra High Pro',
+            preview_icon='💎',
+            processing_time_estimate='60-180 seconds'
         ),
     }
 

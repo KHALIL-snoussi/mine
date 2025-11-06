@@ -1,8 +1,16 @@
-# 🖼️ Ultra Detailed HD Model - Complete Guide
+# 💎 Ultra Detailed HD Pro Model - Complete Guide
 
 ## Overview
 
-The **Ultra Detailed HD** model is specifically designed for **A4 and A3 paper printing** with **crystal-clear face clarity** and maximum detail preservation. This model eliminates blurry faces by processing images at print resolution.
+The **Ultra Detailed HD Pro** model is the ULTIMATE solution for **professional-quality paint-by-numbers** with **AI-powered intelligent upscaling**, **automatic face detection**, and **crystal-clear results**.
+
+### 🚀 NEW AI-Powered Features:
+- ✨ **Intelligent Automatic Upscaling** - Small images automatically enhanced to optimal resolution
+- 👤 **Face Detection & Optimization** - Portraits get special face-optimized processing
+- 🎨 **A2 Paper Support** - Up to 4960x7016 pixels (A2 @ 300 DPI)
+- 💎 **30 Colors** - Maximum color accuracy for skin tones
+- 🔍 **Enhanced Sharpening** - Ultra-sharp details, even from small source images
+- ⚡ **Smart Quality Assessment** - Automatically determines best processing method
 
 ---
 
@@ -32,14 +40,52 @@ Result: NO UPSCALING = SHARP FACES ✨
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
-| **Max Image Size** | 3508 x 4960 pixels | A3 paper @ 300 DPI (no upscaling!) |
-| **Number of Colors** | 28 colors | Maximum detail and color accuracy |
-| **Min Region Size** | 40 pixels | Capture fine facial features |
-| **Font Scale** | 0.3 | Smaller numbers fit in tiny regions |
-| **Edge Detection** | 35-165 | Fine edge detail for faces |
-| **Sharpening** | 0.8 (enhanced) | Extra clarity for facial features |
-| **Local Contrast** | 3.0 CLAHE | Enhanced face contrast |
-| **Processing Time** | 60-120 seconds | Worth it for professional results! |
+| **Max Image Size** | 4960 x 7016 pixels | A2 paper @ 300 DPI - MAXIMUM QUALITY! |
+| **Intelligent Upscaling** | Automatic | Small images auto-enhanced to optimal resolution |
+| **Face Detection** | AI-Powered | Automatic portrait optimization |
+| **Number of Colors** | 30 colors | Ultimate detail and skin tone accuracy |
+| **Min Region Size** | 35 pixels | Capture finest facial features |
+| **Font Scale** | 0.28 | Tiny numbers for maximum detail |
+| **Edge Detection** | 30-170 | Ultra-fine edge detail |
+| **Sharpening** | 1.0 (maximum) | Crystal-clear sharp details |
+| **Sharpen Radius** | 4 pixels | Larger for better detail preservation |
+| **Local Contrast** | 3.5 CLAHE | Maximum face contrast enhancement |
+| **Processing Time** | 60-180 seconds | Professional-grade results! |
+
+---
+
+## 🤖 Intelligent Auto-Enhancement
+
+### What Happens Automatically:
+
+When you upload an image, the Ultra Detailed HD Pro model automatically:
+
+1. **📏 Analyzes Resolution** - Checks if your image needs upscaling
+2. **👤 Detects Faces** - Uses AI to detect portraits for optimized processing
+3. **⬆️ Upscales if Needed** - Automatically enhances small images to 2000+ pixels
+4. **✨ Applies Face Optimization** - Special processing for portraits with faces
+5. **🔍 Enhances Details** - CLAHE, sharpening, and bilateral filtering
+6. **🎨 Optimizes Colors** - Skin tone enhancement for portraits
+
+### Example Auto-Enhancement:
+
+**Input:** 800x600 px portrait photo (low resolution)
+↓
+**Auto-Detected:** Face found → Face-optimized upscaling enabled
+↓
+**Auto-Upscaled:** 3508x2631 px (A4-ready quality)
+↓
+**Auto-Enhanced:** Sharpened, contrast-enhanced, skin tones optimized
+↓
+**Result:** Crystal-clear A4/A3 print-ready template! ✨
+
+### Benefits:
+
+✅ **No Manual Work** - Everything automatic
+✅ **Always Optimal Quality** - Smart algorithm chooses best settings
+✅ **Works with Any Size** - Small images automatically enhanced
+✅ **Face-Aware** - Special treatment for portraits
+✅ **Print-Ready** - Always generates at 300 DPI quality
 
 ---
 

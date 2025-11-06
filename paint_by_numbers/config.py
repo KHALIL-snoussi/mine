@@ -143,23 +143,27 @@ class Config:
                 "GENERATE_PDF": True,
             },
             "ultra_detailed": {
-                "DEFAULT_NUM_COLORS": 28,
-                "MIN_REGION_SIZE": 40,
-                "MAX_IMAGE_SIZE": (3508, 4960),  # A3 size @ 300 DPI for maximum clarity
-                "FONT_SCALE": 0.3,
-                "EDGE_THRESHOLD_LOW": 35,
-                "EDGE_THRESHOLD_HIGH": 165,
-                "BILATERAL_FILTER_D": 7,
-                "BILATERAL_SIGMA_COLOR": 55,
-                "BILATERAL_SIGMA_SPACE": 55,
+                "DEFAULT_NUM_COLORS": 30,
+                "MIN_REGION_SIZE": 35,
+                "MAX_IMAGE_SIZE": (4960, 7016),  # A2 size @ 300 DPI for MAXIMUM clarity
+                "FONT_SCALE": 0.28,
+                "EDGE_THRESHOLD_LOW": 30,
+                "EDGE_THRESHOLD_HIGH": 170,
+                "BILATERAL_FILTER_D": 5,
+                "BILATERAL_SIGMA_COLOR": 50,
+                "BILATERAL_SIGMA_SPACE": 50,
                 "MORPHOLOGY_KERNEL_SIZE": 2,
                 "USE_UNIFIED_PALETTE": True,
                 "UNIFIED_PALETTE_NAME": "classic_24",
                 "GENERATE_SVG": True,
                 "GENERATE_PDF": True,
                 "APPLY_SHARPENING": True,
-                "SHARPEN_AMOUNT": 0.8,  # Extra sharpening for face clarity
-                "CLAHE_CLIP_LIMIT": 3.0,  # Enhanced local contrast for faces
+                "SHARPEN_AMOUNT": 1.0,  # Maximum sharpening for ultimate face clarity
+                "SHARPEN_RADIUS": 4,  # Larger radius for better detail
+                "CLAHE_CLIP_LIMIT": 3.5,  # Enhanced local contrast for faces
+                "APPLY_LOCAL_CONTRAST": True,
+                "APPLY_TONE_BALANCE": True,
+                "AUTO_WHITE_BALANCE": True,
             },
         }
 

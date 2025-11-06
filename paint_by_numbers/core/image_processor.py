@@ -12,6 +12,7 @@ try:
     from paint_by_numbers.utils.helpers import resize_image, ensure_uint8
     from paint_by_numbers.logger import logger
     from paint_by_numbers.utils.opencv import require_cv2
+    from paint_by_numbers.core.intelligent_upscaler import IntelligentUpscaler
 except ImportError:
     import sys
     from pathlib import Path
@@ -20,6 +21,7 @@ except ImportError:
     from utils.helpers import resize_image, ensure_uint8
     from logger import logger
     from utils.opencv import require_cv2
+    from core.intelligent_upscaler import IntelligentUpscaler
 
 
 class ImageProcessor:
@@ -35,6 +37,8 @@ class ImageProcessor:
         self.config = config or Config()
         self.original_image = None
         self.processed_image = None
+        self.upscaler = IntelligentUpscaler(target_format='ultra_hd')
+        self.upscale_metadata = None
 
     def _apply_white_balance(self, image: np.ndarray) -> np.ndarray:
         """Apply simple gray-world white balance with optional clipping."""
@@ -201,7 +205,31 @@ class ImageProcessor:
 
         self.original_image = image
         logger.info(f"Successfully loaded image: {w}x{h} pixels")
-        return image
+
+        # ========================================
+        # INTELLIGENT UPSCALING FOR BEST QUALITY
+        # ========================================
+        # Automatically upscale small images for crystal-clear results
+        upscaled_image, upscale_info = self.upscaler.process(image, force_upscale=False)
+
+        if upscale_info['was_upscaled']:
+            self.upscale_metadata = upscale_info
+            logger.info("🚀 INTELLIGENT UPSCALING APPLIED")
+            logger.info(f"   Original: {upscale_info['original_size'][0]}x{upscale_info['original_size'][1]} "
+                       f"({upscale_info['original_megapixels']:.1f}MP)")
+            logger.info(f"   Enhanced: {upscale_info['final_size'][0]}x{upscale_info['final_size'][1]} "
+                       f"({upscale_info['final_megapixels']:.1f}MP)")
+            logger.info(f"   Quality Improvement: +{upscale_info['quality_improvement']:.0f}%")
+            logger.info(f"   Method: {upscale_info['upscale_method']}")
+            if upscale_info['has_faces']:
+                logger.info("   ✨ Face-optimized processing enabled!")
+
+            # Use the upscaled image
+            self.original_image = upscaled_image
+            return upscaled_image
+        else:
+            logger.info("   Image resolution is already optimal - no upscaling needed")
+            return image
 
     def preprocess(self, image: Optional[np.ndarray] = None,
                    apply_bilateral: bool = True,
