@@ -8,6 +8,7 @@ import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/Button'
 import ModelSelector from '@/components/ModelSelector'
 import BeforeAfterSlider from '@/components/BeforeAfterSlider'
+import ManualAreaSelector, { type SelectedArea } from '@/components/ManualAreaSelector'
 import { apiClient, type KitRecommendation } from '@/lib/api'
 import { useModels, usePalettes } from '@/lib/hooks'
 import {
@@ -35,6 +36,7 @@ export default function CreatePage() {
   const [preview, setPreview] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState('original')
   const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
+  const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
 
   // Model-to-palette mapping (each model has its own colors)
   const MODEL_PALETTES: Record<string, string> = {
@@ -180,6 +182,13 @@ export default function CreatePage() {
         model: selectedModel,
         title: selectedFile.name || 'Preview Template',
         is_public: !apiClient.isAuthenticated(),
+        use_region_emphasis: !!selectedArea,  // Enable if area selected
+        emphasized_region: selectedArea ? {
+          x: selectedArea.x,
+          y: selectedArea.y,
+          width: selectedArea.width,
+          height: selectedArea.height,
+        } : undefined,
       })
 
       setGenerationProgress(100)
@@ -561,6 +570,16 @@ export default function CreatePage() {
                           ))}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* Manual Area Selector */}
+                  {preview && !isLoadingRecommendation && (
+                    <div className="mt-8">
+                      <ManualAreaSelector
+                        imageUrl={preview}
+                        onAreaSelect={setSelectedArea}
+                      />
                     </div>
                   )}
 

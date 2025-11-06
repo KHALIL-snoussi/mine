@@ -133,7 +133,9 @@ class PaintByNumbersGenerator:
                 use_unified_palette: Optional[bool] = None,
                 palette_name: Optional[str] = None,
                 model: str = "classic",
-                paper_format: str = "a4") -> dict:
+                paper_format: str = "a4",
+                use_region_emphasis: bool = False,
+                emphasized_region: Optional[dict] = None) -> dict:
         """
         Generate complete paint-by-numbers package from input image
 
@@ -148,6 +150,8 @@ class PaintByNumbersGenerator:
             palette_name: Name of unified palette to use
             model: Processing model ID (classic, simple, detailed, artistic, vibrant, pastel)
             paper_format: Paper format (a4, a3, square_medium, etc.)
+            use_region_emphasis: Enable multi-region processing for better quality
+            emphasized_region: Dict with {x, y, width, height} (0-1 ratios) for emphasized area
 
         Returns:
             Dictionary with paths to generated files and model info
@@ -243,13 +247,53 @@ class PaintByNumbersGenerator:
         # Apply color style adjustments (Vintage warmth, Pop-Art saturation, etc.)
         styled_image = self.color_quantizer.apply_color_style(self.processed_image)
 
-        self.quantized_image, self.palette = self.color_quantizer.quantize(
-            styled_image,  # Use styled image instead of processed_image
-            n_colors=n_colors,
-            sort_palette=True,
-            use_unified_palette=use_unified_palette,
-            palette_name=palette_name
-        )
+        # Multi-region processing if enabled
+        if use_region_emphasis and emphasized_region:
+            logger.info("🎯 Using multi-region processing with user-selected area")
+
+            from paint_by_numbers.intelligence.subject_detector import SubjectRegion
+            from paint_by_numbers.core.multi_region_processor import MultiRegionProcessor
+
+            # Convert dict to SubjectRegion
+            h, w = styled_image.shape[:2]
+            subject_reg = SubjectRegion(
+                x=int(emphasized_region['x'] * w),
+                y=int(emphasized_region['y'] * h),
+                width=int(emphasized_region['width'] * w),
+                height=int(emphasized_region['height'] * h),
+                confidence=1.0,
+                subject_type='manual'
+            )
+
+            # Process with emphasis
+            processor = MultiRegionProcessor(self.config)
+            multi_result = processor.process_with_emphasis(
+                styled_image,
+                total_colors=n_colors,
+                auto_detect=False,
+                subject_region=subject_reg
+            )
+
+            # Use combined palette from multi-region processing
+            self.palette = multi_result['combined_palette']
+
+            # Quantize using the combined palette
+            from paint_by_numbers.core.color_quantizer import assign_colors_to_palette
+            self.quantized_image = assign_colors_to_palette(styled_image, self.palette)
+
+            logger.info(f"✅ Multi-region processing complete")
+            logger.info(f"   Emphasized: {len(multi_result['emphasized_palette'])} colors")
+            logger.info(f"   Background: {len(multi_result['background_palette'])} colors")
+
+        else:
+            # Standard single-region quantization
+            self.quantized_image, self.palette = self.color_quantizer.quantize(
+                styled_image,  # Use styled image instead of processed_image
+                n_colors=n_colors,
+                sort_palette=True,
+                use_unified_palette=use_unified_palette,
+                palette_name=palette_name
+            )
 
         # Optimize color mapping for better visual quality
         if use_unified_palette:

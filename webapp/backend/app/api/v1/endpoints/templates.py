@@ -116,8 +116,10 @@ async def generate_template_background(
     num_colors: Optional[int],
     model: str,
     paper_format: str,
+    use_region_emphasis: bool = False,
+    emphasized_region: Optional[dict] = None,
 ):
-    """Generate template in background"""
+    """Generate template in background with optional region emphasis"""
     try:
         # Create generator with model configuration
         generator = PaintByNumbersGenerator()
@@ -130,7 +132,9 @@ async def generate_template_background(
             use_unified_palette=True,
             palette_name=palette_name,
             model=model,  # Apply model configuration
-            paper_format=paper_format  # Apply paper format
+            paper_format=paper_format,  # Apply paper format
+            use_region_emphasis=use_region_emphasis,  # Multi-region processing
+            emphasized_region=emphasized_region  # User-selected region
         )
 
         # Update template in database using context manager
@@ -193,11 +197,20 @@ async def generate_template(
     paper_format: str = "a4",
     title: Optional[str] = "Untitled",
     is_public: bool = False,
+    use_region_emphasis: bool = False,
+    region_x: Optional[float] = None,
+    region_y: Optional[float] = None,
+    region_width: Optional[float] = None,
+    region_height: Optional[float] = None,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user)
 ):
     """
     Generate a paint-by-numbers template from an uploaded image
+
+    New parameters:
+        use_region_emphasis: Enable multi-region processing for better quality
+        region_x, region_y, region_width, region_height: Emphasized region coordinates (0-1 ratios)
 
     Args:
         file: Image file to convert
@@ -324,6 +337,17 @@ async def generate_template(
     output_dir = upload_dir / f"template_{template.id}"
     output_dir.mkdir(exist_ok=True)
 
+    # Build emphasized_region dict if coordinates provided
+    emphasized_region = None
+    if use_region_emphasis and all(v is not None for v in [region_x, region_y, region_width, region_height]):
+        emphasized_region = {
+            'x': region_x,
+            'y': region_y,
+            'width': region_width,
+            'height': region_height,
+        }
+        logger.info(f"Region emphasis enabled: {emphasized_region}")
+
     background_tasks.add_task(
         generate_template_background,
         template.id,
@@ -332,7 +356,9 @@ async def generate_template(
         palette_name,
         num_colors,
         model,  # Pass model to background task
-        paper_format  # Pass paper format to background task
+        paper_format,  # Pass paper format to background task
+        use_region_emphasis,  # Pass emphasis flag
+        emphasized_region  # Pass region coordinates
     )
 
     return template

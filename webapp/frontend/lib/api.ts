@@ -235,6 +235,13 @@ class APIClient {
       model?: string
       paper_format?: string
       is_public?: boolean
+      use_region_emphasis?: boolean
+      emphasized_region?: {
+        x: number
+        y: number
+        width: number
+        height: number
+      }
     } = {}
   ): Promise<Template> {
     const formData = new FormData()
@@ -247,6 +254,15 @@ class APIClient {
     if (options.model) formData.append('model', options.model)
     if (options.paper_format) formData.append('paper_format', options.paper_format)
     if (options.is_public !== undefined) formData.append('is_public', options.is_public.toString())
+
+    // Region emphasis parameters
+    if (options.use_region_emphasis !== undefined) formData.append('use_region_emphasis', options.use_region_emphasis.toString())
+    if (options.emphasized_region) {
+      formData.append('region_x', options.emphasized_region.x.toString())
+      formData.append('region_y', options.emphasized_region.y.toString())
+      formData.append('region_width', options.emphasized_region.width.toString())
+      formData.append('region_height', options.emphasized_region.height.toString())
+    }
 
     return this.request<Template>('/api/v1/templates/generate', {
       method: 'POST',
