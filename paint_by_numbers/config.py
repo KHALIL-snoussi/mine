@@ -147,20 +147,20 @@ class Config:
                 "MIN_REGION_SIZE": 35,
                 "MAX_IMAGE_SIZE": (4960, 7016),  # A2 size @ 300 DPI for MAXIMUM clarity
                 "FONT_SCALE": 0.28,
-                "EDGE_THRESHOLD_LOW": 30,
-                "EDGE_THRESHOLD_HIGH": 170,
-                "BILATERAL_FILTER_D": 5,
-                "BILATERAL_SIGMA_COLOR": 50,
-                "BILATERAL_SIGMA_SPACE": 50,
+                "EDGE_THRESHOLD_LOW": 40,  # QUALITY: Conservative to prevent artifacts (was 30)
+                "EDGE_THRESHOLD_HIGH": 160,  # QUALITY: More natural edges (was 170)
+                "BILATERAL_FILTER_D": 7,  # QUALITY: Gentler smoothing (was 5)
+                "BILATERAL_SIGMA_COLOR": 60,  # QUALITY: More natural (was 50)
+                "BILATERAL_SIGMA_SPACE": 60,  # QUALITY: More natural (was 50)
                 "MORPHOLOGY_KERNEL_SIZE": 2,
                 "USE_UNIFIED_PALETTE": True,
                 "UNIFIED_PALETTE_NAME": "classic_24",
                 "GENERATE_SVG": True,
                 "GENERATE_PDF": True,
                 "APPLY_SHARPENING": True,
-                "SHARPEN_AMOUNT": 1.0,  # Maximum sharpening for ultimate face clarity
-                "SHARPEN_RADIUS": 4,  # Larger radius for better detail
-                "CLAHE_CLIP_LIMIT": 3.5,  # Enhanced local contrast for faces
+                "SHARPEN_AMOUNT": 0.6,  # QUALITY: Prevents halos/artifacts (was 1.0)
+                "SHARPEN_RADIUS": 3,  # QUALITY: Subtle sharpening (was 4)
+                "CLAHE_CLIP_LIMIT": 2.5,  # QUALITY: Natural contrast (was 3.5)
                 "APPLY_LOCAL_CONTRAST": True,
                 "APPLY_TONE_BALANCE": True,
                 "AUTO_WHITE_BALANCE": True,
