@@ -53,6 +53,7 @@ webapp/frontend/node_modules/
 webapp/frontend/.next/
 webapp/frontend/out/
 webapp/frontend/build/
+*.tsbuildinfo
 
 # Environment files (may contain secrets)
 .env
