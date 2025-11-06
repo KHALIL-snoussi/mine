@@ -36,6 +36,7 @@ class ContourBuilder:
                       smooth: bool = True) -> np.ndarray:
         """
         Build contours from quantized image
+        ENHANCED for QBRIX-quality professional output
 
         Args:
             quantized_image: Quantized image
@@ -45,15 +46,12 @@ class ContourBuilder:
             Image with contours drawn
         """
         h, w = quantized_image.shape[:2]
+        cv2 = require_cv2()
 
         # Create white background
         contour_img = np.ones((h, w, 3), dtype=np.uint8) * 255
 
-        # Convert to grayscale for edge detection
-        cv2 = require_cv2()
-        gray = cv2.cvtColor(quantized_image, cv2.COLOR_RGB2GRAY)
-
-        # Find edges between different colors
+        # Find edges between different colors (ENHANCED METHOD)
         edges = self._detect_color_boundaries(quantized_image)
 
         # Find contours
@@ -61,20 +59,40 @@ class ContourBuilder:
             edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
         )
 
-        # Smooth contours if requested
+        # ENHANCED SMOOTHING with adaptive epsilon based on contour size
         if smooth and contours:
-            contours = smooth_contours(contours, epsilon_factor=0.002)
+            smoothed_contours = []
+            for contour in contours:
+                # Calculate perimeter
+                perimeter = cv2.arcLength(contour, True)
+
+                # Adaptive epsilon: smaller for small contours, larger for big ones
+                # This preserves detail in small regions while smoothing large areas
+                if perimeter < 100:
+                    epsilon = 0.001 * perimeter  # Keep small details
+                elif perimeter < 500:
+                    epsilon = 0.002 * perimeter  # Moderate smoothing
+                else:
+                    epsilon = 0.003 * perimeter  # More smoothing for large regions
+
+                # Apply Douglas-Peucker algorithm for smooth curves
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                smoothed_contours.append(approx)
+
+            contours = smoothed_contours
 
         self.contours = contours
 
-        cv2 = require_cv2()
-        # Draw contours
+        # Draw contours with ANTI-ALIASING for professional quality
+        line_type = cv2.LINE_AA if self.config.USE_ANTIALIASING else cv2.LINE_8
+
         cv2.drawContours(
             contour_img,
             contours,
             -1,  # Draw all contours
             self.config.CONTOUR_COLOR,
-            self.config.CONTOUR_THICKNESS
+            self.config.CONTOUR_THICKNESS,
+            lineType=line_type  # Anti-aliasing for smooth edges
         )
 
         self.contour_image = contour_img
@@ -83,6 +101,7 @@ class ContourBuilder:
     def _detect_color_boundaries(self, quantized_image: np.ndarray) -> np.ndarray:
         """
         Detect boundaries between different colors
+        ENHANCED for QBRIX-quality pixel-perfect edges
 
         Args:
             quantized_image: Quantized image
@@ -90,27 +109,50 @@ class ContourBuilder:
         Returns:
             Binary edge map
         """
-        h, w = quantized_image.shape[:2]
-        edges = np.zeros((h, w), dtype=np.uint8)
-
-        # Check horizontal boundaries
-        for y in range(h - 1):
-            for x in range(w):
-                if not np.array_equal(quantized_image[y, x], quantized_image[y + 1, x]):
-                    edges[y, x] = 255
-
-        # Check vertical boundaries
-        for y in range(h):
-            for x in range(w - 1):
-                if not np.array_equal(quantized_image[y, x], quantized_image[y, x + 1]):
-                    edges[y, x] = 255
-
-        # Dilate edges slightly to make them more visible
-        kernel = np.ones((2, 2), dtype=np.uint8)
         cv2 = require_cv2()
-        edges = cv2.dilate(edges, kernel, iterations=1)
+        h, w = quantized_image.shape[:2]
 
-        return edges
+        # METHOD 1: Direct pixel comparison (faster for small images)
+        edges_direct = np.zeros((h, w), dtype=np.uint8)
+
+        # Vectorized horizontal boundaries
+        diff_h = np.any(quantized_image[:-1, :] != quantized_image[1:, :], axis=2)
+        edges_direct[:-1, :][diff_h] = 255
+
+        # Vectorized vertical boundaries
+        diff_v = np.any(quantized_image[:, :-1] != quantized_image[:, 1:], axis=2)
+        edges_direct[:, :-1][diff_v] = 255
+
+        # METHOD 2: Multi-scale Canny for clean edges
+        gray = cv2.cvtColor(quantized_image, cv2.COLOR_RGB2GRAY)
+
+        # Apply bilateral filter for clean edges while preserving boundaries
+        bilateral = cv2.bilateralFilter(gray, 5, 50, 50)
+
+        # Multi-scale Canny edge detection
+        edges_canny1 = cv2.Canny(bilateral,
+                                  self.config.EDGE_THRESHOLD_LOW,
+                                  self.config.EDGE_THRESHOLD_HIGH)
+        edges_canny2 = cv2.Canny(bilateral,
+                                  max(10, self.config.EDGE_THRESHOLD_LOW - 20),
+                                  self.config.EDGE_THRESHOLD_HIGH + 20)
+
+        # Combine both Canny scales for better coverage
+        edges_canny = cv2.bitwise_or(edges_canny1, edges_canny2)
+
+        # Combine direct and Canny methods for best results
+        edges_combined = cv2.bitwise_or(edges_direct, edges_canny)
+
+        # Clean up with morphological operations
+        # Close small gaps
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2, 2))
+        edges_combined = cv2.morphologyEx(edges_combined, cv2.MORPH_CLOSE, kernel_close)
+
+        # Thin the edges for crisp 1-pixel lines
+        kernel_thin = np.ones((2, 2), dtype=np.uint8)
+        edges_final = cv2.morphologyEx(edges_combined, cv2.MORPH_GRADIENT, kernel_thin)
+
+        return edges_final
 
     def build_contours_from_regions(self, regions: List, image_shape: Tuple[int, int],
                                    smooth: bool = True) -> np.ndarray:

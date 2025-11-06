@@ -1,10 +1,11 @@
 """
-Premium 3-Model System - Example Showcase
+Premium 4-Model System - Example Showcase
 
-This script demonstrates the new premium 3-model system:
-🎨 ORIGINAL - Natural photorealistic colors
-📸 VINTAGE - Warm nostalgic tones
-🎭 POP-ART - Bold vibrant colors
+This script demonstrates the premium model system:
+🎨 ORIGINAL - Natural photorealistic colors (20 colors)
+📸 VINTAGE - Warm nostalgic tones (18 colors)
+🎭 POP-ART - Bold vibrant colors (16 colors)
+💎 FULL COLOR HD - QBRIX-quality maximum realism (38 colors!)
 
 Each model is professionally calibrated for stunning results.
 """
@@ -129,7 +130,7 @@ def showcase_models():
     sample_image = create_sample_photo("sample_portrait.png", size=(1000, 1000))
 
     # Generate with each model
-    model_ids = ['original', 'vintage', 'pop_art']
+    model_ids = ['original', 'vintage', 'pop_art', 'full_color_hd']
 
     for model_id in model_ids:
         model = ModelRegistry.get_model(model_id)
@@ -174,9 +175,9 @@ def compare_all_models():
 
     generator = PaintByNumbersGenerator()
 
-    print("\n🎨 Processing with all 3 models for comparison...\n")
+    print("\n🎨 Processing with all 4 models for comparison...\n")
 
-    for model_id in ['original', 'vintage', 'pop_art']:
+    for model_id in ['original', 'vintage', 'pop_art', 'full_color_hd']:
         model = ModelRegistry.get_model(model_id)
         print(f"  {model.preview_icon} {model.name}...")
 
@@ -189,9 +190,10 @@ def compare_all_models():
 
     print("\n✓ Comparison complete!")
     print("\nCompare results in:")
-    print("  • output/comparison/original/")
-    print("  • output/comparison/vintage/")
-    print("  • output/comparison/pop_art/")
+    print("  • output/comparison/original/ (20 colors)")
+    print("  • output/comparison/vintage/ (18 colors)")
+    print("  • output/comparison/pop_art/ (16 colors)")
+    print("  • output/comparison/full_color_hd/ (38 colors - QBRIX QUALITY!)")
 
 
 def main():
@@ -199,11 +201,12 @@ def main():
     print("""
 ╔══════════════════════════════════════════════════════════════════╗
 ║                                                                  ║
-║            PREMIUM 3-MODEL PAINT-BY-NUMBERS SYSTEM               ║
+║            PREMIUM 4-MODEL PAINT-BY-NUMBERS SYSTEM               ║
 ║                                                                  ║
-║  🎨 ORIGINAL  - Natural photorealistic colors                    ║
-║  📸 VINTAGE   - Warm nostalgic tones                             ║
-║  🎭 POP-ART   - Bold vibrant colors                              ║
+║  🎨 ORIGINAL       - Natural photorealistic (20 colors)          ║
+║  📸 VINTAGE        - Warm nostalgic tones (18 colors)            ║
+║  🎭 POP-ART        - Bold vibrant colors (16 colors)             ║
+║  💎 FULL COLOR HD  - QBRIX maximum realism (38 colors!)          ║
 ║                                                                  ║
 ║  Each model is professionally calibrated for stunning results    ║
 ║  with crystal-clear numbers and A4 print quality (40×50 cm)      ║
@@ -228,12 +231,15 @@ def main():
         print("            ALL DEMONSTRATIONS COMPLETE! ✓")
         print("=" * 70)
         print("\n📁 Generated outputs:")
-        print("  • output/premium_models/original/")
-        print("  • output/premium_models/vintage/")
-        print("  • output/premium_models/pop_art/")
-        print("  • output/comparison/ (all 3 models side-by-side)")
+        print("  • output/premium_models/original/ (20 colors - natural)")
+        print("  • output/premium_models/vintage/ (18 colors - warm retro)")
+        print("  • output/premium_models/pop_art/ (16 colors - bold vibrant)")
+        print("  • output/premium_models/full_color_hd/ (38 colors - QBRIX QUALITY!)")
+        print("  • output/comparison/ (all 4 models side-by-side)")
         print("\n💡 TIP: Compare the different styles to see how each model")
         print("   transforms the same image with unique characteristics!")
+        print("\n🌟 FULL COLOR HD uses 38 colors for maximum realism - ")
+        print("   perfect for complex portraits like QBRIX premium kits!")
 
     except Exception as e:
         print(f"\n❌ Error running showcase: {str(e)}")

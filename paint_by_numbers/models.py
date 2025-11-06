@@ -1,10 +1,11 @@
 """
-Premium 3-Model Paint-by-Numbers System
-Inspired by Qbrix's professional approach
+Premium 4-Model Paint-by-Numbers System
+Inspired by QBRIX's professional approach
 
-🎨 ORIGINAL - Natural photorealistic colors
-📸 VINTAGE - Warm nostalgic tones
-🎭 POP-ART - Bold vibrant colors
+🎨 ORIGINAL - Natural photorealistic colors (20 colors)
+📸 VINTAGE - Warm nostalgic tones (18 colors)
+🎭 POP-ART - Bold vibrant colors (16 colors)
+💎 FULL COLOR HD - QBRIX-quality maximum realism (38 colors!)
 
 Each model is professionally calibrated for stunning results.
 """
@@ -113,7 +114,7 @@ class ModelProfile:
 
 
 class ModelRegistry:
-    """Registry of 3 Premium Processing Models"""
+    """Registry of 4 Premium Processing Models (including QBRIX-quality Full Color HD)"""
 
     MODELS = {
         # MODEL 1: ORIGINAL - Natural Photorealistic
@@ -259,6 +260,57 @@ class ModelRegistry:
             preview_icon='🎭',
             processing_time_estimate='30-50 seconds'
         ),
+
+        # MODEL 4: FULL COLOR HD - QBRIX Premium Quality (38 colors)
+        'full_color_hd': ModelProfile(
+            id='full_color_hd',
+            name='Full Color HD',
+            display_name='Full Color HD 40×50 cm',
+            description='MAXIMUM REALISM with 38 colors for photo-quality results. ' +
+                       'Like QBRIX premium tier - smooth skin tones, fine gradients, ' +
+                       'and professional portrait quality. Perfect for complex photos ' +
+                       'where you want EVERY detail preserved. Optimized for stamp-brush technique.',
+            difficulty_level='advanced',
+            size_label='40×50 cm',
+            recommended_for=[
+                '✓ MAXIMUM photo realism (38 colors!)',
+                '✓ Professional portrait photography',
+                '✓ Complex photos with many details',
+                '✓ Smooth skin tone gradients',
+                '✓ Gallery-quality wall art',
+                '✓ Wedding & family portraits',
+                '✓ When you want the BEST possible quality',
+                '✓ Stamp-brush optimized regions'
+            ],
+            # QBRIX-level quality settings
+            num_colors=38,  # Like QBRIX Full Color - maximum realism
+            min_region_size=50,  # Smaller regions for fine detail, but stamp-friendly
+            max_image_size=(3508, 4960),  # A3 @ 300 DPI for maximum quality
+            edge_threshold_low=30,  # Capture subtle edges
+            edge_threshold_high=160,  # Strong edge definition
+            bilateral_filter_d=6,  # Fine detail preservation
+            bilateral_sigma_color=55,
+            bilateral_sigma_space=55,
+            morphology_kernel_size=2,  # Minimal morphology for detail
+
+            # CRYSTAL-CLEAR NUMBERS (optimized for 38 colors)
+            font_scale=0.5,  # Smaller but still clear (more numbers to fit)
+            font_thickness=2,
+            font_outline_thickness=4,
+            number_contrast_boost=True,
+
+            # Natural realistic style with maximum color depth
+            color_style='natural',
+            saturation_boost=1.03,  # Very subtle enhancement
+            warmth_adjustment=0,
+            palette_name='full_color_hd_38',
+
+            style_tags=['maximum-realism', 'photo-quality', 'premium', '38-colors', 'qbrix-quality', 'stamp-optimized'],
+            color_range='35-38 colors',
+            detail_level='Ultra HD Professional',
+            preview_icon='💎',
+            processing_time_estimate='90-120 seconds'
+        ),
     }
 
     @classmethod
@@ -318,14 +370,14 @@ class ModelRegistry:
 
 def get_model_comparison() -> Dict[str, Any]:
     """
-    Get a comparison of all 3 premium models
+    Get a comparison of all 4 premium models (including QBRIX-quality Full Color HD)
 
     Returns:
         Dictionary with model comparison data
     """
     return {
         'title': 'Premium Paint-by-Numbers Models',
-        'subtitle': 'Choose your perfect style',
+        'subtitle': 'Choose your perfect style (4 professional models)',
         'models': ModelRegistry.get_models_list(),
         'comparison_factors': [
             'Style',
@@ -334,5 +386,6 @@ def get_model_comparison() -> Dict[str, Any]:
             'Best For',
             'Processing Time'
         ],
-        'note': 'All models include crystal-clear numbers and professional A4 print quality (40×50 cm)'
+        'note': 'All models include crystal-clear numbers and professional A4 print quality (40×50 cm). ' +
+               'FULL COLOR HD (38 colors) matches QBRIX premium tier for maximum realism!'
     }
