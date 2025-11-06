@@ -9,9 +9,54 @@ interface PortraitCropSelectorProps {
   onCancel?: () => void
 }
 
-// Fixed portrait dimensions (3:4 aspect ratio)
-const CROP_WIDTH = 600
-const CROP_HEIGHT = 800
+// Portrait aspect ratio (3:4)
+const PORTRAIT_ASPECT_RATIO = 3 / 4
+
+// Responsive crop sizing configuration
+const CROP_SIZE_CONFIG = {
+  // Crop will be this percentage of the image width
+  imageWidthPercentage: 0.6, // 60% of image width
+
+  // Minimum crop dimensions (in pixels)
+  minWidth: 400,
+  minHeight: 533, // 400 * (4/3) to maintain aspect ratio
+
+  // Maximum crop dimensions (in pixels)
+  maxWidth: 1200,
+  maxHeight: 1600, // 1200 * (4/3)
+}
+
+// Calculate responsive crop dimensions based on image size
+function calculateCropDimensions(imageWidth: number, imageHeight: number): { width: number; height: number } {
+  // Start with a percentage of the image width
+  let cropWidth = Math.round(imageWidth * CROP_SIZE_CONFIG.imageWidthPercentage)
+  let cropHeight = Math.round(cropWidth / PORTRAIT_ASPECT_RATIO)
+
+  // Apply minimum constraints
+  if (cropWidth < CROP_SIZE_CONFIG.minWidth) {
+    cropWidth = CROP_SIZE_CONFIG.minWidth
+    cropHeight = CROP_SIZE_CONFIG.minHeight
+  }
+
+  // Apply maximum constraints
+  if (cropWidth > CROP_SIZE_CONFIG.maxWidth) {
+    cropWidth = CROP_SIZE_CONFIG.maxWidth
+    cropHeight = CROP_SIZE_CONFIG.maxHeight
+  }
+
+  // Ensure crop doesn't exceed image dimensions
+  if (cropWidth > imageWidth) {
+    cropWidth = imageWidth
+    cropHeight = Math.round(cropWidth / PORTRAIT_ASPECT_RATIO)
+  }
+
+  if (cropHeight > imageHeight) {
+    cropHeight = imageHeight
+    cropWidth = Math.round(cropHeight * PORTRAIT_ASPECT_RATIO)
+  }
+
+  return { width: cropWidth, height: cropHeight }
+}
 
 export default function PortraitCropSelector({
   imageUrl,
@@ -25,12 +70,17 @@ export default function PortraitCropSelector({
   const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 })
   const [scale, setScale] = useState(1)
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 })
+  const [cropDimensions, setCropDimensions] = useState({ width: 600, height: 800 })
 
   // Load image
   useEffect(() => {
     const img = new Image()
     img.onload = () => {
       setImage(img)
+
+      // Calculate responsive crop dimensions based on image size
+      const calculatedCropDimensions = calculateCropDimensions(img.width, img.height)
+      setCropDimensions(calculatedCropDimensions)
 
       // Calculate scale to fit the image in the container (max 800px wide)
       const maxDisplayWidth = 800
@@ -45,8 +95,8 @@ export default function PortraitCropSelector({
       setCanvasSize({ width: displayWidth, height: displayHeight })
 
       // Center the crop frame initially
-      const cropDisplayWidth = CROP_WIDTH * displayScale
-      const cropDisplayHeight = CROP_HEIGHT * displayScale
+      const cropDisplayWidth = calculatedCropDimensions.width * displayScale
+      const cropDisplayHeight = calculatedCropDimensions.height * displayScale
 
       setCropPosition({
         x: Math.max(0, (displayWidth - cropDisplayWidth) / 2),
@@ -76,16 +126,16 @@ export default function PortraitCropSelector({
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     // Clear the crop area
-    const cropDisplayWidth = CROP_WIDTH * scale
-    const cropDisplayHeight = CROP_HEIGHT * scale
+    const cropDisplayWidth = cropDimensions.width * scale
+    const cropDisplayHeight = cropDimensions.height * scale
 
     ctx.clearRect(cropPosition.x, cropPosition.y, cropDisplayWidth, cropDisplayHeight)
     ctx.drawImage(
       image,
       cropPosition.x / scale,
       cropPosition.y / scale,
-      CROP_WIDTH,
-      CROP_HEIGHT,
+      cropDimensions.width,
+      cropDimensions.height,
       cropPosition.x,
       cropPosition.y,
       cropDisplayWidth,
@@ -114,11 +164,11 @@ export default function PortraitCropSelector({
     ctx.fillStyle = '#3b82f6'
     ctx.font = 'bold 14px system-ui'
     ctx.fillText(
-      `${CROP_WIDTH} × ${CROP_HEIGHT}px (Portrait)`,
+      `${cropDimensions.width} × ${cropDimensions.height}px (Portrait)`,
       cropPosition.x + 10,
       cropPosition.y + 25
     )
-  }, [image, cropPosition, scale, canvasSize])
+  }, [image, cropPosition, scale, canvasSize, cropDimensions])
 
   // Handle mouse/touch events for dragging
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -129,8 +179,8 @@ export default function PortraitCropSelector({
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
 
-    const cropDisplayWidth = CROP_WIDTH * scale
-    const cropDisplayHeight = CROP_HEIGHT * scale
+    const cropDisplayWidth = cropDimensions.width * scale
+    const cropDisplayHeight = cropDimensions.height * scale
 
     // Check if click is inside crop frame
     if (
@@ -152,8 +202,8 @@ export default function PortraitCropSelector({
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
 
-    const cropDisplayWidth = CROP_WIDTH * scale
-    const cropDisplayHeight = CROP_HEIGHT * scale
+    const cropDisplayWidth = cropDimensions.width * scale
+    const cropDisplayHeight = cropDimensions.height * scale
 
     // Calculate new position (keeping crop frame within bounds)
     const newX = Math.max(0, Math.min(x - cropDisplayWidth / 2, canvasSize.width - cropDisplayWidth))
@@ -175,8 +225,8 @@ export default function PortraitCropSelector({
 
     // Create a new canvas for the cropped image at original resolution
     const cropCanvas = document.createElement('canvas')
-    cropCanvas.width = CROP_WIDTH
-    cropCanvas.height = CROP_HEIGHT
+    cropCanvas.width = cropDimensions.width
+    cropCanvas.height = cropDimensions.height
     const ctx = cropCanvas.getContext('2d')
     if (!ctx) return
 
@@ -189,12 +239,12 @@ export default function PortraitCropSelector({
       image,
       sourceX,
       sourceY,
-      CROP_WIDTH,
-      CROP_HEIGHT,
+      cropDimensions.width,
+      cropDimensions.height,
       0,
       0,
-      CROP_WIDTH,
-      CROP_HEIGHT
+      cropDimensions.width,
+      cropDimensions.height
     )
 
     // Convert to blob and call callback
@@ -212,7 +262,7 @@ export default function PortraitCropSelector({
         <h3 className="text-lg font-semibold text-slate-900">📐 Position Your Portrait Frame</h3>
         <p className="mt-1 text-sm text-slate-600">
           Drag the blue frame to select the area you want to process.
-          The frame is fixed at <strong>{CROP_WIDTH} × {CROP_HEIGHT}px</strong> (portrait orientation).
+          The frame is automatically sized at <strong>{cropDimensions.width} × {cropDimensions.height}px</strong> (portrait orientation) based on your image.
         </p>
       </div>
 
