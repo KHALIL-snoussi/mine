@@ -155,33 +155,33 @@ export function recommendModel(info: ImageInfo): {
   modelId: string
   reason: string
 } {
-  // Simple/small images
+  // Simple/small images - use vintage for softer look
   if (info.width < 800 && info.height < 800) {
     return {
-      modelId: 'simple',
-      reason: 'Smaller image works best with Simple model (fewer, larger regions)'
+      modelId: 'vintage',
+      reason: 'Smaller image works best with Vintage model (muted colors, fewer regions)'
     }
   }
 
-  // Large, high-res images
+  // Large, high-res images - use full_color_hd for maximum detail
   if (info.width >= 1500 && info.height >= 1500) {
     return {
-      modelId: 'detailed',
-      reason: 'High resolution image - Detailed model will preserve fine details'
+      modelId: 'full_color_hd',
+      reason: 'High resolution image - Full Color HD model will preserve fine details'
     }
   }
 
-  // Wide/tall images
+  // Wide/tall images - use pop_art for bold contrast
   if (info.aspectRatio > 2 || info.aspectRatio < 0.5) {
     return {
-      modelId: 'artistic',
-      reason: 'Unusual aspect ratio - Artistic model handles this well'
+      modelId: 'pop_art',
+      reason: 'Unusual aspect ratio - Pop-Art model handles this well with high contrast'
     }
   }
 
-  // Default to classic
+  // Default to original (natural photorealistic)
   return {
-    modelId: 'classic',
-    reason: 'Standard image - Classic model provides balanced results'
+    modelId: 'original',
+    reason: 'Standard image - Original model provides natural photorealistic results'
   }
 }

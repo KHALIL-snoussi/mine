@@ -189,7 +189,7 @@ async def generate_template(
     file: UploadFile = File(...),
     palette_name: str = "classic_18",
     num_colors: Optional[int] = None,
-    model: str = "classic",
+    model: str = "original",
     paper_format: str = "a4",
     title: Optional[str] = "Untitled",
     is_public: bool = False,
@@ -203,7 +203,7 @@ async def generate_template(
         file: Image file to convert
         palette_name: Color palette to use
         num_colors: Number of colors (optional, model determines default)
-        model: Processing model (classic, simple, detailed, artistic, vibrant, pastel)
+        model: Processing model (original, vintage, pop_art, full_color_hd)
         paper_format: Paper format (a4, a3, square_medium, etc.)
         title: Template title
         is_public: Make template visible in gallery

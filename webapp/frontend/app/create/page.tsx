@@ -33,6 +33,10 @@ export default function CreatePage() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
+<<<<<<< Updated upstream
+=======
+  const [selectedPalette, setSelectedPalette] = useState('classic_18')
+>>>>>>> Stashed changes
   const [selectedModel, setSelectedModel] = useState('original')
   const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
 
