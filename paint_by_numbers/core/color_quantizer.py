@@ -23,6 +23,30 @@ except ImportError:
     from utils.opencv import require_cv2
 
 
+def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
+    """
+    Assign each pixel in image to the nearest color in palette
+
+    Args:
+        image: Input image (H, W, 3) in BGR
+        palette: Color palette (N, 3) in BGR
+
+    Returns:
+        Quantized image with pixels assigned to palette colors
+    """
+    h, w = image.shape[:2]
+    pixels = image.reshape(-1, 3).astype(np.float32)
+
+    # Find nearest palette color for each pixel
+    distances = np.linalg.norm(pixels[:, np.newaxis] - palette[np.newaxis, :], axis=2)
+    labels = np.argmin(distances, axis=1)
+
+    # Create quantized image
+    quantized = palette[labels].reshape(h, w, 3).astype(np.uint8)
+
+    return quantized
+
+
 class ColorQuantizer:
     """Handles color quantization using K-means clustering or unified palettes"""
 
