@@ -11,6 +11,7 @@ dist/
 # Test outputs and generated files
 paint_test_output/
 test_input.png
+test_portrait_for_ultra_hd.jpg
 my_output/
 *_output/
 paint_by_numbers/output/
