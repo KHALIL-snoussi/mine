@@ -33,9 +33,19 @@ export default function CreatePage() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
-  const [selectedPalette, setSelectedPalette] = useState('classic_18')
-  const [selectedModel, setSelectedModel] = useState('classic')
+  const [selectedModel, setSelectedModel] = useState('original')
   const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
+
+  // Model-to-palette mapping (each model has its own colors)
+  const MODEL_PALETTES: Record<string, string> = {
+    'original': 'realistic_natural',
+    'vintage': 'vintage_warm',
+    'pop_art': 'pop_art_bold',
+    'full_color_hd': 'full_color_hd_38',
+  }
+
+  // Get the palette for the selected model
+  const selectedPalette = MODEL_PALETTES[selectedModel] || 'realistic_natural'
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
@@ -125,8 +135,7 @@ export default function CreatePage() {
       try {
         const kitRec = await apiClient.getKitRecommendation(file)
         setKitRecommendation(kitRec)
-        // Auto-select the recommended palette
-        setSelectedPalette(kitRec.recommended_kit.palette_name)
+        // Note: Palette is now automatically selected based on the model, not the kit
       } catch (error) {
         console.error('Error getting kit recommendation:', error)
       } finally {
@@ -541,16 +550,13 @@ export default function CreatePage() {
                                 ))}
                               </div>
 
-                              <button
-                                onClick={() => setSelectedPalette(kitData.kit.palette_name)}
-                                className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-semibold transition-all ${
-                                  selectedPalette === kitData.kit.palette_name
-                                    ? 'bg-primary-600 text-white'
-                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                }`}
-                              >
-                                {selectedPalette === kitData.kit.palette_name ? '✓ Selected' : 'Select This Kit'}
-                              </button>
+                              <Link href="/shop">
+                                <button
+                                  className="mt-3 w-full rounded-lg px-3 py-2 text-xs font-semibold transition-all bg-slate-100 text-slate-700 hover:bg-slate-200"
+                                >
+                                  View This Kit
+                                </button>
+                              </Link>
                             </div>
                           ))}
                         </div>
@@ -567,6 +573,7 @@ export default function CreatePage() {
                           name: selectedPalette,
                           colors: selectedPaletteInfo.colors
                         }}
+                        model={selectedModel}
                       />
                     </div>
                   )}
@@ -577,121 +584,30 @@ export default function CreatePage() {
                 <div className="space-y-8">
                   <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
                     <div className="border-b border-slate-200/70 p-8">
-                      <h2 className="text-2xl font-semibold text-slate-900">Step 2 · Fine-tune the look</h2>
-                      <p className="mt-1 text-sm text-slate-500">Swap AI models or palettes until the preview matches your style. Every run stays free.</p>
+                      <h2 className="text-2xl font-semibold text-slate-900">Step 2 · Choose your style</h2>
+                      <p className="mt-1 text-sm text-slate-500">Select an AI model - each has its own unique colors and style. Every run stays free.</p>
                     </div>
-                    <div className="flex flex-col gap-8 p-8 lg:flex-row">
-                      <div className="flex-1">
-                        <ModelSelector
-                          models={modelsData}
-                          selectedModel={selectedModel}
-                          onSelectModel={setSelectedModel}
-                          isLoading={!modelsData}
-                        />
-                      </div>
-                      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-slate-50 p-6">
-                        <h3 className="text-lg font-semibold text-slate-800">Palette</h3>
-                        <p className="mt-1 text-xs text-slate-500">Pick a palette that matches your paint kit!</p>
+                    <div className="p-8">
+                      <ModelSelector
+                        models={modelsData}
+                        selectedModel={selectedModel}
+                        onSelectModel={setSelectedModel}
+                        isLoading={!modelsData}
+                      />
 
-                        <div className="mt-3 rounded-lg bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-200 p-3">
-                          <p className="text-xs font-semibold text-primary-800 mb-1">💡 Smart System:</p>
-                          <p className="text-xs text-primary-700">Choose a palette once, generate unlimited templates with the same paint kit!</p>
-                          <Link href="/shop" className="inline-block mt-2">
-                            <span className="text-xs font-semibold text-primary-600 hover:text-primary-700 underline">View Paint Kits →</span>
-                          </Link>
-                        </div>
-
-                        <select
-                          value={selectedPalette}
-                          onChange={(event) => setSelectedPalette(event.target.value)}
-                          className="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-200"
-                        >
-                          {palettesData
-                            ? palettesData.map((palette) => (
-                                <option key={palette.name} value={palette.name}>
-                                  {palette.display_name} · {palette.num_colors} colors
-                                </option>
-                              ))
-                            : (
-                                <option value={selectedPalette}>Loading palettes...</option>
-                              )}
-                        </select>
-
-                        {selectedPaletteInfo && (
-                          <div className="mt-4 space-y-3 text-xs text-slate-600">
-                            <p className="text-[0.75rem] font-semibold uppercase tracking-widest text-slate-500">
-                              Swatch preview
+                      {/* Info about automatic palette selection */}
+                      <div className="mt-6 rounded-xl bg-gradient-to-r from-primary-50 to-secondary-50 border-2 border-primary-200 p-4">
+                        <div className="flex items-start gap-3">
+                          <span className="text-2xl">✨</span>
+                          <div>
+                            <p className="text-sm font-bold text-slate-900 mb-1">
+                              Each Model Uses Its Own Colors
                             </p>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedPaletteInfo.colors.slice(0, 10).map((color, idx) => (
-                                <div key={idx} className="flex flex-col items-center gap-1 text-[0.65rem]">
-                                  <span
-                                    className="h-10 w-10 rounded-full border border-slate-200"
-                                    style={{ backgroundColor: rgbToHex(color) }}
-                                  />
-                                  <span className="text-slate-500">{selectedPaletteInfo.color_names?.[idx] ?? rgbToHex(color)}</span>
-                                </div>
-                              ))}
-                            </div>
-                            <p className="text-xs text-slate-500">{selectedPaletteInfo.description}</p>
-
-                            {/* Paint Kit Recommendation */}
-                            {selectedPalette && (
-                              <div className="mt-3 pt-3 border-t border-slate-200">
-                                <p className="text-[0.75rem] font-semibold uppercase tracking-widest text-slate-500 mb-2">
-                                  Recommended Paint Kit
-                                </p>
-                                {selectedPalette === 'classic_12' && (
-                                  <div className="rounded-lg bg-white border border-primary-200 p-3">
-                                    <p className="font-semibold text-sm text-slate-800">Starter Kit</p>
-                                    <p className="text-xs text-primary-600 font-bold">$24.99 · 12 colors</p>
-                                    <p className="text-xs text-slate-600 mt-1">Perfect for beginners & kids</p>
-                                  </div>
-                                )}
-                                {selectedPalette === 'classic_18' && (
-                                  <div className="rounded-lg bg-gradient-to-br from-primary-50 to-secondary-50 border border-primary-300 p-3">
-                                    <p className="font-semibold text-sm text-slate-800">Creative Kit ⭐</p>
-                                    <p className="text-xs text-primary-600 font-bold">$39.99 · 18 colors</p>
-                                    <p className="text-xs text-slate-700 mt-1">Most popular choice!</p>
-                                  </div>
-                                )}
-                                {selectedPalette === 'classic_24' && (
-                                  <div className="rounded-lg bg-white border border-secondary-300 p-3">
-                                    <p className="font-semibold text-sm text-slate-800">Professional Kit</p>
-                                    <p className="text-xs text-secondary-600 font-bold">$59.99 · 24 colors</p>
-                                    <p className="text-xs text-slate-600 mt-1">For serious artists</p>
-                                  </div>
-                                )}
-                                {selectedPalette === 'pastel_12' && (
-                                  <div className="rounded-lg bg-pink-50 border border-pink-200 p-3">
-                                    <p className="font-semibold text-sm text-slate-800">Pastel Dreams Kit</p>
-                                    <p className="text-xs text-pink-600 font-bold">$29.99 · 12 colors</p>
-                                    <p className="text-xs text-slate-600 mt-1">Soft, beautiful pastels</p>
-                                  </div>
-                                )}
-                                {selectedPalette === 'nature_15' && (
-                                  <div className="rounded-lg bg-green-50 border border-green-200 p-3">
-                                    <p className="font-semibold text-sm text-slate-800">Nature Collection Kit</p>
-                                    <p className="text-xs text-green-600 font-bold">$34.99 · 15 colors</p>
-                                    <p className="text-xs text-slate-600 mt-1">Earth tones & landscapes</p>
-                                  </div>
-                                )}
-                                {selectedPalette === 'vibrant_18' && (
-                                  <div className="rounded-lg bg-orange-50 border border-orange-200 p-3">
-                                    <p className="font-semibold text-sm text-slate-800">Vibrant Artist Kit</p>
-                                    <p className="text-xs text-orange-600 font-bold">$42.99 · 18 colors</p>
-                                    <p className="text-xs text-slate-600 mt-1">Bold, vivid colors</p>
-                                  </div>
-                                )}
-                                <Link href="/shop">
-                                  <Button size="sm" variant="outline" className="w-full mt-2 text-xs">
-                                    Buy This Kit
-                                  </Button>
-                                </Link>
-                              </div>
-                            )}
+                            <p className="text-xs text-slate-700">
+                              Your selected model automatically comes with its optimized color palette. No need to choose separately!
+                            </p>
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
                   </div>
