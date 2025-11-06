@@ -54,6 +54,12 @@ def convert_file_path_to_url(file_path: Optional[str]) -> Optional[str]:
     if file_path.startswith('/uploads/'):
         return f"{settings.BACKEND_URL}{file_path}"
 
+    # If path contains uploads/ (relative path like "uploads/guest/..."), add leading slash
+    if 'uploads/' in file_path:
+        # Remove any existing "uploads/" prefix and add it back with leading slash
+        path_after_uploads = file_path.split('uploads/', 1)[1]
+        return f"{settings.BACKEND_URL}/uploads/{path_after_uploads}"
+
     # Otherwise add backend URL with /uploads/ prefix
     return f"{settings.BACKEND_URL}/uploads/{file_path.lstrip('/')}"
 
