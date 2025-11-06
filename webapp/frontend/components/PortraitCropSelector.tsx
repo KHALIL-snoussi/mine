@@ -13,17 +13,19 @@ interface PortraitCropSelectorProps {
 const PORTRAIT_ASPECT_RATIO = 3 / 4
 
 // Responsive crop sizing configuration
+// Optimized for A4 printing (210mm × 297mm at 300 DPI = ~2480 × 3508 pixels)
 const CROP_SIZE_CONFIG = {
   // Crop will be this percentage of the image width
-  imageWidthPercentage: 0.6, // 60% of image width
+  // 75% gives good subject focus while showing more than just the face
+  imageWidthPercentage: 0.75, // 75% of image width
 
-  // Minimum crop dimensions (in pixels)
-  minWidth: 400,
-  minHeight: 533, // 400 * (4/3) to maintain aspect ratio
+  // Minimum crop dimensions (in pixels) - suitable for A4 at lower DPI
+  minWidth: 1000,
+  minHeight: 1333, // 1000 * (4/3) to maintain aspect ratio
 
-  // Maximum crop dimensions (in pixels)
-  maxWidth: 1200,
-  maxHeight: 1600, // 1200 * (4/3)
+  // Maximum crop dimensions (in pixels) - suitable for A4 at high quality (300 DPI)
+  maxWidth: 2400,
+  maxHeight: 3200, // 2400 * (4/3)
 }
 
 // Calculate responsive crop dimensions based on image size
