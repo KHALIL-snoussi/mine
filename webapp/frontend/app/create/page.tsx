@@ -32,18 +32,11 @@ function formatFileSize(bytes: number) {
 export default function CreatePage() {
   const router = useRouter()
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-<<<<<<< Updated upstream
-=======
-  const [selectedPalette, setSelectedPalette] = useState('classic_18')
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-  const [selectedModel, setSelectedModel] = useState('original')
-  const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
-  const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
+const [selectedFile, setSelectedFile] = useState<File | null>(null)
+const [preview, setPreview] = useState<string | null>(null)
+const [selectedModel, setSelectedModel] = useState('original')
+const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
+const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
 
   // Model-to-palette mapping (each model has its own colors)
   const MODEL_PALETTES: Record<string, string> = {
