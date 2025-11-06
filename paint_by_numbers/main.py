@@ -240,8 +240,11 @@ class PaintByNumbersGenerator:
         if n_colors is None:
             n_colors = self.config.DEFAULT_NUM_COLORS
 
+        # Apply color style adjustments (Vintage warmth, Pop-Art saturation, etc.)
+        styled_image = self.color_quantizer.apply_color_style(self.processed_image)
+
         self.quantized_image, self.palette = self.color_quantizer.quantize(
-            self.processed_image,
+            styled_image,  # Use styled image instead of processed_image
             n_colors=n_colors,
             sort_palette=True,
             use_unified_palette=use_unified_palette,

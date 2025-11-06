@@ -142,6 +142,76 @@ STANDARD_PALETTES = {
         (255, 255, 255),  # White
         (0, 0, 0),        # Black
     ],
+
+    # ===== PREMIUM PALETTES FOR 3-MODEL SYSTEM =====
+
+    # ORIGINAL MODEL - Natural Photorealistic Palette
+    "realistic_natural": [
+        (255, 255, 255),  # Pure White
+        (245, 245, 240),  # Off White
+        (15, 15, 15),     # Near Black
+        (65, 65, 65),     # Charcoal
+        (128, 128, 128),  # Medium Gray
+        (192, 192, 192),  # Light Gray
+        (220, 180, 160),  # Skin Tone Light
+        (180, 130, 100),  # Skin Tone Medium
+        (120, 80, 60),    # Skin Tone Dark
+        (185, 85, 75),    # Natural Red
+        (220, 120, 90),   # Warm Coral
+        (240, 180, 120),  # Peach
+        (95, 130, 160),   # Sky Blue
+        (70, 100, 140),   # Deep Blue
+        (85, 120, 85),    # Forest Green
+        (140, 165, 100),  # Sage Green
+        (160, 110, 75),   # Natural Brown
+        (210, 190, 140),  # Sand
+        (190, 160, 130),  # Warm Tan
+        (245, 220, 120),  # Soft Yellow
+    ],
+
+    # VINTAGE MODEL - Warm Nostalgic Palette
+    "vintage_warm": [
+        (250, 245, 235),  # Cream White
+        (235, 220, 200),  # Antique White
+        (40, 35, 30),     # Vintage Black
+        (90, 75, 60),     # Sepia Brown
+        (145, 130, 110),  # Taupe Gray
+        (190, 175, 155),  # Warm Gray
+        (210, 170, 140),  # Vintage Skin
+        (175, 135, 105),  # Golden Skin
+        (140, 100, 75),   # Bronze Skin
+        (185, 95, 75),    # Muted Red
+        (205, 140, 95),   # Terra Cotta
+        (220, 180, 135),  # Warm Peach
+        (140, 150, 165),  # Dusty Blue
+        (95, 110, 125),   # Vintage Blue
+        (105, 125, 95),   # Olive Green
+        (165, 175, 130),  # Sage
+        (140, 100, 70),   # Walnut Brown
+        (190, 165, 130),  # Wheat
+        (205, 180, 145),  # Biscuit
+        (220, 200, 140),  # Vintage Gold
+    ],
+
+    # POP-ART MODEL - Bold Vibrant Palette
+    "pop_art_bold": [
+        (255, 255, 255),  # Bright White
+        (0, 0, 0),        # Pure Black
+        (255, 30, 60),    # Electric Red
+        (255, 100, 180),  # Hot Pink
+        (255, 180, 0),    # Golden Yellow
+        (255, 120, 0),    # Vivid Orange
+        (0, 180, 255),    # Cyan Blue
+        (0, 80, 200),     # Bold Blue
+        (120, 0, 200),    # Purple
+        (255, 0, 140),    # Magenta
+        (0, 220, 100),    # Neon Green
+        (180, 255, 0),    # Lime Green
+        (255, 200, 255),  # Bright Pink
+        (180, 230, 255),  # Sky Cyan
+        (255, 230, 100),  # Sunshine Yellow
+        (200, 50, 50),    # Deep Red
+    ],
 }
 
 
@@ -178,6 +248,27 @@ COLOR_NAMES = {
         "Sky Blue", "Forest Green", "Olive Drab", "Saddle Brown", "Sienna", "Tan",
         "Yellow", "Orange", "Gray", "Light Steel Blue", "Steel Blue", "Sea Green",
         "Yellow Green", "White", "Black"
+    ],
+
+    # Premium Palettes Names
+    "realistic_natural": [
+        "Pure White", "Off White", "Near Black", "Charcoal", "Medium Gray", "Light Gray",
+        "Light Skin", "Medium Skin", "Dark Skin", "Natural Red", "Warm Coral", "Peach",
+        "Sky Blue", "Deep Blue", "Forest Green", "Sage Green", "Natural Brown", "Sand",
+        "Warm Tan", "Soft Yellow"
+    ],
+
+    "vintage_warm": [
+        "Cream White", "Antique White", "Vintage Black", "Sepia Brown", "Taupe Gray", "Warm Gray",
+        "Vintage Skin", "Golden Skin", "Bronze Skin", "Muted Red", "Terra Cotta", "Warm Peach",
+        "Dusty Blue", "Vintage Blue", "Olive Green", "Sage", "Walnut Brown", "Wheat",
+        "Biscuit", "Vintage Gold"
+    ],
+
+    "pop_art_bold": [
+        "Bright White", "Pure Black", "Electric Red", "Hot Pink", "Golden Yellow", "Vivid Orange",
+        "Cyan Blue", "Bold Blue", "Purple", "Magenta", "Neon Green", "Lime Green",
+        "Bright Pink", "Sky Cyan", "Sunshine Yellow", "Deep Red"
     ],
 }
 

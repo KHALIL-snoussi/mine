@@ -1,9 +1,12 @@
 """
-Multiple AI Models/Modes for Paint-by-Numbers Generation
-Inspired by Qbrix's multi-model approach
+Premium 3-Model Paint-by-Numbers System
+Inspired by Qbrix's professional approach
 
-Each model offers a unique processing style with different characteristics.
-Customers can choose the model that best fits their needs and skill level.
+🎨 ORIGINAL - Natural photorealistic colors
+📸 VINTAGE - Warm nostalgic tones
+🎭 POP-ART - Bold vibrant colors
+
+Each model is professionally calibrated for stunning results.
 """
 
 from dataclasses import dataclass, field
@@ -19,8 +22,9 @@ class ModelProfile:
     name: str
     display_name: str
     description: str
-    difficulty_level: str  # 'beginner', 'intermediate', 'advanced', 'expert'
+    difficulty_level: str  # 'beginner', 'intermediate', 'advanced'
     recommended_for: list
+    size_label: str  # Display size like "40×50 cm"
 
     # Processing parameters
     num_colors: int
@@ -32,11 +36,21 @@ class ModelProfile:
     bilateral_sigma_color: int
     bilateral_sigma_space: int
     morphology_kernel_size: int
+
+    # ENHANCED number rendering for crystal-clear visibility
     font_scale: float
+    font_thickness: int = 2
+    font_outline_thickness: int = 3
+    number_contrast_boost: bool = True
+
+    # Color style
+    color_style: str = "natural"  # 'natural', 'vintage', 'pop_art'
+    saturation_boost: float = 1.0  # 1.0 = normal, >1.0 = more saturated
+    warmth_adjustment: int = 0  # Shift toward warm (-20 to +20)
 
     # Palette settings
     use_unified_palette: bool = True
-    palette_name: str = "classic_18"
+    palette_name: str = "realistic_natural"
 
     # Style characteristics
     style_tags: list = field(default_factory=list)
@@ -44,13 +58,14 @@ class ModelProfile:
 
     # Visual preview settings
     preview_icon: str = "🎨"
-    color_range: str = "10-15 colors"
-    detail_level: str = "Medium"
+    color_range: str = "16-20 colors"
+    detail_level: str = "High"
 
     def to_config(self) -> Config:
-        """Convert model profile to Config object"""
+        """Convert model profile to Config object with enhanced settings"""
         config = Config()
 
+        # Basic parameters
         config.DEFAULT_NUM_COLORS = self.num_colors
         config.MIN_REGION_SIZE = self.min_region_size
         config.MAX_IMAGE_SIZE = self.max_image_size
@@ -60,7 +75,19 @@ class ModelProfile:
         config.BILATERAL_SIGMA_COLOR = self.bilateral_sigma_color
         config.BILATERAL_SIGMA_SPACE = self.bilateral_sigma_space
         config.MORPHOLOGY_KERNEL_SIZE = self.morphology_kernel_size
+
+        # ENHANCED font settings for crystal-clear numbers
         config.FONT_SCALE = self.font_scale
+        config.FONT_THICKNESS = self.font_thickness
+        config.FONT_OUTLINE_THICKNESS = self.font_outline_thickness
+        config.NUMBER_CONTRAST_BOOST = self.number_contrast_boost
+
+        # Color style settings
+        config.COLOR_STYLE = self.color_style
+        config.SATURATION_BOOST = self.saturation_boost
+        config.WARMTH_ADJUSTMENT = self.warmth_adjustment
+
+        # Palette
         config.USE_UNIFIED_PALETTE = self.use_unified_palette
         config.UNIFIED_PALETTE_NAME = self.palette_name
 
@@ -73,6 +100,7 @@ class ModelProfile:
             'name': self.name,
             'display_name': self.display_name,
             'description': self.description,
+            'size_label': self.size_label,
             'difficulty_level': self.difficulty_level,
             'recommended_for': self.recommended_for,
             'color_range': self.color_range,
@@ -80,240 +108,156 @@ class ModelProfile:
             'processing_time': self.processing_time_estimate,
             'preview_icon': self.preview_icon,
             'style_tags': self.style_tags,
+            'color_style': self.color_style,
         }
 
 
 class ModelRegistry:
-    """Registry of available processing models"""
+    """Registry of 3 Premium Processing Models"""
 
     MODELS = {
-        # Model 1: Classic Standard - Balanced approach
-        'classic': ModelProfile(
-            id='classic',
-            name='Classic',
-            display_name='Classic Standard',
-            description='Our signature balanced approach perfect for most images. ' +
-                       'Ideal blend of detail and simplicity.',
+        # MODEL 1: ORIGINAL - Natural Photorealistic
+        'original': ModelProfile(
+            id='original',
+            name='Original',
+            display_name='Original 40×50 cm',
+            description='Natural photorealistic colors that stay true to your image. ' +
+                       'Perfect for portraits, family photos, and realistic subjects. ' +
+                       'Professional quality with crystal-clear numbers.',
             difficulty_level='intermediate',
+            size_label='40×50 cm',
             recommended_for=[
-                'First-time painters',
-                'Portraits and photos',
-                'General purpose',
-                'Gift projects'
+                '✓ Portrait photography',
+                '✓ Family photos',
+                '✓ Realistic landscapes',
+                '✓ Pet portraits',
+                '✓ Wedding photos',
+                '✓ Professional results'
             ],
-            num_colors=15,
-            min_region_size=100,
-            max_image_size=(1200, 1200),
-            edge_threshold_low=50,
-            edge_threshold_high=150,
-            bilateral_filter_d=9,
-            bilateral_sigma_color=75,
-            bilateral_sigma_space=75,
-            morphology_kernel_size=3,
-            font_scale=0.5,
-            palette_name='classic_18',
-            style_tags=['balanced', 'versatile', 'popular'],
-            color_range='12-18 colors',
-            detail_level='Medium',
-            preview_icon='⭐',
-            processing_time_estimate='30-45 seconds'
-        ),
-
-        # Model 2: Simple Easy - For beginners
-        'simple': ModelProfile(
-            id='simple',
-            name='Simple',
-            display_name='Simple & Easy',
-            description='Fewer colors and larger regions for quick, relaxing painting. ' +
-                       'Perfect for beginners and children.',
-            difficulty_level='beginner',
-            recommended_for=[
-                'Beginners and children',
-                'Quick projects (2-4 hours)',
-                'Relaxing activity',
-                'Abstract and simple images'
-            ],
-            num_colors=10,
-            min_region_size=200,
-            max_image_size=(800, 800),
-            edge_threshold_low=60,
-            edge_threshold_high=140,
-            bilateral_filter_d=11,
-            bilateral_sigma_color=90,
-            bilateral_sigma_space=90,
-            morphology_kernel_size=5,
-            font_scale=0.6,
-            palette_name='classic_12',
-            style_tags=['beginner', 'easy', 'quick'],
-            color_range='8-12 colors',
-            detail_level='Low',
-            preview_icon='🌟',
-            processing_time_estimate='25-35 seconds'
-        ),
-
-        # Model 3: Detailed Pro - For experienced painters
-        'detailed': ModelProfile(
-            id='detailed',
-            name='Detailed',
-            display_name='Detailed Professional',
-            description='Maximum detail with more colors and finer regions. ' +
-                       'For experienced painters seeking a challenge.',
-            difficulty_level='advanced',
-            recommended_for=[
-                'Experienced painters',
-                'Complex images',
-                'High-detail portraits',
-                'Professional results'
-            ],
-            num_colors=24,
-            min_region_size=50,
-            max_image_size=(1800, 1800),
-            edge_threshold_low=40,
-            edge_threshold_high=160,
-            bilateral_filter_d=7,
-            bilateral_sigma_color=60,
-            bilateral_sigma_space=60,
-            morphology_kernel_size=2,
-            font_scale=0.35,
-            palette_name='classic_24',
-            style_tags=['advanced', 'detailed', 'professional'],
-            color_range='20-24 colors',
-            detail_level='High',
-            preview_icon='💎',
-            processing_time_estimate='45-75 seconds'
-        ),
-
-        # Model 4: Artistic Painterly - Stylized effect
-        'artistic': ModelProfile(
-            id='artistic',
-            name='Artistic',
-            display_name='Artistic Painterly',
-            description='Enhanced color blending with a painterly, artistic effect. ' +
-                       'Creates a more impressionistic final result.',
-            difficulty_level='intermediate',
-            recommended_for=[
-                'Creative projects',
-                'Landscapes and nature',
-                'Artistic interpretation',
-                'Unique gifts'
-            ],
-            num_colors=18,
-            min_region_size=120,
-            max_image_size=(1400, 1400),
-            edge_threshold_low=35,
-            edge_threshold_high=120,
-            bilateral_filter_d=13,
-            bilateral_sigma_color=100,
-            bilateral_sigma_space=100,
-            morphology_kernel_size=4,
-            font_scale=0.45,
-            palette_name='vibrant_18',
-            style_tags=['artistic', 'creative', 'impressionistic'],
-            color_range='15-18 colors',
-            detail_level='Medium-High',
-            preview_icon='🎭',
-            processing_time_estimate='35-50 seconds'
-        ),
-
-        # Model 5: Vibrant Bold - Bold colors and high contrast
-        'vibrant': ModelProfile(
-            id='vibrant',
-            name='Vibrant',
-            display_name='Vibrant & Bold',
-            description='Enhanced saturation and bold colors for eye-catching results. ' +
-                       'Perfect for modern and pop art styles.',
-            difficulty_level='intermediate',
-            recommended_for=[
-                'Modern art style',
-                'Pop art and bold images',
-                'High contrast photos',
-                'Statement pieces'
-            ],
-            num_colors=16,
-            min_region_size=90,
-            max_image_size=(1300, 1300),
-            edge_threshold_low=55,
+            # Optimized for natural look with excellent clarity
+            num_colors=20,  # Rich color depth without overwhelming
+            min_region_size=80,  # Perfect balance - not too small, not too large
+            max_image_size=(2480, 3508),  # A4 @ 300 DPI - perfect print quality
+            edge_threshold_low=45,
             edge_threshold_high=155,
             bilateral_filter_d=8,
             bilateral_sigma_color=70,
             bilateral_sigma_space=70,
             morphology_kernel_size=3,
-            font_scale=0.5,
-            palette_name='vibrant_18',
-            style_tags=['bold', 'colorful', 'modern'],
-            color_range='14-18 colors',
-            detail_level='Medium',
-            preview_icon='🔥',
-            processing_time_estimate='30-45 seconds'
+
+            # CRYSTAL-CLEAR NUMBERS
+            font_scale=0.6,  # Bigger, easier to read
+            font_thickness=2,  # Bold numbers
+            font_outline_thickness=4,  # Strong white outline
+            number_contrast_boost=True,
+
+            # Natural color style
+            color_style='natural',
+            saturation_boost=1.05,  # Slightly enhanced for vibrancy
+            warmth_adjustment=0,
+            palette_name='realistic_natural',
+
+            style_tags=['photorealistic', 'natural', 'professional', 'clear'],
+            color_range='18-22 colors',
+            detail_level='High Definition',
+            preview_icon='🎨',
+            processing_time_estimate='40-60 seconds'
         ),
 
-        # Model 6: Pastel Soft - Gentle, muted colors
-        'pastel': ModelProfile(
-            id='pastel',
-            name='Pastel',
-            display_name='Pastel & Soft',
-            description='Gentle, muted colors for a soft and soothing aesthetic. ' +
-                       'Ideal for calming, delicate subjects.',
-            difficulty_level='beginner',
+        # MODEL 2: VINTAGE - Warm Nostalgic Tones
+        'vintage': ModelProfile(
+            id='vintage',
+            name='Vintage',
+            display_name='Vintage 40×50 cm',
+            description='Warm, nostalgic tones with a retro aesthetic. ' +
+                       'Slightly muted colors create a timeless, classic look. ' +
+                       'Perfect for creating that vintage feel with modern clarity.',
+            difficulty_level='intermediate',
+            size_label='40×50 cm',
             recommended_for=[
-                'Delicate subjects',
-                'Baby rooms and nurseries',
-                'Relaxing projects',
-                'Gentle aesthetics'
+                '✓ Vintage-style photos',
+                '✓ Nostalgic memories',
+                '✓ Classic portraits',
+                '✓ Retro aesthetics',
+                '✓ Warm landscapes',
+                '✓ Timeless artwork'
             ],
-            num_colors=12,
-            min_region_size=150,
-            max_image_size=(1000, 1000),
-            edge_threshold_low=45,
-            edge_threshold_high=135,
-            bilateral_filter_d=10,
+            # Optimized for warm vintage look
+            num_colors=18,  # Slightly fewer for classic feel
+            min_region_size=95,  # Comfortable painting regions
+            max_image_size=(2480, 3508),  # A4 @ 300 DPI
+            edge_threshold_low=40,
+            edge_threshold_high=145,
+            bilateral_filter_d=10,  # Softer edges for vintage feel
             bilateral_sigma_color=85,
             bilateral_sigma_space=85,
             morphology_kernel_size=4,
-            font_scale=0.55,
-            palette_name='pastel_12',
-            style_tags=['soft', 'gentle', 'calming'],
-            color_range='10-12 colors',
-            detail_level='Low-Medium',
-            preview_icon='🌸',
-            processing_time_estimate='25-40 seconds'
+
+            # CRYSTAL-CLEAR NUMBERS
+            font_scale=0.65,  # Even bigger for comfort
+            font_thickness=2,
+            font_outline_thickness=4,
+            number_contrast_boost=True,
+
+            # Vintage color style - warm and nostalgic
+            color_style='vintage',
+            saturation_boost=0.85,  # Slightly desaturated
+            warmth_adjustment=15,  # Warm shift (sepia-like)
+            palette_name='vintage_warm',
+
+            style_tags=['vintage', 'retro', 'warm', 'nostalgic', 'classic'],
+            color_range='16-20 colors',
+            detail_level='Medium-High',
+            preview_icon='📸',
+            processing_time_estimate='35-55 seconds'
         ),
 
-        # Model 7: Ultra Detailed - Maximum resolution for A4/A3 printing
-        'ultra_detailed': ModelProfile(
-            id='ultra_detailed',
-            name='Ultra Detailed',
-            display_name='Ultra Detailed HD Pro',
-            description='ULTIMATE quality with intelligent upscaling, face detection, and automatic ' +
-                       'enhancement. Crystal-clear faces, fine details, and professional results. ' +
-                       'Automatically upscales small images to optimal resolution. Perfect for A4/A3/A2 printing.',
-            difficulty_level='expert',
+        # MODEL 3: POP-ART - Bold Vibrant Colors
+        'pop_art': ModelProfile(
+            id='pop_art',
+            name='Pop-Art',
+            display_name='Pop-Art 40×50 cm',
+            description='Bold, vibrant colors with high contrast like Andy Warhol masterpieces. ' +
+                       'Eye-catching, modern aesthetic perfect for statement pieces. ' +
+                       'Maximum impact with professional clarity.',
+            difficulty_level='intermediate',
+            size_label='40×50 cm',
             recommended_for=[
-                'Portrait photography with faces - BEST QUALITY',
-                'A4, A3, and A2 paper printing',
-                'Professional gallery prints',
-                'Wedding photos and family portraits',
-                'Maximum detail preservation',
-                'Small images that need upscaling',
-                'Large format wall art',
-                'Commercial printing projects'
+                '✓ Bold statement pieces',
+                '✓ Modern art style',
+                '✓ Pop culture images',
+                '✓ High-contrast photos',
+                '✓ Contemporary decor',
+                '✓ Creative projects'
             ],
-            num_colors=30,
-            min_region_size=35,
-            max_image_size=(4960, 7016),  # A2 @ 300 DPI - MAXIMUM QUALITY!
-            edge_threshold_low=30,
-            edge_threshold_high=170,
-            bilateral_filter_d=5,
-            bilateral_sigma_color=50,
-            bilateral_sigma_space=50,
-            morphology_kernel_size=2,
-            font_scale=0.28,
-            palette_name='classic_24',
-            style_tags=['hd', 'professional', 'print-ready', 'ultra-high-detail', 'ai-enhanced', 'face-optimized'],
-            color_range='24-30 colors',
-            detail_level='Ultra High Pro',
-            preview_icon='💎',
-            processing_time_estimate='60-180 seconds'
+            # Optimized for bold pop-art style
+            num_colors=16,  # Fewer colors = bolder impact
+            min_region_size=110,  # Larger regions for graphic look
+            max_image_size=(2480, 3508),  # A4 @ 300 DPI
+            edge_threshold_low=60,  # Strong edges
+            edge_threshold_high=170,  # High contrast
+            bilateral_filter_d=7,  # Sharp transitions
+            bilateral_sigma_color=60,
+            bilateral_sigma_space=60,
+            morphology_kernel_size=3,
+
+            # ULTRA-CLEAR NUMBERS for bold style
+            font_scale=0.7,  # Largest font
+            font_thickness=3,  # Extra bold
+            font_outline_thickness=5,  # Maximum outline
+            number_contrast_boost=True,
+
+            # Pop-art color style - vibrant and bold
+            color_style='pop_art',
+            saturation_boost=1.35,  # Highly saturated
+            warmth_adjustment=0,
+            palette_name='pop_art_bold',
+
+            style_tags=['pop-art', 'bold', 'vibrant', 'modern', 'graphic'],
+            color_range='14-18 colors',
+            detail_level='Bold & Graphic',
+            preview_icon='🎭',
+            processing_time_estimate='30-50 seconds'
         ),
     }
 
@@ -339,52 +283,56 @@ class ModelRegistry:
 
     @classmethod
     def get_default_model(cls) -> ModelProfile:
-        """Get the default model (Classic)"""
-        return cls.MODELS['classic']
+        """Get the default model (Original)"""
+        return cls.MODELS['original']
 
     @classmethod
-    def get_recommended_model(cls, image_complexity: str = 'medium',
-                            user_experience: str = 'beginner') -> ModelProfile:
+    def get_recommended_model(cls, style_preference: str = 'natural') -> ModelProfile:
         """
-        Get recommended model based on image and user characteristics
+        Get recommended model based on style preference
 
         Args:
-            image_complexity: 'simple', 'medium', 'complex'
-            user_experience: 'beginner', 'intermediate', 'advanced'
+            style_preference: 'natural', 'vintage', 'bold', 'modern'
 
         Returns:
             Recommended ModelProfile
         """
-        recommendations = {
-            ('simple', 'beginner'): 'simple',
-            ('simple', 'intermediate'): 'classic',
-            ('simple', 'advanced'): 'artistic',
-            ('medium', 'beginner'): 'classic',
-            ('medium', 'intermediate'): 'classic',
-            ('medium', 'advanced'): 'detailed',
-            ('complex', 'beginner'): 'classic',
-            ('complex', 'intermediate'): 'detailed',
-            ('complex', 'advanced'): 'detailed',
+        style_map = {
+            'natural': 'original',
+            'realistic': 'original',
+            'photo': 'original',
+            'vintage': 'vintage',
+            'retro': 'vintage',
+            'warm': 'vintage',
+            'classic': 'vintage',
+            'bold': 'pop_art',
+            'vibrant': 'pop_art',
+            'modern': 'pop_art',
+            'pop': 'pop_art',
+            'graphic': 'pop_art',
         }
 
-        model_id = recommendations.get((image_complexity, user_experience), 'classic')
+        model_id = style_map.get(style_preference.lower(), 'original')
         return cls.MODELS[model_id]
 
 
 def get_model_comparison() -> Dict[str, Any]:
     """
-    Get a comparison table of all models
+    Get a comparison of all 3 premium models
 
     Returns:
         Dictionary with model comparison data
     """
     return {
+        'title': 'Premium Paint-by-Numbers Models',
+        'subtitle': 'Choose your perfect style',
         'models': ModelRegistry.get_models_list(),
         'comparison_factors': [
-            'Difficulty Level',
-            'Number of Colors',
+            'Style',
+            'Color Range',
             'Detail Level',
-            'Processing Time',
-            'Best For'
-        ]
+            'Best For',
+            'Processing Time'
+        ],
+        'note': 'All models include crystal-clear numbers and professional A4 print quality (40×50 cm)'
     }

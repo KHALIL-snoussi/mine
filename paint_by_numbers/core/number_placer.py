@@ -161,7 +161,7 @@ class NumberPlacer:
     def _draw_number(self, image: np.ndarray, number: int,
                     position: Tuple[int, int], color: Tuple[int, int, int]):
         """
-        Draw number at specified position
+        Draw CRYSTAL-CLEAR number at specified position with enhanced visibility
 
         Args:
             image: Image to draw on
@@ -171,7 +171,9 @@ class NumberPlacer:
         """
         text = str(number)
         cv2 = require_cv2()
-        font = cv2.FONT_HERSHEY_SIMPLEX
+
+        # Use bold, clear font
+        font = cv2.FONT_HERSHEY_DUPLEX  # Changed to DUPLEX for better clarity
         font_scale = self.config.FONT_SCALE
         thickness = self.config.FONT_THICKNESS
 
@@ -185,24 +187,43 @@ class NumberPlacer:
         text_x = x - text_w // 2
         text_y = y + text_h // 2
 
-        # Draw text with slight outline for better visibility
-        # Draw white outline
-        outline_color = (255, 255, 255) if color == (0, 0, 0) else (0, 0, 0)
+        # ENHANCED NUMBER RENDERING FOR MAXIMUM VISIBILITY
+
+        # Step 1: Draw thick white halo/glow for contrast boost
+        if self.config.NUMBER_CONTRAST_BOOST:
+            # Create a glowing effect with multiple layers
+            for offset in range(self.config.FONT_OUTLINE_THICKNESS, 0, -1):
+                alpha = 255 - (offset * 40)  # Fade out the glow
+                glow_color = (255, 255, 255)  # White glow
+
+                cv2.putText(
+                    image, text,
+                    (text_x, text_y),
+                    font, font_scale,
+                    glow_color,
+                    thickness + offset * 2,
+                    cv2.LINE_AA
+                )
+
+        # Step 2: Draw black outline for definition
         cv2.putText(
             image, text,
             (text_x, text_y),
             font, font_scale,
-            outline_color,
-            thickness + 2,
+            (0, 0, 0),  # Black outline
+            thickness + 1,
             cv2.LINE_AA
         )
 
-        # Draw main text
+        # Step 3: Draw main number in black (or contrasting color)
+        # Always use black for maximum clarity on white background
+        final_color = (0, 0, 0)
+
         cv2.putText(
             image, text,
             (text_x, text_y),
             font, font_scale,
-            color,
+            final_color,
             thickness,
             cv2.LINE_AA
         )

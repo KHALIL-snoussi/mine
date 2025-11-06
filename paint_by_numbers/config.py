@@ -62,11 +62,18 @@ class Config:
     EDGE_THRESHOLD_LOW = 50        # Canny edge detection low threshold
     EDGE_THRESHOLD_HIGH = 150      # Canny edge detection high threshold
 
-    # Number Placement
-    FONT_SCALE = 0.5               # Font size for numbers
-    FONT_THICKNESS = 1             # Font thickness
+    # Number Placement - ENHANCED FOR CRYSTAL-CLEAR VISIBILITY
+    FONT_SCALE = 0.6               # Font size for numbers (bigger = easier to read)
+    FONT_THICKNESS = 2             # Font thickness (bold numbers)
+    FONT_OUTLINE_THICKNESS = 4     # White outline thickness for contrast
+    NUMBER_CONTRAST_BOOST = True   # Add white halo around numbers for visibility
     NUMBER_COLOR = (0, 0, 0)       # Black numbers
     MIN_NUMBER_SPACING = 30        # Minimum pixels between numbers
+
+    # Color Style Processing - NEW FEATURE
+    COLOR_STYLE = "natural"        # 'natural', 'vintage', 'pop_art'
+    SATURATION_BOOST = 1.0         # Color saturation multiplier (1.0 = normal)
+    WARMTH_ADJUSTMENT = 0          # Warm/cool shift (-20 to +20)
 
     # Output
     TEMPLATE_BACKGROUND = (255, 255, 255)  # White background
