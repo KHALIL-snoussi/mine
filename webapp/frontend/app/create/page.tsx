@@ -310,7 +310,7 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
                       {!selectedFile ? 'Step 1 · Upload your photo' : showCropSelector ? 'Step 2 · Position portrait frame' : 'Step 1 · Upload complete ✓'}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      {!selectedFile ? 'Upload any photo - you\'ll crop it to portrait dimensions (600×800px) next.' : showCropSelector ? 'Drag the frame to select which area to process. All work happens inside this crop.' : 'Image cropped and ready for processing!'}
+                      {!selectedFile ? 'Upload any photo - you\'ll crop it to portrait dimensions next.' : showCropSelector ? 'Drag the frame to select which area to process. All work happens inside this crop.' : 'Image cropped and ready for processing!'}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
@@ -359,7 +359,7 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
                               className="max-h-64 rounded-2xl border-2 border-primary-200 object-contain shadow-md"
                             />
                             <div className="rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700">
-                              ✓ Cropped to 600 × 800px portrait
+                              ✓ Cropped to portrait orientation
                             </div>
                           </>
                         )}
