@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import ModelSelector from '@/components/ModelSelector'
 import BeforeAfterSlider from '@/components/BeforeAfterSlider'
 import ManualAreaSelector, { type SelectedArea } from '@/components/ManualAreaSelector'
+import PortraitCropSelector from '@/components/PortraitCropSelector'
 import { apiClient, type KitRecommendation } from '@/lib/api'
 import { useModels, usePalettes } from '@/lib/hooks'
 import {
@@ -34,6 +35,9 @@ export default function CreatePage() {
 
 const [selectedFile, setSelectedFile] = useState<File | null>(null)
 const [preview, setPreview] = useState<string | null>(null)
+const [originalPreview, setOriginalPreview] = useState<string | null>(null)
+const [showCropSelector, setShowCropSelector] = useState(false)
+const [croppedFile, setCroppedFile] = useState<File | null>(null)
 const [selectedModel, setSelectedModel] = useState('original')
 const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
 const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
@@ -69,7 +73,7 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
     [palettesData, selectedPalette]
   )
 
-  const hasValidImage = Boolean(selectedFile && validation?.valid)
+  const hasValidImage = Boolean(selectedFile && validation?.valid && (croppedFile || !showCropSelector))
 
   const steps = useMemo(() => {
     return [
@@ -80,6 +84,11 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
       },
       {
         id: 2,
+        label: 'Crop',
+        state: croppedFile ? 'done' : showCropSelector ? 'active' : selectedFile ? 'ready' : 'idle',
+      },
+      {
+        id: 3,
         label: 'Style',
         state: isGenerating
           ? 'active'
@@ -88,12 +97,12 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
             : 'idle',
       },
       {
-        id: 3,
-        label: 'Preview',
+        id: 4,
+        label: 'Generate',
         state: isGenerating ? 'active' : hasValidImage ? 'ready' : 'idle',
       },
     ]
-  }, [selectedFile, showValidation, hasValidImage, isGenerating])
+  }, [selectedFile, showValidation, showCropSelector, croppedFile, hasValidImage, isGenerating])
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -101,6 +110,9 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
 
     setSelectedFile(null)
     setPreview(null)
+    setOriginalPreview(null)
+    setShowCropSelector(false)
+    setCroppedFile(null)
     setValidation(null)
     setImageInfo(null)
     setRecommendedModel(null)
@@ -128,7 +140,9 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
 
       const reader = new FileReader()
       reader.onloadend = () => {
-        setPreview(reader.result as string)
+        const dataUrl = reader.result as string
+        setOriginalPreview(dataUrl)
+        setShowCropSelector(true) // Show crop selector instead of preview immediately
       }
       reader.readAsDataURL(file)
 
@@ -158,8 +172,40 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
     maxSize: 10 * 1024 * 1024,
   })
 
+  // Handle crop completion
+  const handleCropComplete = async (croppedImageUrl: string) => {
+    // Convert cropped image URL to File
+    const response = await fetch(croppedImageUrl)
+    const blob = await response.blob()
+    const file = new File([blob], selectedFile?.name || 'cropped.jpg', { type: 'image/jpeg' })
+
+    setCroppedFile(file)
+    setPreview(croppedImageUrl)
+    setShowCropSelector(false)
+
+    // Update image info for cropped image
+    try {
+      const info = await getImageInfo(file)
+      setImageInfo(info)
+    } catch (error) {
+      console.error('Error loading cropped image info:', error)
+    }
+  }
+
+  // Handle crop cancel
+  const handleCropCancel = () => {
+    // Reset to initial state
+    setShowCropSelector(false)
+    setSelectedFile(null)
+    setOriginalPreview(null)
+    setPreview(null)
+  }
+
   const handleGenerate = async () => {
     if (!selectedFile || !validation?.valid) return
+
+    // Use cropped file if available, otherwise use original
+    const fileToUpload = croppedFile || selectedFile
 
     setIsGenerating(true)
     setGenerationProgress(0)
@@ -177,18 +223,13 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
 
       setGenerationMessage('Analyzing colors and balancing detail...')
 
-      const template = await apiClient.generateTemplate(selectedFile, {
+      const template = await apiClient.generateTemplate(fileToUpload, {
         palette_name: selectedPalette,
         model: selectedModel,
         title: selectedFile.name || 'Preview Template',
         is_public: !apiClient.isAuthenticated(),
-        use_region_emphasis: !!selectedArea,  // Enable if area selected
-        emphasized_region: selectedArea ? {
-          x: selectedArea.x,
-          y: selectedArea.y,
-          width: selectedArea.width,
-          height: selectedArea.height,
-        } : undefined,
+        // No region emphasis needed - we're using the entire cropped area
+        use_region_emphasis: false,
       })
 
       setGenerationProgress(100)
@@ -265,8 +306,12 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
               <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
                 <div className="flex flex-col gap-6 border-b border-slate-200/70 p-8 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h2 className="text-2xl font-semibold text-slate-900">Step 1 · Upload your photo</h2>
-                    <p className="mt-1 text-sm text-slate-500">Crisp, well-lit images between 800×800 and 4000×4000 pixels work best.</p>
+                    <h2 className="text-2xl font-semibold text-slate-900">
+                      {!selectedFile ? 'Step 1 · Upload your photo' : showCropSelector ? 'Step 2 · Position portrait frame' : 'Step 1 · Upload complete ✓'}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {!selectedFile ? 'Upload any photo - you\'ll crop it to portrait dimensions (600×800px) next.' : showCropSelector ? 'Drag the frame to select which area to process. All work happens inside this crop.' : 'Image cropped and ready for processing!'}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-500">
                     {steps.map((step, idx) => {
@@ -304,24 +349,33 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
                     }`}
                   >
                     <input {...getInputProps()} />
-                    {preview ? (
+                    {(preview || showCropSelector) ? (
                       <div className="flex w-full flex-col items-center gap-4">
-                        <img
-                          src={preview}
-                          alt="Preview"
-                          className="max-h-64 rounded-2xl border border-slate-200 object-contain shadow-md"
-                        />
+                        {preview && (
+                          <>
+                            <img
+                              src={preview}
+                              alt="Cropped preview"
+                              className="max-h-64 rounded-2xl border-2 border-primary-200 object-contain shadow-md"
+                            />
+                            <div className="rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700">
+                              ✓ Cropped to 600 × 800px portrait
+                            </div>
+                          </>
+                        )}
                         <div className="text-sm text-slate-600">
                           <p className="font-medium">{selectedFile?.name}</p>
-                          {imageInfo && (
+                          {imageInfo && preview && (
                             <p className="text-xs text-slate-500">
                               {imageInfo.width} × {imageInfo.height} · {formatFileSize(imageInfo.fileSize)}
                             </p>
                           )}
                         </div>
-                        <Button variant="outline" size="sm" type="button" onClick={() => open()}>
-                          Change image
-                        </Button>
+                        {preview && (
+                          <Button variant="outline" size="sm" type="button" onClick={() => open()}>
+                            Change image
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -573,12 +627,13 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
                     </div>
                   )}
 
-                  {/* Manual Area Selector */}
-                  {preview && !isLoadingRecommendation && (
+                  {/* Portrait Crop Selector - First step after upload */}
+                  {showCropSelector && originalPreview && (
                     <div className="mt-8">
-                      <ManualAreaSelector
-                        imageUrl={preview}
-                        onAreaSelect={setSelectedArea}
+                      <PortraitCropSelector
+                        imageUrl={originalPreview}
+                        onCropComplete={handleCropComplete}
+                        onCancel={handleCropCancel}
                       />
                     </div>
                   )}
@@ -603,8 +658,8 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
                 <div className="space-y-8">
                   <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
                     <div className="border-b border-slate-200/70 p-8">
-                      <h2 className="text-2xl font-semibold text-slate-900">Step 2 · Choose your style</h2>
-                      <p className="mt-1 text-sm text-slate-500">Select an AI model - each has its own unique colors and style. Every run stays free.</p>
+                      <h2 className="text-2xl font-semibold text-slate-900">Step 3 · Choose your style</h2>
+                      <p className="mt-1 text-sm text-slate-500">Select an AI model - each has its own unique colors and style. All processing happens inside your cropped area.</p>
                     </div>
                     <div className="p-8">
                       <ModelSelector
@@ -633,8 +688,8 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
 
                   <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
                     <div className="border-b border-slate-200/70 p-8">
-                      <h2 className="text-2xl font-semibold text-slate-900">Step 3 · Generate your preview</h2>
-                      <p className="mt-1 text-sm text-slate-500">We’ll build the template, legend, guide, and comparison image automatically.</p>
+                      <h2 className="text-2xl font-semibold text-slate-900">Step 4 · Generate your preview</h2>
+                      <p className="mt-1 text-sm text-slate-500">We'll process your cropped portrait and build the template, legend, and guides automatically.</p>
                     </div>
                     <div className="p-8">
                       {!isGenerating ? (
