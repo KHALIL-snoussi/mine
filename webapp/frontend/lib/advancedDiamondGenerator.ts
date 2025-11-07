@@ -391,7 +391,7 @@ export async function generateAdvancedDiamondPainting(
             // Only count foreground pixels
             if (segmentationMask[idx] > 127) {
               totalForegroundPixels++
-              const cell = gridData.cells[y][x]
+              const cell = gridData[y][x]
               const code = cell.dmcCode
               foregroundColorCounts[code] = (foregroundColorCounts[code] || 0) + 1
             }
