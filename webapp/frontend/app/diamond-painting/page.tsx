@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useDropzone } from 'react-dropzone'
 
 import { Button } from '@/components/ui/Button'
+import DiamondCropSelector from '@/components/DiamondCropSelector'
 import { generateDiamondPainting, DiamondPaintingResult, DiamondPaintingOptions } from '@/lib/diamondPaintingGenerator'
 import { downloadMaterialsList, printMaterialsList } from '@/lib/diamondPaintingPDF'
 import { getDMCCategories } from '@/lib/dmcColors'
@@ -18,7 +19,10 @@ export default function DiamondPaintingPage() {
   const router = useRouter()
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [originalPreview, setOriginalPreview] = useState<string | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
+  const [showCropSelector, setShowCropSelector] = useState(false)
+  const [croppedImage, setCroppedImage] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
   const [result, setResult] = useState<DiamondPaintingResult | null>(null)
@@ -47,12 +51,16 @@ export default function DiamondPaintingPage() {
     console.log('File selected:', file.name, file.type, file.size)
     setSelectedFile(file)
     setResult(null)
+    setPreview(null)
+    setCroppedImage(null)
 
     try {
       const reader = new FileReader()
       reader.onloadend = () => {
         console.log('File loaded successfully')
-        setPreview(reader.result as string)
+        const dataUrl = reader.result as string
+        setOriginalPreview(dataUrl)
+        setShowCropSelector(true) // Show crop selector instead of going straight to preview
       }
       reader.onerror = (error) => {
         console.error('File reading error:', error)
@@ -75,8 +83,23 @@ export default function DiamondPaintingPage() {
     maxSize: 10 * 1024 * 1024,
   })
 
+  // Handle crop completion
+  const handleCropComplete = (croppedImageUrl: string) => {
+    setCroppedImage(croppedImageUrl)
+    setPreview(croppedImageUrl)
+    setShowCropSelector(false)
+  }
+
+  // Handle crop cancel
+  const handleCropCancel = () => {
+    setShowCropSelector(false)
+    setSelectedFile(null)
+    setOriginalPreview(null)
+  }
+
   const handleGenerate = async () => {
-    if (!preview) return
+    const imageToProcess = croppedImage || preview
+    if (!imageToProcess) return
 
     setIsGenerating(true)
     setGenerationProgress(0)
@@ -96,7 +119,7 @@ export default function DiamondPaintingPage() {
         maxColors,
       }
 
-      const diamondResult = await generateDiamondPainting(preview, options)
+      const diamondResult = await generateDiamondPainting(imageToProcess, options)
 
       setGenerationProgress(100)
       setResult(diamondResult)
@@ -186,58 +209,70 @@ export default function DiamondPaintingPage() {
                 </div>
 
                 <div className="p-8">
-                  <div
-                    {...getRootProps()}
-                    className={`group relative flex min-h-[260px] flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed bg-slate-50 p-8 text-center transition-all ${
-                      isDragActive
-                        ? 'border-primary-400 bg-primary-50/70'
-                        : 'border-slate-200 hover:border-primary-200 hover:bg-white'
-                    }`}
-                  >
-                    <input {...getInputProps()} />
-                    {preview ? (
-                      <div className="flex w-full flex-col items-center gap-4">
-                        <img
-                          src={preview}
-                          alt="Preview"
-                          className="max-h-64 rounded-2xl border-2 border-primary-200 object-contain shadow-md"
-                        />
-                        <div className="text-sm text-slate-600">
-                          <p className="font-medium">{selectedFile?.name}</p>
-                          {selectedFile && (
-                            <p className="text-xs text-slate-500">
-                              {formatFileSize(selectedFile.size)}
-                            </p>
-                          )}
+                  {showCropSelector && originalPreview ? (
+                    <DiamondCropSelector
+                      imageUrl={originalPreview}
+                      aspectRatio="free"
+                      onCropComplete={handleCropComplete}
+                      onCancel={handleCropCancel}
+                    />
+                  ) : (
+                    <div
+                      {...getRootProps()}
+                      className={`group relative flex min-h-[260px] flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed bg-slate-50 p-8 text-center transition-all ${
+                        isDragActive
+                          ? 'border-primary-400 bg-primary-50/70'
+                          : 'border-slate-200 hover:border-primary-200 hover:bg-white'
+                      }`}
+                    >
+                      <input {...getInputProps()} />
+                      {preview && !showCropSelector ? (
+                        <div className="flex w-full flex-col items-center gap-4">
+                          <img
+                            src={preview}
+                            alt="Preview"
+                            className="max-h-64 rounded-2xl border-2 border-primary-200 object-contain shadow-md"
+                          />
+                          <div className="rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700">
+                            ✓ Area selected and ready
+                          </div>
+                          <div className="text-sm text-slate-600">
+                            <p className="font-medium">{selectedFile?.name}</p>
+                            {selectedFile && (
+                              <p className="text-xs text-slate-500">
+                                {formatFileSize(selectedFile.size)}
+                              </p>
+                            )}
+                          </div>
+                          <Button variant="outline" size="sm" type="button" onClick={() => open()}>
+                            Change image
+                          </Button>
                         </div>
-                        <Button variant="outline" size="sm" type="button" onClick={() => open()}>
-                          Change image
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-primary-500">
-                          <svg className="h-8 w-8" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                            <path
-                              d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                              strokeWidth={2}
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-primary-500">
+                            <svg className="h-8 w-8" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                              <path
+                                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                          </div>
+                          <p className="text-sm font-medium text-slate-700">
+                            {isDragActive ? 'Drop the image to start' : 'Drag & drop an image, or click to browse'}
+                          </p>
+                          <p className="text-xs text-slate-500">JPG, PNG, or WebP · up to 10MB</p>
                         </div>
-                        <p className="text-sm font-medium text-slate-700">
-                          {isDragActive ? 'Drop the image to start' : 'Drag & drop an image, or click to browse'}
-                        </p>
-                        <p className="text-xs text-slate-500">JPG, PNG, or WebP · up to 10MB</p>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Options Section */}
-              {selectedFile && !result && (
+              {selectedFile && !result && !showCropSelector && preview && (
                 <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
                   <div className="border-b border-slate-200/70 p-8">
                     <h2 className="text-2xl font-semibold text-slate-900">Step 2 · Customize settings</h2>
