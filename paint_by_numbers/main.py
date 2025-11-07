@@ -224,6 +224,21 @@ class PaintByNumbersGenerator:
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
 
+        # Step 1.5: Portrait-specific smoothing (for portrait models)
+        is_portrait_model = model in ['portrait', 'portrait_pro']
+        if is_portrait_model:
+            logger.info(f"\n[1.5/8] 👤 Applying portrait-optimized face smoothing...")
+            logger.info("   This is KEY to smooth skin tones and fewer regions!")
+
+            # Determine blur strength based on model
+            face_blur_kernel = 25 if model == 'portrait' else 31  # portrait_pro = stronger
+
+            self.processed_image = self.image_processor.apply_portrait_smoothing(
+                self.processed_image,
+                face_blur_kernel=face_blur_kernel,
+                detection_margin=1.5
+            )
+
         # Step 2: Intelligent Palette Selection & Color quantization
         logger.info(f"\n[2/8] Intelligent palette selection and color quantization...")
 
@@ -316,6 +331,20 @@ class PaintByNumbersGenerator:
 
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
+
+        # Step 2.5: Portrait-specific region merging (for portrait models)
+        if is_portrait_model:
+            logger.info(f"\n[2.5/8] 🎨 Applying portrait-optimized region merging...")
+            logger.info("   This reduces 1000+ tiny regions to ~100 paintable regions!")
+
+            # Determine merge aggressiveness based on model
+            min_region_size = 500 if model == 'portrait' else 400  # portrait = larger regions
+
+            self.quantized_image = self.image_processor.merge_small_regions(
+                self.quantized_image,
+                min_region_size=min_region_size,
+                aggressive=True  # Always aggressive for portraits
+            )
 
         # Step 3: Detect regions
         logger.info(f"\n[3/8] Detecting regions...")

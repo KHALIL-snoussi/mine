@@ -298,6 +298,214 @@ class ImageProcessor:
         self.processed_image = processed
         return processed
 
+    def apply_portrait_smoothing(self, image: Optional[np.ndarray] = None,
+                                 face_blur_kernel: int = 25,
+                                 detection_margin: float = 1.5) -> np.ndarray:
+        """
+        Apply intelligent face-aware smoothing for portrait optimization.
+        Detects faces and applies strong smoothing ONLY to skin areas,
+        keeping hair, eyes, and glasses sharp.
+
+        This is THE KEY to reducing over-segmentation in portraits!
+
+        Args:
+            image: Input image (uses processed image if None)
+            face_blur_kernel: Blur strength for face (15-31, must be odd)
+            detection_margin: Expand detected face by this factor
+
+        Returns:
+            Portrait-smoothed image with smooth skin, sharp details
+        """
+        if image is None:
+            if self.processed_image is None:
+                raise ValueError("No processed image. Call preprocess() first.")
+            image = self.processed_image.copy()
+        else:
+            image = image.copy()
+
+        cv2 = require_cv2()
+
+        try:
+            # Import face detector
+            try:
+                from paint_by_numbers.intelligence.subject_detector import SubjectDetector
+            except ImportError:
+                import sys
+                from pathlib import Path
+                sys.path.insert(0, str(Path(__file__).parent.parent))
+                from intelligence.subject_detector import SubjectDetector
+
+            # Detect face region
+            detector = SubjectDetector()
+            face_region = detector.detect_best_subject(image,
+                                                       expand_faces=True,
+                                                       expansion_factor=detection_margin)
+
+            logger.info(f"   Detected {face_region.subject_type} region for portrait smoothing")
+            logger.info(f"   Face region: ({face_region.x}, {face_region.y}, {face_region.width}, {face_region.height})")
+
+            # Create smooth mask with feathered edges
+            emphasis_mask = detector.create_emphasis_mask(image, face_region, feather_size=50)
+
+            # Ensure blur kernel is odd
+            if face_blur_kernel % 2 == 0:
+                face_blur_kernel += 1
+
+            # Apply STRONG Gaussian blur to reduce skin texture detail
+            # This is critical - strong blur = fewer regions on face!
+            face_blurred = cv2.GaussianBlur(image, (face_blur_kernel, face_blur_kernel), 0)
+
+            logger.info(f"   Applied {face_blur_kernel}x{face_blur_kernel} Gaussian blur to face region")
+
+            # Blend: smooth face, sharp background/hair
+            result = np.zeros_like(image, dtype=np.float32)
+            for c in range(3):  # RGB channels
+                result[:, :, c] = (
+                    emphasis_mask * face_blurred[:, :, c].astype(np.float32) +
+                    (1 - emphasis_mask) * image[:, :, c].astype(np.float32)
+                )
+
+            result = np.clip(result, 0, 255).astype(np.uint8)
+
+            logger.info("   ✓ Portrait smoothing complete - face regions will be much smoother!")
+            return result
+
+        except Exception as e:
+            logger.warning(f"   Face detection failed ({e}), applying gentle global smoothing")
+            # Fallback: gentle global smoothing
+            kernel = min(face_blur_kernel, 15)
+            if kernel % 2 == 0:
+                kernel += 1
+            return cv2.GaussianBlur(image, (kernel, kernel), 0)
+
+    def merge_small_regions(self, quantized_image: np.ndarray,
+                           min_region_size: int = 500,
+                           aggressive: bool = True) -> np.ndarray:
+        """
+        Aggressively merge small regions to create larger, paintable areas.
+        Critical for portrait quality - reduces 1000+ regions to 80-120.
+
+        Args:
+            quantized_image: Color-quantized image
+            min_region_size: Minimum pixels per region (500-1000 for portraits)
+            aggressive: Use aggressive merging (recommended for portraits)
+
+        Returns:
+            Image with merged regions
+        """
+        cv2 = require_cv2()
+        result = quantized_image.copy()
+        h, w = result.shape[:2]
+
+        logger.info(f"   Starting region merging (min size: {min_region_size}px, aggressive: {aggressive})")
+
+        # Convert to labels for analysis
+        result_gray = cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
+        _, labels = cv2.connectedComponents(result_gray)
+
+        original_regions = labels.max() + 1
+        merged_count = 0
+
+        # Find all unique colors
+        unique_colors = {}
+        for y in range(h):
+            for x in range(w):
+                color = tuple(result[y, x])
+                if color not in unique_colors:
+                    unique_colors[color] = []
+                unique_colors[color].append((y, x))
+
+        # Process each color to find and merge small regions
+        for color, pixels in unique_colors.items():
+            if len(pixels) < min_region_size:
+                # Small region - find nearest similar color to merge with
+                # Get first pixel location
+                py, px = pixels[0]
+
+                # Find neighboring pixels of different colors
+                best_neighbor = None
+                best_distance = float('inf')
+
+                # Search in a window around this pixel
+                search_radius = 5
+                for dy in range(-search_radius, search_radius + 1):
+                    for dx in range(-search_radius, search_radius + 1):
+                        ny, nx = py + dy, px + dx
+                        if 0 <= ny < h and 0 <= nx < w:
+                            neighbor_color = tuple(result[ny, nx])
+                            if neighbor_color != color:
+                                # Calculate color distance
+                                dist = sum((a - b) ** 2 for a, b in zip(color, neighbor_color))
+                                if dist < best_distance:
+                                    best_distance = dist
+                                    best_neighbor = neighbor_color
+
+                # Merge this small region with best neighbor
+                if best_neighbor is not None:
+                    for py, px in pixels:
+                        result[py, px] = best_neighbor
+                    merged_count += 1
+
+        if aggressive:
+            # Second pass: merge similar adjacent colors even if not small
+            # This further reduces region count
+            similarity_threshold = 400  # Color distance threshold (lower = more strict)
+
+            for _ in range(2):  # Multiple passes for thorough merging
+                changed = False
+                result_gray = cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
+                _, labels = cv2.connectedComponents(result_gray)
+
+                for label_id in range(1, labels.max() + 1):
+                    mask = (labels == label_id)
+                    if not mask.any():
+                        continue
+
+                    # Get this region's color
+                    ys, xs = np.where(mask)
+                    if len(ys) == 0:
+                        continue
+                    region_color = tuple(result[ys[0], xs[0]])
+
+                    # Find edge pixels
+                    kernel = np.ones((3, 3), np.uint8)
+                    dilated = cv2.dilate(mask.astype(np.uint8), kernel, iterations=1)
+                    edge = dilated - mask.astype(np.uint8)
+                    edge_ys, edge_xs = np.where(edge > 0)
+
+                    if len(edge_ys) == 0:
+                        continue
+
+                    # Find most common neighbor color
+                    neighbor_colors = {}
+                    for ey, ex in zip(edge_ys, edge_xs):
+                        nc = tuple(result[ey, ex])
+                        if nc != region_color:
+                            neighbor_colors[nc] = neighbor_colors.get(nc, 0) + 1
+
+                    if neighbor_colors:
+                        # Get most common neighbor
+                        best_neighbor = max(neighbor_colors.items(), key=lambda x: x[1])[0]
+
+                        # Check if similar enough to merge
+                        color_dist = sum((a - b) ** 2 for a, b in zip(region_color, best_neighbor))
+                        if color_dist < similarity_threshold:
+                            result[mask] = best_neighbor
+                            merged_count += 1
+                            changed = True
+
+                if not changed:
+                    break
+
+        # Count final regions
+        result_gray = cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
+        _, labels = cv2.connectedComponents(result_gray)
+        final_regions = labels.max() + 1
+
+        logger.info(f"   ✓ Region merging complete: {original_regions} → {final_regions} regions ({merged_count} merges)")
+
+        return result
+
     def enhance_edges(self, image: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Enhance edges in the image

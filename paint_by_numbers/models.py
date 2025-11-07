@@ -261,7 +261,105 @@ class ModelRegistry:
             processing_time_estimate='30-50 seconds'
         ),
 
-        # MODEL 4: FULL COLOR HD - QBRIX Premium Quality (38 colors)
+        # MODEL 4: PORTRAIT - Professional Portrait Optimized
+        'portrait': ModelProfile(
+            id='portrait',
+            name='Portrait',
+            display_name='Portrait Pro 40×50 cm',
+            description='PORTRAIT-OPTIMIZED with face detection and skin smoothing. ' +
+                       'Large, paintable regions with realistic skin tones. ' +
+                       'Smooth faces, sharp details on eyes/glasses. Perfect for headshots.',
+            difficulty_level='beginner',
+            size_label='40×50 cm',
+            recommended_for=[
+                '✓ Portrait photography',
+                '✓ Headshots & selfies',
+                '✓ Family portraits',
+                '✓ Face-focused images',
+                '✓ Smooth skin tones',
+                '✓ Easy to paint (large regions)',
+                '✓ Realistic DMC colors'
+            ],
+            # PORTRAIT-OPTIMIZED SETTINGS
+            num_colors=12,  # Fewer colors for smoother faces
+            min_region_size=500,  # LARGE regions - easy to paint
+            max_image_size=(2480, 3508),  # A4 @ 300 DPI
+            edge_threshold_low=30,
+            edge_threshold_high=140,
+            bilateral_filter_d=12,  # Strong smoothing
+            bilateral_sigma_color=90,
+            bilateral_sigma_space=90,
+            morphology_kernel_size=5,  # Merge small regions
+
+            # CLEAR NUMBERS
+            font_scale=0.7,
+            font_thickness=2,
+            font_outline_thickness=4,
+            number_contrast_boost=True,
+
+            # Portrait color style - realistic skin tones
+            color_style='portrait',
+            saturation_boost=1.0,
+            warmth_adjustment=5,  # Slight warmth for skin
+            palette_name='portrait_realistic',
+
+            style_tags=['portrait', 'smooth', 'realistic', 'beginner-friendly', 'large-regions'],
+            color_range='10-14 colors',
+            detail_level='Smooth & Paintable',
+            preview_icon='👤',
+            processing_time_estimate='45-70 seconds'
+        ),
+
+        # MODEL 5: PORTRAIT PRO - Ultra-Quality Portrait
+        'portrait_pro': ModelProfile(
+            id='portrait_pro',
+            name='Portrait Pro',
+            display_name='Portrait Pro Ultra 40×50 cm',
+            description='MAXIMUM PORTRAIT QUALITY with multi-pass face detection, ' +
+                       'selective smoothing, and professional skin tones. ' +
+                       'Best quality for portraits regardless of processing time.',
+            difficulty_level='intermediate',
+            size_label='40×50 cm',
+            recommended_for=[
+                '✓ Professional portraits',
+                '✓ Maximum quality headshots',
+                '✓ Wedding portraits',
+                '✓ Gallery-quality faces',
+                '✓ Smooth professional finish',
+                '✓ Best possible skin tones',
+                '✓ When time doesn\'t matter'
+            ],
+            # ULTRA-QUALITY PORTRAIT SETTINGS
+            num_colors=15,  # More colors for subtle gradients
+            min_region_size=400,  # Balanced - quality + detail
+            max_image_size=(3508, 4960),  # A3 for maximum quality
+            edge_threshold_low=25,
+            edge_threshold_high=135,
+            bilateral_filter_d=15,  # Maximum smoothing
+            bilateral_sigma_color=100,
+            bilateral_sigma_space=100,
+            morphology_kernel_size=6,
+
+            # CLEAR NUMBERS
+            font_scale=0.65,
+            font_thickness=2,
+            font_outline_thickness=4,
+            number_contrast_boost=True,
+
+            # Ultra portrait color style
+            color_style='portrait_pro',
+            saturation_boost=1.02,
+            warmth_adjustment=3,
+            palette_name='portrait_realistic',
+
+            style_tags=['portrait', 'ultra-quality', 'face-detection', 'multi-pass', 'professional'],
+            color_range='12-16 colors',
+            detail_level='Ultra Professional',
+            preview_icon='🎯',
+            processing_time_estimate='90-180 seconds'
+        ),
+
+        # MODEL 6: FULL COLOR HD - QBRIX Premium Quality (38 colors)
         'full_color_hd': ModelProfile(
             id='full_color_hd',
             name='Full Color HD',

@@ -274,6 +274,35 @@ STANDARD_PALETTES = {
         (140, 110, 140),  # Mauve
         (200, 160, 180),  # Light Mauve
     ],
+
+    # PORTRAIT REALISTIC - Professional Portrait Palette (12-15 colors)
+    # Optimized for smooth skin tones, realistic faces, and minimal regions
+    "portrait_realistic": [
+        # Skin tones - EXPANDED for smooth gradients (8 colors)
+        # Based on DMC thread colors: 353, 754, 3774, 950, 945, 3064, 898, 801
+        (255, 235, 220),  # DMC 353 - Lightest Peach (highlights)
+        (245, 215, 200),  # DMC 754 - Light Peach (light skin)
+        (235, 195, 175),  # DMC 3774 - Desert Sand (fair skin)
+        (220, 175, 150),  # DMC 950 - Peach Beige (medium fair)
+        (200, 155, 130),  # DMC 945 - Tawny (medium skin)
+        (175, 130, 105),  # DMC 3064 - Desert Sand Dark (tan)
+        (150, 110, 85),   # DMC 898 - Coffee Brown (deep tan)
+        (120, 85, 65),    # DMC 801 - Dark Coffee Brown (dark skin/shadows)
+
+        # Hair/Beard (3 colors)
+        (30, 20, 15),     # DMC 310 - Black (dark hair/beard)
+        (70, 50, 35),     # DMC 938 - Dark Brown (brown hair)
+        (110, 80, 55),    # DMC 3031 - Mocha (light brown hair)
+
+        # Eyes/Details (2 colors)
+        (90, 70, 60),     # DMC 3787 - Brown Gray (eyes)
+        (255, 255, 255),  # White - highlights/teeth
+
+        # Background - Sky/Simple (2-3 colors)
+        (160, 200, 230),  # DMC 809 - Light Blue (sky)
+        (200, 220, 240),  # DMC 747 - Very Light Sky Blue (light sky)
+        (240, 240, 235),  # Off-white/light background
+    ],
 }
 
 
@@ -331,6 +360,18 @@ COLOR_NAMES = {
         "Bright White", "Pure Black", "Electric Red", "Hot Pink", "Golden Yellow", "Vivid Orange",
         "Cyan Blue", "Bold Blue", "Purple", "Magenta", "Neon Green", "Lime Green",
         "Bright Pink", "Sky Cyan", "Sunshine Yellow", "Deep Red"
+    ],
+
+    "portrait_realistic": [
+        # Skin tones (8)
+        "Lightest Peach", "Light Peach", "Fair Skin", "Medium Fair",
+        "Medium Skin", "Tan", "Deep Tan", "Dark Skin",
+        # Hair (3)
+        "Black Hair", "Brown Hair", "Light Brown",
+        # Details (2)
+        "Brown Gray", "White",
+        # Background (3)
+        "Sky Blue", "Light Sky", "Background"
     ],
 
     "full_color_hd_38": [

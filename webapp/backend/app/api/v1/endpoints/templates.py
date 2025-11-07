@@ -216,7 +216,7 @@ async def generate_template(
         file: Image file to convert
         palette_name: Color palette to use (realistic_natural, vintage_warm, pop_art_bold, full_color_hd_38, etc.)
         num_colors: Number of colors (optional, model determines default)
-        model: Processing model (original, vintage, pop_art, full_color_hd)
+        model: Processing model (original, vintage, pop_art, portrait, portrait_pro, full_color_hd)
         paper_format: Paper format (a4, a3, square_medium, etc.)
         title: Template title
         is_public: Make template visible in gallery
