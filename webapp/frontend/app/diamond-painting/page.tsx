@@ -7,7 +7,7 @@ import { useDropzone } from 'react-dropzone'
 
 import { Button } from '@/components/ui/Button'
 import DiamondCropSelector from '@/components/DiamondCropSelector'
-import { generateDiamondPainting, DiamondPaintingResult, DiamondPaintingOptions } from '@/lib/diamondPaintingGenerator'
+import { generateAdvancedDiamondPainting, AdvancedDiamondResult, AdvancedDiamondOptions } from '@/lib/advancedDiamondGenerator'
 import { downloadMaterialsList, printMaterialsList } from '@/lib/diamondPaintingPDF'
 import { getAllStylePacks } from '@/lib/diamondStylePacks'
 
@@ -25,7 +25,8 @@ export default function DiamondPaintingPage() {
   const [croppedImage, setCroppedImage] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generationProgress, setGenerationProgress] = useState(0)
-  const [result, setResult] = useState<DiamondPaintingResult | null>(null)
+  const [generationStep, setGenerationStep] = useState<string>('Preparing...')
+  const [result, setResult] = useState<AdvancedDiamondResult | null>(null)
 
   // Diamond painting options - Qbrix style (manual selection)
   const [canvasFormat, setCanvasFormat] = useState<'a4_portrait' | 'a4_landscape' | 'a4_square'>('a4_square')
@@ -101,29 +102,56 @@ export default function DiamondPaintingPage() {
 
     setIsGenerating(true)
     setGenerationProgress(0)
+    setGenerationStep('Preparing image...')
 
-    const progressInterval = setInterval(() => {
-      setGenerationProgress((prev) => {
-        if (prev >= 90) return prev
-        return prev + 10
-      })
-    }, 300)
+    // Monitor console logs for progress
+    const originalLog = console.log
+    let stepCount = 0
+    const steps = [
+      'Applying white balance...',
+      'Applying bilateral filter...',
+      'Applying unsharp mask...',
+      'Applying style-specific processing...',
+      'Quantizing to 7-color palette...',
+      'Cleaning up regions...',
+      'Building grid data...',
+      'Creating tile system...',
+      'Calculating bead counts...',
+      'Generating preview...',
+    ]
+
+    console.log = function(...args) {
+      originalLog.apply(console, args)
+      const message = args[0]
+      if (typeof message === 'string' && steps.includes(message)) {
+        stepCount++
+        setGenerationStep(message)
+        setGenerationProgress(Math.round((stepCount / steps.length) * 90))
+      }
+    }
 
     try {
-      const options: DiamondPaintingOptions = {
+      const options: AdvancedDiamondOptions = {
         canvasFormat,
         stylePack: selectedStylePack,
+        qualitySettings: {
+          bilateralSigma: 3,
+          sharpenAmount: 0.8,
+          ditheringStrength: 0.5,
+          minClusterSize: 4, // 2×2 beads minimum
+        },
       }
 
-      const diamondResult = await generateDiamondPainting(imageToProcess, options)
+      const diamondResult = await generateAdvancedDiamondPainting(imageToProcess, options)
 
       setGenerationProgress(100)
+      setGenerationStep('Complete!')
       setResult(diamondResult)
     } catch (error: any) {
       console.error('Generation failed:', error)
       alert(`Generation failed: ${error?.message || 'Unknown error'}`)
     } finally {
-      clearInterval(progressInterval)
+      console.log = originalLog
       setIsGenerating(false)
     }
   }
@@ -347,14 +375,17 @@ export default function DiamondPaintingPage() {
                       {isGenerating && (
                         <div className="mt-4">
                           <div className="flex items-center justify-between text-sm text-slate-600 mb-2">
-                            <span>Processing...</span>
-                            <span>{generationProgress}%</span>
+                            <span className="font-medium">{generationStep}</span>
+                            <span className="font-bold">{generationProgress}%</span>
                           </div>
                           <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
                             <div
-                              className="h-3 rounded-full bg-primary-500 transition-all duration-300 ease-out"
+                              className="h-3 rounded-full bg-gradient-to-r from-primary-500 to-secondary-500 transition-all duration-300 ease-out"
                               style={{ width: `${generationProgress}%` }}
                             />
+                          </div>
+                          <div className="mt-2 text-xs text-slate-500">
+                            Using LAB color space, error diffusion, and region cleanup for professional quality
                           </div>
                         </div>
                       )}
@@ -435,23 +466,32 @@ export default function DiamondPaintingPage() {
                       <div className="rounded-lg bg-slate-50 p-4 border-2 border-slate-200">
                         <div className="text-xs text-slate-500 font-semibold uppercase">Dimensions</div>
                         <div className="text-xl font-bold text-slate-900 mt-1">
-                          {result.dimensions.width} × {result.dimensions.height}
+                          {result.dimensions.widthBeads} × {result.dimensions.heightBeads}
                         </div>
-                        <div className="text-xs text-slate-500">diamonds</div>
+                        <div className="text-xs text-slate-500">{result.dimensions.widthCm} × {result.dimensions.heightCm} cm</div>
                       </div>
 
                       <div className="rounded-lg bg-slate-50 p-4 border-2 border-slate-200">
-                        <div className="text-xs text-slate-500 font-semibold uppercase">Total Diamonds</div>
+                        <div className="text-xs text-slate-500 font-semibold uppercase">Total Beads</div>
                         <div className="text-xl font-bold text-slate-900 mt-1">
-                          {result.estimatedDiamonds.toLocaleString()}
+                          {result.totalBeads.toLocaleString()}
                         </div>
                       </div>
 
                       <div className="rounded-lg bg-slate-50 p-4 border-2 border-slate-200">
                         <div className="text-xs text-slate-500 font-semibold uppercase">Colors Used</div>
                         <div className="text-xl font-bold text-slate-900 mt-1">
-                          {result.colorsUsed.length} DMC
+                          {result.beadCounts.length} DMC
                         </div>
+                        <div className="text-xs text-slate-500">Exactly 7 colors</div>
+                      </div>
+
+                      <div className="rounded-lg bg-slate-50 p-4 border-2 border-slate-200">
+                        <div className="text-xs text-slate-500 font-semibold uppercase">Tiles</div>
+                        <div className="text-xl font-bold text-slate-900 mt-1">
+                          {result.tiles.length}
+                        </div>
+                        <div className="text-xs text-slate-500">{result.dimensions.tilesWide}×{result.dimensions.tilesHigh} grid</div>
                       </div>
 
                       <div className="rounded-lg bg-slate-50 p-4 border-2 border-slate-200">
@@ -459,14 +499,13 @@ export default function DiamondPaintingPage() {
                         <div className={`text-xl font-bold mt-1 ${
                           result.difficulty === 'Easy' ? 'text-green-600' :
                           result.difficulty === 'Medium' ? 'text-yellow-600' :
-                          result.difficulty === 'Hard' ? 'text-orange-600' :
-                          'text-red-600'
+                          'text-orange-600'
                         }`}>
                           {result.difficulty}
                         </div>
                       </div>
 
-                      <div className="col-span-2 rounded-lg bg-primary-50 p-4 border-2 border-primary-200">
+                      <div className="rounded-lg bg-primary-50 p-4 border-2 border-primary-200">
                         <div className="text-xs text-primary-700 font-semibold uppercase">Estimated Time</div>
                         <div className="text-xl font-bold text-primary-900 mt-1">
                           {result.estimatedTime}
@@ -497,18 +536,69 @@ export default function DiamondPaintingPage() {
                     </div>
                   </div>
 
-                  {/* Color Legend Preview */}
+                  {/* Bead Counts - Professional QBRIX Style */}
                   <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70 p-8">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">DMC Colors Used</h3>
-                    <div className="max-h-96 overflow-y-auto">
-                      <div className="space-y-2">
-                        {result.colorsUsed.slice(0, 10).map((color, index) => (
-                          <div key={`${color.dmcColor.code}-${index}`} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
-                            <div
-                              className="w-10 h-10 rounded border-2 border-slate-300"
-                              style={{ backgroundColor: color.dmcColor.hex }}
-                            />
-                            <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Bead Requirements</h3>
+                    <div className="text-sm text-slate-600 mb-4">
+                      Order these exact DMC codes and quantities:
+                    </div>
+                    <div className="space-y-2">
+                      {result.beadCounts.map((bead, index) => (
+                        <div key={`${bead.dmcColor.code}-${index}`} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors">
+                          <div
+                            className="w-12 h-12 rounded border-2 border-slate-300 flex-shrink-0"
+                            style={{ backgroundColor: bead.dmcColor.hex }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-slate-900">
+                              DMC {bead.dmcColor.code}
+                            </div>
+                            <div className="text-sm text-slate-600">{bead.dmcColor.name}</div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-bold text-lg text-slate-900">{bead.count.toLocaleString()}</div>
+                            <div className="text-xs text-slate-500">{bead.percentage}% · Symbol: {bead.symbol}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-semibold text-slate-900">Total Beads:</span>
+                        <span className="font-bold text-primary-600">{result.totalBeads.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tile System Info */}
+                  <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70 p-8">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">Tile System (16×16)</h3>
+                    <div className="text-sm text-slate-600 mb-4">
+                      Your pattern is divided into {result.tiles.length} tiles for easier assembly:
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+                        <div className="text-xs text-slate-500 uppercase">Grid Layout</div>
+                        <div className="font-bold text-slate-900">
+                          {result.dimensions.tilesWide} wide × {result.dimensions.tilesHigh} high
+                        </div>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+                        <div className="text-xs text-slate-500 uppercase">Tile Size</div>
+                        <div className="font-bold text-slate-900">16 × 16 beads</div>
+                      </div>
+                    </div>
+                    <div className="mt-4 p-4 rounded-lg bg-primary-50 border border-primary-200">
+                      <div className="text-xs font-semibold text-primary-700 uppercase mb-1">Pro Tip</div>
+                      <div className="text-sm text-primary-900">
+                        Complete one tile at a time for best results. Each tile takes about {Math.round(result.totalBeads / result.tiles.length / 120 * 60)} minutes.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Old color legend - keeping only the container for reference */}
+                  <div className="hidden">
+                    <div className="flex-1">
                               <div className="font-semibold text-slate-900">DMC {color.dmcColor.code}</div>
                               <div className="text-xs text-slate-500">{color.dmcColor.name}</div>
                             </div>
