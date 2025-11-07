@@ -29,18 +29,40 @@ export default function DiamondPaintingPage() {
   const [drillShape, setDrillShape] = useState<'square' | 'round'>('square')
   const [maxColors, setMaxColors] = useState(40)
 
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]
-    if (!file) return
+  const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
+    console.log('Drop triggered - Accepted:', acceptedFiles, 'Rejected:', rejectedFiles)
 
+    if (rejectedFiles.length > 0) {
+      const errors = rejectedFiles[0].errors.map((e: any) => e.message).join(', ')
+      alert(`File rejected: ${errors}`)
+      return
+    }
+
+    const file = acceptedFiles[0]
+    if (!file) {
+      console.log('No file selected')
+      return
+    }
+
+    console.log('File selected:', file.name, file.type, file.size)
     setSelectedFile(file)
     setResult(null)
 
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setPreview(reader.result as string)
+    try {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        console.log('File loaded successfully')
+        setPreview(reader.result as string)
+      }
+      reader.onerror = (error) => {
+        console.error('File reading error:', error)
+        alert('Error reading file. Please try again.')
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('Error processing file:', error)
+      alert('Error processing file. Please try again.')
     }
-    reader.readAsDataURL(file)
   }, [])
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
