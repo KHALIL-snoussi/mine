@@ -285,10 +285,10 @@ export default function DiamondPaintingPage() {
                       <label className="block text-sm font-semibold text-slate-900 mb-3">Canvas Size</label>
                       <div className="grid grid-cols-2 gap-3">
                         {[
-                          { value: 'small', label: 'Small', desc: '~40x40' },
-                          { value: 'medium', label: 'Medium', desc: '~60x60' },
-                          { value: 'large', label: 'Large', desc: '~80x80' },
-                          { value: 'xlarge', label: 'X-Large', desc: '~100x100' },
+                          { value: 'small', label: 'Small', desc: '~60x60 diamonds' },
+                          { value: 'medium', label: 'Medium', desc: '~100x100 diamonds' },
+                          { value: 'large', label: 'Large', desc: '~150x150 diamonds' },
+                          { value: 'xlarge', label: 'X-Large', desc: '~200x200 diamonds' },
                         ].map((size) => (
                           <button
                             key={size.value}
@@ -311,9 +311,9 @@ export default function DiamondPaintingPage() {
                       <label className="block text-sm font-semibold text-slate-900 mb-3">Quality</label>
                       <div className="grid grid-cols-3 gap-3">
                         {[
-                          { value: 'standard', label: 'Standard', colors: '30 colors' },
-                          { value: 'high', label: 'High', colors: '40 colors' },
-                          { value: 'ultra', label: 'Ultra', colors: '50 colors' },
+                          { value: 'standard', label: 'Standard', colors: '~35 colors' },
+                          { value: 'high', label: 'High', colors: '~45 colors' },
+                          { value: 'ultra', label: 'Ultra HD', colors: '~60 colors' },
                         ].map((q) => (
                           <button
                             key={q.value}
@@ -514,8 +514,8 @@ export default function DiamondPaintingPage() {
                     <h3 className="text-lg font-semibold text-slate-900 mb-4">DMC Colors Used</h3>
                     <div className="max-h-96 overflow-y-auto">
                       <div className="space-y-2">
-                        {result.colorsUsed.slice(0, 10).map((color) => (
-                          <div key={color.dmcColor.code} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        {result.colorsUsed.slice(0, 10).map((color, index) => (
+                          <div key={`${color.dmcColor.code}-${index}`} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
                             <div
                               className="w-10 h-10 rounded border-2 border-slate-300"
                               style={{ backgroundColor: color.dmcColor.hex }}

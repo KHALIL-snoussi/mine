@@ -50,19 +50,19 @@ export interface DMCColorUsage {
   percentage: number // Percentage of total diamonds
 }
 
-// Quality presets
+// Quality presets - MAXIMIZED FOR CLARITY
 const QUALITY_PRESETS = {
-  standard: { gridSize: 12, maxColors: 30 },
-  high: { gridSize: 10, maxColors: 40 },
-  ultra: { gridSize: 8, maxColors: 50 },
+  standard: { gridSize: 8, maxColors: 35 },
+  high: { gridSize: 6, maxColors: 45 },
+  ultra: { gridSize: 4, maxColors: 60 },  // MAXIMUM QUALITY
 }
 
-// Canvas size presets (in diamonds)
+// Canvas size presets (in diamonds) - INCREASED DIMENSIONS
 const CANVAS_SIZES = {
-  small: { maxDimension: 40 },   // ~40x40 diamonds
-  medium: { maxDimension: 60 },  // ~60x60 diamonds
-  large: { maxDimension: 80 },   // ~80x80 diamonds
-  xlarge: { maxDimension: 100 }, // ~100x100 diamonds
+  small: { maxDimension: 60 },   // ~60x60 diamonds
+  medium: { maxDimension: 100 },  // ~100x100 diamonds
+  large: { maxDimension: 150 },   // ~150x150 diamonds
+  xlarge: { maxDimension: 200 },  // ~200x200 diamonds - HUGE!
 }
 
 /**
@@ -219,10 +219,10 @@ export async function generateDiamondPainting(
         // Sort by usage (most used first)
         colorsUsed.sort((a, b) => b.count - a.count)
 
-        // Generate preview image (with diamond effect)
+        // Generate preview image (with diamond effect) - HIGH RESOLUTION
         const previewCanvas = document.createElement('canvas')
-        const previewSize = 800 // Preview size in pixels
-        const diamondSize = Math.max(1, Math.floor(previewSize / Math.max(gridWidth, gridHeight)))
+        const previewSize = 2000 // INCREASED from 800 to 2000 for crystal clear output
+        const diamondSize = Math.max(2, Math.floor(previewSize / Math.max(gridWidth, gridHeight)))
 
         previewCanvas.width = gridWidth * diamondSize
         previewCanvas.height = gridHeight * diamondSize
@@ -242,14 +242,14 @@ export async function generateDiamondPainting(
             previewCtx.fillStyle = `rgb(${r},${g},${b})`
             previewCtx.fillRect(x * diamondSize, y * diamondSize, diamondSize, diamondSize)
 
-            // Add diamond effect (subtle border)
-            if (diamondSize > 3) {
-              previewCtx.strokeStyle = `rgba(0,0,0,0.1)`
-              previewCtx.lineWidth = 1
+            // Add diamond effect (MORE VISIBLE)
+            if (diamondSize > 2) {
+              previewCtx.strokeStyle = `rgba(0,0,0,0.15)` // Slightly darker border
+              previewCtx.lineWidth = Math.max(1, diamondSize * 0.08) // Scale line width with diamond size
               previewCtx.strokeRect(x * diamondSize, y * diamondSize, diamondSize, diamondSize)
 
               // Add slight highlight for realism
-              if (diamondSize > 6) {
+              if (diamondSize > 4) {
                 const highlight = drillShape === 'round' ? drawRoundHighlight : drawSquareHighlight
                 highlight(previewCtx, x * diamondSize, y * diamondSize, diamondSize)
               }
@@ -257,7 +257,7 @@ export async function generateDiamondPainting(
           }
         }
 
-        const imageDataUrl = previewCanvas.toDataURL('image/png', 0.95)
+        const imageDataUrl = previewCanvas.toDataURL('image/png', 1.0) // Maximum quality PNG
 
         // Calculate difficulty
         const difficulty = calculateDifficulty(colorsUsed.length, totalDiamonds)
