@@ -356,12 +356,6 @@ export async function generateAdvancedDiamondPainting(
         const backgroundCount = beadCounts.find(bc => bc.dmcColor.code === backgroundDMC.code)?.count || 0
         const backgroundPercentage = (backgroundCount / (gridWidth * gridHeight)) * 100
 
-        // Count edge pixels
-        let edgePixelCount = 0
-        for (let i = 0; i < edgeMask.length; i++) {
-          if (edgeMask[i] > 30) edgePixelCount++
-        }
-
         // Calculate palette usage deviation from targets
         let totalDeviation = 0
         let colorsWithinTolerance = 0
