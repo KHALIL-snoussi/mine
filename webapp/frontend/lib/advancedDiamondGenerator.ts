@@ -83,6 +83,7 @@ export interface ProcessingDiagnostics {
   backgroundPercentage: number // Percentage of canvas that is background
   backgroundDMCCode: string // DMC code used for background
   edgePixelCount: number // Number of edge pixels preserved
+  edgeDensity: number // % of pixels that are edges (0-100)
   averageClusterSize: number // Average size of color clusters
   foregroundCoverage: number // % of canvas identified as subject (from segmentation)
   paletteUsageDeviation: number // Average deviation from target percentages
@@ -217,33 +218,27 @@ export async function generateAdvancedDiamondPainting(
 
         let imageData = ctx.getImageData(0, 0, upscaleWidth, upscaleHeight)
 
-        // Step 2: Advanced preprocessing pipeline (at 2× resolution)
-        console.log('Applying white balance...')
+        // Step 2: Initial preprocessing (at 2× resolution)
+        console.log('Step 2: Applying white balance...')
         whiteBalance(imageData)
 
-        console.log('Applying bilateral filter...')
-        imageData = bilateralFilter(imageData, quality.bilateralSigma || 3, 30, 3)
+        // Step 3: Tone balance + CLAHE (before segmentation for better masks)
+        console.log('Step 3: Applying CLAHE for tone balance...')
+        imageData = applyCLAHE(imageData, 2.0, 8)
 
-        console.log('Applying unsharp mask...')
-        imageData = unsharpMask(imageData, quality.sharpenAmount || 0.8, 1, 5)
-
-        // Step 3: Style-specific processing
-        console.log('Applying style-specific processing...')
-        applyStyleProcessing(imageData, stylePackId)
-
-        // Step 4: Detect background and store for later
-        console.log('Detecting background color...')
-        const bgColor = detectBackgroundColor(imageData)
+        // Step 4: Style-specific processing
+        console.log('Step 4: Applying style-specific processing...')
+        imageData = applyStyleProcessing(imageData, stylePackId)
 
         // Step 5: Extract edge mask BEFORE downsampling
-        console.log('Extracting edge mask...')
+        console.log('Step 5: Extracting edge mask...')
         const edgeMask2x = sobelEdgeDetection(imageData)
 
         // Store original for edge blending
         const originalData = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
 
         // Step 6: Downsample to target resolution using Lanczos
-        console.log('Downsampling with Lanczos...')
+        console.log('Step 6: Downsampling with Lanczos...')
         imageData = lanczosResample(imageData, gridWidth, gridHeight, 3)
 
         // Downsample edge mask too
@@ -267,7 +262,7 @@ export async function generateAdvancedDiamondPainting(
         }
 
         // Step 7: Generate foreground/background segmentation mask
-        console.log('Generating segmentation mask...')
+        console.log('Step 7: Generating segmentation mask...')
         const segmentationMask = kMeansSegmentation(imageData, 2)
 
         // Calculate foreground coverage
@@ -277,35 +272,28 @@ export async function generateAdvancedDiamondPainting(
         }
         const foregroundCoverage = (foregroundPixels / segmentationMask.length) * 100
 
-        // Step 8: Apply CLAHE to foreground regions for midtone recovery
-        console.log('Applying CLAHE for local contrast...')
-        const clipLimit = foregroundCoverage > 50 ? 2.5 : 2.0 // Adaptive based on subject size
-        imageData = applyCLAHE(imageData, clipLimit, 8)
+        // Step 8: Bilateral filter (preserves edges while smoothing noise)
+        console.log('Step 8: Applying bilateral filter...')
+        imageData = bilateralFilter(imageData, quality.bilateralSigma || 3, 30, 3)
 
-        // Step 9: Apply segmented tone curves (stronger lift for subject, keep background light)
-        console.log('Applying segmented tone curves...')
-        // Lift highlights and deepen shadows on foreground only
+        // Step 9: Mask-aware sharpening (only sharpens foreground)
+        console.log('Step 9: Applying mask-aware sharpening...')
+        imageData = maskAwareUnsharpMask(imageData, segmentationMask, quality.sharpenAmount || 1.2, 2, 5)
+
+        // Step 10: Apply segmented tone curves (stronger lift for subject)
+        console.log('Step 10: Applying segmented tone curves...')
         imageData = applySegmentedToneCurves(imageData, segmentationMask, 1.25, 0.6)
 
-        // Step 9b: Apply mask-aware sharpening (only sharpens foreground faces)
-        console.log('Applying mask-aware sharpening...')
-        imageData = maskAwareUnsharpMask(imageData, segmentationMask, 1.2, 2, 5)
-
-        // Step 9c: Enhance edge detail at high-gradient pixels
-        console.log('Enhancing edge detail...')
+        // Step 11: Enhance edge detail at high-gradient pixels
+        console.log('Step 11: Enhancing edge detail...')
         imageData = enhanceEdgeDetail(imageData, edgeMask, 85, 0.4)
 
-        // Step 10: Force background to lightest color in palette
-        console.log('Separating background...')
-        const lightestColor = findLightestColor(palette)
-        forceBackgroundColor(imageData, bgColor, lightestColor)
-
-        // Step 10b: Apply stochastic dither to prevent banding in flat regions
-        console.log('Applying stochastic dither...')
+        // Step 12: Apply stochastic dither to prevent banding in flat regions
+        console.log('Step 12: Applying stochastic dither...')
         imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
 
-        // Step 11: Histogram-aware quantization with target percentages
-        console.log('Quantizing with histogram balancing...')
+        // Step 13: Histogram-aware quantization with target percentages
+        console.log('Step 13: Quantizing with histogram balancing...')
         const targetPercentages = stylePack.colors.map(c => c.targetPercentage)
         let quantized = quantizeWithTargetPercentages(
           imageData,
@@ -313,20 +301,27 @@ export async function generateAdvancedDiamondPainting(
           targetPercentages,
           segmentationMask,
           15, // ±15% tolerance
-          5   // Under-use penalty (favors under-used colors)
+          5,  // Under-use penalty (favors under-used colors)
+          stylePack.minColorPercent // Floor: no color drops below this %
         )
 
-        // Step 12: Blend edges back for crisp details
-        console.log('Blending edges for detail...')
+        // Step 14: Force background to lightest color (AFTER quantization)
+        console.log('Step 14: Forcing background to lightest color...')
+        const lightestColor = findLightestColor(palette)
+        const bgColor = detectBackgroundColor(quantized)
+        forceBackgroundColor(quantized, bgColor, lightestColor)
+
+        // Step 15: Blend edges back for crisp details
+        console.log('Step 15: Blending edges for detail...')
         const downsampledOriginal = lanczosResample(originalData, gridWidth, gridHeight, 3)
         quantized = blendEdges(quantized, downsampledOriginal, edgeMask, 0.3)
 
-        // Step 10: Apply majority filter (avoiding edges)
-        console.log('Applying majority filter...')
+        // Step 16: Apply majority filter (avoiding edges)
+        console.log('Step 16: Applying majority filter...')
         const filtered = majorityFilter(quantized, edgeMask, 30)
 
-        // Step 11: Advanced cleanup - merge isolated cells (preserving edges)
-        console.log('Cleaning up isolated cells...')
+        // Step 17: Advanced cleanup - merge isolated cells (preserving edges)
+        console.log('Step 17: Cleaning up isolated cells...')
         const minClusterSize = quality.minClusterSize || 4
         const { cleaned, stats } = cleanupWithEdgePreservation(
           filtered,
@@ -336,20 +331,20 @@ export async function generateAdvancedDiamondPainting(
           30
         )
 
-        // Step 12: Build grid data with symbols
-        console.log('Building grid data...')
+        // Step 18: Build grid data with symbols
+        console.log('Step 18: Building grid data...')
         const gridData = buildGridData(cleaned, palette, stylePack)
 
-        // Step 13: Split into 16×16 tiles
-        console.log('Creating tile system...')
+        // Step 19: Split into 16×16 tiles
+        console.log('Step 19: Creating tile system...')
         const tiles = createTileSystem(gridData, gridWidth, gridHeight)
 
-        // Step 14: Calculate bead counts
-        console.log('Calculating bead counts...')
+        // Step 20: Calculate bead counts
+        console.log('Step 20: Calculating bead counts...')
         const beadCounts = calculateBeadCounts(gridData, stylePack)
 
-        // Step 15: Calculate diagnostics
-        console.log('Calculating diagnostics...')
+        // Step 21: Calculate diagnostics
+        console.log('Step 21: Calculating diagnostics...')
         const clusterStats = calculateClusterStats(cleaned)
 
         // Find background color (lightest) and its percentage
@@ -404,12 +399,20 @@ export async function generateAdvancedDiamondPainting(
             Math.round((foregroundColorCounts[code] / totalForegroundPixels) * 1000) / 10
         }
 
+        // Calculate edge density
+        let edgePixelCount = 0
+        for (let i = 0; i < edgeMask.length; i++) {
+          if (edgeMask[i] > 30) edgePixelCount++
+        }
+        const edgeDensity = (edgePixelCount / (gridWidth * gridHeight)) * 100
+
         const diagnostics: ProcessingDiagnostics = {
           isolatedCellsRemoved: stats.isolated,
           smallClustersRemoved: stats.smallClusters,
           backgroundPercentage: Math.round(backgroundPercentage * 10) / 10,
           backgroundDMCCode: backgroundDMC.code,
           edgePixelCount,
+          edgeDensity: Math.round(edgeDensity * 10) / 10,
           averageClusterSize: Math.round(clusterStats.avgSize * 10) / 10,
           foregroundCoverage: Math.round(foregroundCoverage * 10) / 10,
           paletteUsageDeviation: Math.round(averageDeviation * 10) / 10,
@@ -417,8 +420,8 @@ export async function generateAdvancedDiamondPainting(
           foregroundPaletteCoverage,
         }
 
-        // Step 16: Generate high-res preview
-        console.log('Generating preview...')
+        // Step 22: Generate high-res preview
+        console.log('Step 22: Generating preview...')
         const previewUrl = generatePreview(gridData, gridWidth, gridHeight)
 
         // Calculate dimensions
@@ -465,8 +468,9 @@ export async function generateAdvancedDiamondPainting(
 /**
  * Apply style-specific processing
  */
-function applyStyleProcessing(imageData: ImageData, styleId: string): void {
-  const data = imageData.data
+function applyStyleProcessing(imageData: ImageData, styleId: string): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
 
   if (styleId === 'a4_vintage') {
     // VINTAGE: Desaturate, warm shift, reduce contrast
@@ -492,9 +496,10 @@ function applyStyleProcessing(imageData: ImageData, styleId: string): void {
       g = mid + (g - mid) * 0.85
       b = mid + (b - mid) * 0.85
 
-      data[i] = Math.round(Math.max(0, Math.min(255, r)))
-      data[i + 1] = Math.round(Math.max(0, Math.min(255, g)))
-      data[i + 2] = Math.round(Math.max(0, Math.min(255, b)))
+      output[i] = Math.round(Math.max(0, Math.min(255, r)))
+      output[i + 1] = Math.round(Math.max(0, Math.min(255, g)))
+      output[i + 2] = Math.round(Math.max(0, Math.min(255, b)))
+      output[i + 3] = 255
     }
   } else if (styleId === 'a4_pop_art') {
     // POP ART: High saturation, high contrast, posterize
@@ -521,12 +526,17 @@ function applyStyleProcessing(imageData: ImageData, styleId: string): void {
       g = Math.round(g / 255 * (levels - 1)) * (255 / (levels - 1))
       b = Math.round(b / 255 * (levels - 1)) * (255 / (levels - 1))
 
-      data[i] = Math.round(Math.max(0, Math.min(255, r)))
-      data[i + 1] = Math.round(Math.max(0, Math.min(255, g)))
-      data[i + 2] = Math.round(Math.max(0, Math.min(255, b)))
+      output[i] = Math.round(Math.max(0, Math.min(255, r)))
+      output[i + 1] = Math.round(Math.max(0, Math.min(255, g)))
+      output[i + 2] = Math.round(Math.max(0, Math.min(255, b)))
+      output[i + 3] = 255
     }
+  } else {
+    // ORIGINAL: No processing - photo-faithful
+    output.set(data)
   }
-  // ORIGINAL: No processing - photo-faithful
+
+  return new ImageData(output, width, height)
 }
 
 /**

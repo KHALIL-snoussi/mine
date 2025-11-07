@@ -16,6 +16,15 @@ export interface StylePack {
   name: string
   description: string
   colors: StylePackColor[] // Fixed palette of 7 colors with metadata
+
+  // Palette balancing metadata
+  foregroundTarget: number // Target % for foreground colors (e.g., 45)
+  backgroundTarget: number // Target % for background colors (e.g., 55)
+  minColorPercent: number // Floor: no color drops below this % (e.g., 3-5)
+
+  // Visual style adjustments
+  contrastBoost: number // 1.0 = none, 1.5 = high, 0.85 = soft
+  saturationBias: number // -0.2 to +0.5 (negative desaturates, positive boosts)
 }
 
 /**
@@ -34,7 +43,12 @@ export const A4_ORIGINAL_PACK: StylePack = {
     { code: '434', name: 'Light Brown', rgb: [152, 94, 51], hex: '#985E33', category: 'Brown', defaultSymbol: 'E', targetPercentage: 14 },
     { code: '809', name: 'Delft Blue', rgb: [148, 186, 217], hex: '#94BAD9', category: 'Blue', defaultSymbol: 'F', targetPercentage: 10 },
     { code: '702', name: 'Kelly Green', rgb: [89, 163, 61], hex: '#59A33D', category: 'Green', defaultSymbol: 'G', targetPercentage: 6 },
-  ]
+  ],
+  foregroundTarget: 45,
+  backgroundTarget: 55,
+  minColorPercent: 5, // All 7 colors must appear with at least 5%
+  contrastBoost: 1.0, // Neutral - no boost
+  saturationBias: 0.0, // Neutral - preserve natural colors
 }
 
 /**
@@ -53,7 +67,12 @@ export const A4_VINTAGE_PACK: StylePack = {
     { code: '3781', name: 'Dark Mocha', rgb: [108, 84, 67], hex: '#6C5443', category: 'Brown', defaultSymbol: 'E', targetPercentage: 15 },
     { code: '945', name: 'Tawny', rgb: [250, 211, 187], hex: '#FAD3BB', category: 'Skin', defaultSymbol: 'F', targetPercentage: 8 },
     { code: '3820', name: 'Dark Straw', rgb: [223, 182, 95], hex: '#DFB65F', category: 'Yellow', defaultSymbol: 'G', targetPercentage: 5 },
-  ]
+  ],
+  foregroundTarget: 42,
+  backgroundTarget: 58,
+  minColorPercent: 4, // Softer floor - warm browns can overlap
+  contrastBoost: 0.85, // Softer contrast for vintage feel
+  saturationBias: -0.15, // Slight desaturation for aged look
 }
 
 /**
@@ -72,7 +91,12 @@ export const A4_POP_ART_PACK: StylePack = {
     { code: '973', name: 'Bright Canary', rgb: [255, 227, 0], hex: '#FFE300', category: 'Yellow', defaultSymbol: 'E', targetPercentage: 14 },
     { code: '602', name: 'Medium Cranberry', rgb: [229, 72, 119], hex: '#E54877', category: 'Pink', defaultSymbol: 'F', targetPercentage: 12 },
     { code: '700', name: 'Bright Green', rgb: [10, 117, 36], hex: '#0A7524', category: 'Green', defaultSymbol: 'G', targetPercentage: 9 },
-  ]
+  ],
+  foregroundTarget: 50,
+  backgroundTarget: 50,
+  minColorPercent: 7, // ALL colors must be visible (comic style)
+  contrastBoost: 1.6, // High contrast for punchy pop-art look
+  saturationBias: 0.4, // Strong saturation boost
 }
 
 /**

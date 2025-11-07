@@ -918,7 +918,8 @@ export function quantizeWithTargetPercentages(
   targetPercentages: number[],
   mask: Uint8Array,
   tolerance: number = 15,
-  underUsePenalty: number = 5 // Negative penalty (bonus) for under-used colors
+  underUsePenalty: number = 5, // Negative penalty (bonus) for under-used colors
+  minColorPercent: number = 3 // Floor: no color drops below this %
 ): ImageData {
   const { width, height, data } = imageData
   const output = new Uint8ClampedArray(data)
@@ -956,9 +957,15 @@ export function quantizeWithTargetPercentages(
         const deviation = currentPercent - targetPercentages[p]
 
         let penalty = 0
-        if (deviation > tolerance) {
-          // Over target: strong penalty to push pixels away
-          penalty = deviation * 10
+
+        // FLOOR ENFORCEMENT: If color is below minColorPercent, apply MASSIVE bonus
+        if (currentPercent < minColorPercent) {
+          // Huge bonus (negative penalty) to ensure it reaches the floor
+          penalty = (minColorPercent - currentPercent) * -50
+        } else if (deviation > tolerance) {
+          // Over target: STRONG penalty to push pixels away
+          // Increased from 10 to 25 for more aggressive balancing
+          penalty = deviation * 25
         } else if (deviation < -tolerance) {
           // Under target: negative penalty (bonus) to favor this color
           // This prevents midtones from collapsing to a single color
