@@ -7,6 +7,7 @@ import { useDropzone } from 'react-dropzone'
 
 import { Button } from '@/components/ui/Button'
 import DiamondCropSelector from '@/components/DiamondCropSelector'
+import { TileThumbnail, TileLegend } from '@/components/TileThumbnail'
 import { generateAdvancedDiamondPainting, AdvancedDiamondResult, AdvancedDiamondOptions } from '@/lib/advancedDiamondGenerator'
 import {
   downloadMaterialsList,
@@ -16,6 +17,8 @@ import {
   downloadTilePage,
   printTilePage,
   downloadAllTiles,
+  downloadCompleteBooklet,
+  printCompleteBooklet,
 } from '@/lib/diamondPaintingPDF'
 import { getAllStylePacks } from '@/lib/diamondStylePacks'
 
@@ -204,6 +207,63 @@ export default function DiamondPaintingPage() {
   const handleDownloadAllTiles = () => {
     if (!result) return
     downloadAllTiles(result)
+  }
+
+  const handleTileKeyDown = (index: number, e: React.KeyboardEvent) => {
+    if (!result) return
+
+    const tilesWide = result.dimensions.tilesWide
+    const tilesHigh = result.dimensions.tilesHigh
+    const totalTiles = result.tiles.length
+
+    let newIndex = index
+
+    switch (e.key) {
+      case 'ArrowRight':
+        e.preventDefault()
+        newIndex = index + 1
+        if (newIndex >= totalTiles) newIndex = index // Stay at end
+        break
+      case 'ArrowLeft':
+        e.preventDefault()
+        newIndex = index - 1
+        if (newIndex < 0) newIndex = 0 // Stay at start
+        break
+      case 'ArrowDown':
+        e.preventDefault()
+        newIndex = index + tilesWide
+        if (newIndex >= totalTiles) newIndex = index // Stay at current if would go past end
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        newIndex = index - tilesWide
+        if (newIndex < 0) newIndex = index // Stay at current if would go before start
+        break
+      case 'Enter':
+      case ' ':
+        e.preventDefault()
+        handleViewTile(index)
+        return
+      case 'Home':
+        e.preventDefault()
+        newIndex = 0
+        break
+      case 'End':
+        e.preventDefault()
+        newIndex = totalTiles - 1
+        break
+      default:
+        return
+    }
+
+    // Focus the new tile
+    if (newIndex !== index) {
+      const tileButtons = document.querySelectorAll('[data-tile-button]')
+      const targetButton = tileButtons[newIndex] as HTMLButtonElement
+      if (targetButton) {
+        targetButton.focus()
+      }
+    }
   }
 
   return (
@@ -563,40 +623,104 @@ export default function DiamondPaintingPage() {
                     </div>
                   </div>
 
-                  {/* Tile Viewer */}
+                  {/* Tile Viewer - QBRIX Style with Miniature Previews */}
                   <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70 p-8">
-                    <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                      View Assembly Instructions
-                    </h3>
-                    <p className="text-sm text-slate-600 mb-6">
-                      Click any tile to view detailed instructions with symbols and row/column numbers
-                    </p>
-
-                    <div className="grid gap-2" style={{
-                      gridTemplateColumns: `repeat(${result.dimensions.tilesWide}, 1fr)`
-                    }}>
-                      {result.tiles.map((tile, index) => (
-                        <button
-                          key={tile.tileNumber}
-                          onClick={() => handleViewTile(index)}
-                          className="relative group aspect-square border-2 border-slate-300 hover:border-primary-500 rounded-lg transition-all hover:shadow-md bg-gradient-to-br from-slate-50 to-slate-100 hover:from-primary-50 hover:to-primary-100"
-                        >
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-sm font-bold text-slate-700 group-hover:text-primary-700">
-                              {tile.tileNumber}
-                            </span>
-                          </div>
-                          <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded">
-                              View
-                            </span>
-                          </div>
-                        </button>
-                      ))}
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          View Assembly Instructions
+                        </h3>
+                        <p className="text-sm text-slate-600 mt-1">
+                          Miniature tile previews matching your PDF booklet
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="mt-4 text-xs text-slate-500 text-center">
-                      {result.dimensions.tilesWide} × {result.dimensions.tilesHigh} = {result.tiles.length} tiles total
+                    {/* Stats Row */}
+                    <div className="mb-6 p-4 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-slate-700">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-primary-600">{result.dimensions.tilesWide} × {result.dimensions.tilesHigh}</span>
+                          <span className="text-slate-500">=</span>
+                          <span className="font-bold">{result.tiles.length} tiles total</span>
+                        </div>
+                        <div className="text-slate-400">•</div>
+                        <div className="text-slate-600">Tap to enlarge</div>
+                        <div className="text-slate-400">•</div>
+                        <div className="text-slate-600">
+                          PDF includes {Math.ceil(result.tiles.length / 12)} spread{Math.ceil(result.tiles.length / 12) === 1 ? '' : 's'} (12 tiles per page)
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="mb-6 flex gap-3">
+                      <Button
+                        onClick={handleDownloadAllTiles}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        📥 Download Complete Booklet
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (result) printCompleteBooklet(result, {})
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        🖨️ Print Booklet
+                      </Button>
+                    </div>
+
+                    {/* Tile Grid with Miniature Previews */}
+                    <div
+                      className="grid gap-3"
+                      style={{
+                        gridTemplateColumns: `repeat(${result.dimensions.tilesWide}, 1fr)`
+                      }}
+                      role="grid"
+                      aria-label="Tile assembly grid"
+                    >
+                      {result.tiles.map((tile, index) => {
+                        const colorMap = new Map(
+                          result.beadCounts.map(bc => [
+                            bc.dmcColor.code,
+                            { symbol: bc.symbol, hex: bc.dmcColor.hex, name: bc.dmcColor.name }
+                          ])
+                        )
+
+                        const rowStart = tile.startRow + 1
+                        const rowEnd = tile.endRow
+                        const colStart = tile.startCol + 1
+                        const colEnd = tile.endCol
+
+                        return (
+                          <div
+                            key={tile.tileNumber}
+                            data-tile-index={index}
+                          >
+                            <TileThumbnail
+                              tile={tile}
+                              colorMap={colorMap}
+                              onClick={() => handleViewTile(index)}
+                              onKeyDown={(e) => handleTileKeyDown(index, e)}
+                              ariaLabel={`Open tile ${tile.tileNumber} instructions (rows ${rowStart}–${rowEnd}, columns ${colStart}–${colEnd})`}
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    <div className="mt-6 p-4 rounded-lg bg-primary-50 border border-primary-200">
+                      <div className="text-xs font-semibold text-primary-700 uppercase mb-1">
+                        💡 Assembly Tip
+                      </div>
+                      <div className="text-sm text-primary-900">
+                        Work tile by tile from top-left to bottom-right. Each miniature preview shows the exact 16×16 beige grid you'll see in the printed booklet.
+                      </div>
                     </div>
                   </div>
 

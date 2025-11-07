@@ -105,7 +105,7 @@ function generateTileSpreadBody(
   result: DiamondPaintingResult,
   startTileIndex: number
 ): string {
-  const { tiles, beadCounts } = result
+  const { tiles, beadCounts, dimensions } = result
   const tilesOnPage = tiles.slice(startTileIndex, startTileIndex + 12)
 
   if (tilesOnPage.length === 0) {
@@ -116,10 +116,21 @@ function generateTileSpreadBody(
     beadCounts.map(bc => [bc.dmcColor.code, { color: bc.dmcColor, symbol: bc.symbol }])
   )
 
-  const pageLabel = `${startTileIndex + 1}–${Math.min(startTileIndex + 12, tiles.length)}`
+  const pageLabel = `Tiles ${startTileIndex + 1}–${Math.min(startTileIndex + 12, tiles.length)} ▢`
+
+  // Calculate grid section covered by this spread
+  const firstTile = tilesOnPage[0]
+  const lastTile = tilesOnPage[tilesOnPage.length - 1]
+  const rowRange = `Rows ${firstTile.startRow + 1}–${lastTile.endRow} of ${dimensions.heightBeads}`
+  const colRange = `Cols ${firstTile.startCol + 1}–${lastTile.endCol} of ${dimensions.widthBeads}`
+  const pageNumber = Math.floor(startTileIndex / 12) + 1
+  const totalPages = Math.ceil(tiles.length / 12)
 
   return `
-  <div class="page-header">${pageLabel} ▢</div>
+  <div class="page-header">
+    <div class="page-label">${pageLabel}</div>
+    <div class="page-map">Page ${pageNumber} of ${totalPages} • ${rowRange} • ${colRange}</div>
+  </div>
 
   <div class="tiles-grid">
     ${tilesOnPage.map(tile => {
@@ -393,11 +404,28 @@ export function generateCompleteBooklet(
     }
 
     .page-header {
-      text-align: right;
-      font-size: 12px;
-      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #000;
+    }
+
+    .page-label {
+      font-size: 14px;
+      font-weight: 900;
       color: #000;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .page-map {
+      font-size: 9px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .tiles-grid {
