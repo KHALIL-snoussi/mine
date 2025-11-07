@@ -23,6 +23,122 @@ except ImportError:
     from utils.opencv import require_cv2
 
 
+def rgb_to_lab(rgb: np.ndarray) -> np.ndarray:
+    """
+    Convert RGB to LAB color space for perceptual color operations.
+
+    Args:
+        rgb: RGB array (can be single color or image) with values 0-255
+
+    Returns:
+        LAB array: L (0-100), a (-128 to 127), b (-128 to 127)
+    """
+    cv2 = require_cv2()
+
+    # Ensure proper shape
+    original_shape = rgb.shape
+    if len(rgb.shape) == 1:
+        # Single color
+        rgb = rgb.reshape(1, 1, 3)
+    elif len(rgb.shape) == 2:
+        # Palette of colors
+        rgb = rgb.reshape(1, -1, 3)
+
+    # Convert to uint8 if needed
+    rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+
+    # OpenCV conversion
+    lab = cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB).astype(np.float32)
+
+    # Reshape back to original
+    if len(original_shape) == 1:
+        return lab.reshape(3)
+    elif len(original_shape) == 2:
+        return lab.reshape(-1, 3)
+    else:
+        return lab
+
+
+def lab_to_rgb(lab: np.ndarray) -> np.ndarray:
+    """
+    Convert LAB to RGB color space.
+
+    Args:
+        lab: LAB array
+
+    Returns:
+        RGB array with values 0-255
+    """
+    cv2 = require_cv2()
+
+    # Ensure proper shape
+    original_shape = lab.shape
+    if len(lab.shape) == 1:
+        lab = lab.reshape(1, 1, 3)
+    elif len(lab.shape) == 2:
+        lab = lab.reshape(1, -1, 3)
+
+    # Clip and convert
+    lab = np.clip(lab, [0, -128, -128], [100, 127, 127]).astype(np.uint8)
+    rgb = cv2.cvtColor(lab, cv2.COLOR_LAB2RGB)
+
+    # Reshape back
+    if len(original_shape) == 1:
+        return rgb.reshape(3)
+    elif len(original_shape) == 2:
+        return rgb.reshape(-1, 3)
+    else:
+        return rgb
+
+
+def delta_e_cie2000(lab1: np.ndarray, lab2: np.ndarray) -> float:
+    """
+    Calculate CIEDE2000 color difference - industry standard for perceptual matching.
+    Lower values = more similar colors.
+
+    Args:
+        lab1, lab2: LAB color arrays (L, a, b)
+
+    Returns:
+        Perceptual color difference (0 = identical, >100 = very different)
+    """
+    L1, a1, b1 = lab1[0], lab1[1], lab1[2]
+    L2, a2, b2 = lab2[0], lab2[1], lab2[2]
+
+    kL = kC = kH = 1.0  # Weighting factors
+
+    C1 = np.sqrt(a1**2 + b1**2)
+    C2 = np.sqrt(a2**2 + b2**2)
+    Cbar = (C1 + C2) / 2.0
+
+    G = 0.5 * (1 - np.sqrt(Cbar**7 / (Cbar**7 + 25**7)))
+
+    a1p = a1 * (1 + G)
+    a2p = a2 * (1 + G)
+
+    C1p = np.sqrt(a1p**2 + b1**2)
+    C2p = np.sqrt(a2p**2 + b2**2)
+
+    dL = L2 - L1
+    dC = C2p - C1p
+
+    # Simplified hue difference
+    dH_squared = (a2 - a1)**2 + (b2 - b1)**2 - dC**2
+    dH = np.sqrt(np.maximum(0, dH_squared))
+
+    SL = 1 + (0.015 * (L1 - 50)**2) / np.sqrt(20 + (L1 - 50)**2)
+    SC = 1 + 0.045 * C1p
+    SH = 1 + 0.015 * C1p
+
+    dE = np.sqrt(
+        (dL / (kL * SL))**2 +
+        (dC / (kC * SC))**2 +
+        (dH / (kH * SH))**2
+    )
+
+    return dE
+
+
 def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
     """
     Assign each pixel in image to the nearest color in palette
@@ -423,3 +539,102 @@ class ColorQuantizer:
         quantized = palette[labels].reshape(h, w, 3)
 
         return quantized
+
+    def quantize_with_target_percentages(
+        self,
+        image: np.ndarray,
+        palette: np.ndarray,
+        target_percentages: np.ndarray,
+        tolerance: float = 15.0,
+        under_use_penalty: float = 5.0,
+        max_passes: int = 3
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Advanced quantization with target percentage enforcement.
+        Prevents color collapse and ensures balanced palette usage.
+
+        Args:
+            image: Input image in RGB format
+            palette: Color palette (N, 3) in RGB
+            target_percentages: Target percentage for each color (N,)
+            tolerance: Tolerance for deviation from target (%)
+            under_use_penalty: Penalty multiplier for under-used colors (bonus to favor them)
+            max_passes: Number of refinement passes
+
+        Returns:
+            Tuple of (quantized_image, labels)
+        """
+        h, w = image.shape[:2]
+        total_pixels = h * w
+
+        # Convert image and palette to LAB for perceptual matching
+        logger.info("Converting to LAB color space for perceptual quantization...")
+        image_lab = rgb_to_lab(image)
+        palette_lab = rgb_to_lab(palette)
+
+        # Flatten image
+        pixels_lab = image_lab.reshape(-1, 3)
+
+        # Initialize tracking
+        current_counts = np.zeros(len(palette), dtype=int)
+        assignments = np.full(total_pixels, -1, dtype=int)
+
+        logger.info(f"Performing {max_passes}-pass quantization with target percentages...")
+
+        for pass_idx in range(max_passes):
+            for i in range(total_pixels):
+                # Skip already assigned pixels in early passes
+                if assignments[i] >= 0 and pass_idx < max_passes - 1:
+                    continue
+
+                pixel_lab = pixels_lab[i]
+                best_idx = -1
+                best_score = float('inf')
+
+                for p in range(len(palette)):
+                    # Calculate perceptual color difference (CIEDE2000)
+                    delta_e = delta_e_cie2000(pixel_lab, palette_lab[p])
+
+                    # Calculate penalty/bonus based on target deviation
+                    current_percent = (current_counts[p] / total_pixels) * 100
+                    deviation = current_percent - target_percentages[p]
+
+                    penalty = 0.0
+                    if deviation > tolerance:
+                        # Over target: strong penalty to push pixels away
+                        penalty = deviation * 10.0
+                    elif deviation < -tolerance:
+                        # Under target: negative penalty (bonus) to favor this color
+                        penalty = deviation * under_use_penalty
+
+                    score = delta_e + penalty
+
+                    if score < best_score:
+                        best_score = score
+                        best_idx = p
+
+                # Update assignment
+                if assignments[i] >= 0:
+                    current_counts[assignments[i]] -= 1
+                assignments[i] = best_idx
+                current_counts[best_idx] += 1
+
+            # Log progress
+            actual_percentages = (current_counts / total_pixels) * 100
+            logger.info(f"Pass {pass_idx + 1}/{max_passes} complete. Color usage: " +
+                       f"{', '.join([f'{p:.1f}%' for p in actual_percentages])}")
+
+        # Create quantized image
+        quantized = palette[assignments].reshape(h, w, 3)
+        self.quantized_image = ensure_uint8(quantized)
+        self.labels = assignments.reshape(h, w)
+        self.palette = palette
+
+        # Log final statistics
+        final_percentages = (current_counts / total_pixels) * 100
+        logger.info("Target percentage enforcement complete:")
+        for i, (target, actual) in enumerate(zip(target_percentages, final_percentages)):
+            diff = actual - target
+            logger.info(f"  Color {i+1}: Target={target:.1f}%, Actual={actual:.1f}%, Diff={diff:+.1f}%")
+
+        return quantized, self.labels
