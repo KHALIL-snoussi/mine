@@ -3,8 +3,10 @@
  * Creates comprehensive PDF with pattern, legend, and materials list
  */
 
-import { DiamondPaintingResult, DiamondGrid, calculatePhysicalSize } from './diamondPaintingGenerator'
-import { DMCColorUsage } from './diamondPaintingGenerator'
+import { AdvancedDiamondResult } from './advancedDiamondGenerator'
+
+// For backwards compatibility with old calls
+export type DiamondPaintingResult = AdvancedDiamondResult
 
 export interface PDFGeneratorOptions {
   includePattern: boolean
@@ -22,13 +24,12 @@ export function generateMaterialsListHTML(
   result: DiamondPaintingResult,
   options: { title?: string; customerName?: string } = {}
 ): string {
-  const { colorsUsed, dimensions, estimatedDiamonds, difficulty, estimatedTime } = result
-  const physicalSize = calculatePhysicalSize(dimensions.width, dimensions.height)
+  const { beadCounts, dimensions, totalBeads, difficulty, estimatedTime } = result
 
   // Calculate total bags needed (each bag typically contains 200 diamonds)
   const diamondsPerBag = 200
-  const totalBags = colorsUsed.reduce((sum, color) => {
-    return sum + Math.ceil(color.count / diamondsPerBag)
+  const totalBags = beadCounts.reduce((sum, bead) => {
+    return sum + Math.ceil(bead.count / diamondsPerBag)
   }, 0)
 
   const html = `
@@ -251,16 +252,16 @@ export function generateMaterialsListHTML(
     <div class="info-grid">
       <div class="info-box">
         <div class="info-label">Canvas Size</div>
-        <div class="info-value">${dimensions.width} × ${dimensions.height} diamonds</div>
+        <div class="info-value">${dimensions.widthBeads} × ${dimensions.heightBeads} diamonds</div>
         <div style="margin-top: 8px; color: #6b7280; font-size: 14px;">
-          ${physicalSize.cm.width} × ${physicalSize.cm.height} cm<br>
-          ${physicalSize.inches.width} × ${physicalSize.inches.height} inches
+          ${dimensions.widthCm} × ${dimensions.heightCm} cm<br>
+          ${(dimensions.widthCm / 2.54).toFixed(1)} × ${(dimensions.heightCm / 2.54).toFixed(1)} inches
         </div>
       </div>
 
       <div class="info-box">
         <div class="info-label">Total Diamonds</div>
-        <div class="info-value">${estimatedDiamonds.toLocaleString()}</div>
+        <div class="info-value">${totalBeads.toLocaleString()}</div>
         <div style="margin-top: 8px; color: #6b7280; font-size: 14px;">
           Approximately ${totalBags} bags needed
         </div>
@@ -268,7 +269,7 @@ export function generateMaterialsListHTML(
 
       <div class="info-box">
         <div class="info-label">Colors Used</div>
-        <div class="info-value">${colorsUsed.length} DMC Colors</div>
+        <div class="info-value">${beadCounts.length} DMC Colors</div>
         <div style="margin-top: 8px;">
           <span class="difficulty-badge difficulty-${difficulty.toLowerCase()}">${difficulty}</span>
         </div>
@@ -303,21 +304,21 @@ export function generateMaterialsListHTML(
         </tr>
       </thead>
       <tbody>
-        ${colorsUsed
+        ${beadCounts
           .map(
-            (color) => `
+            (bead) => `
           <tr>
             <td>
-              <span class="symbol-badge">${color.symbol}</span>
+              <span class="symbol-badge">${bead.symbol}</span>
             </td>
             <td>
-              <span class="color-swatch" style="background-color: ${color.dmcColor.hex};"></span>
+              <span class="color-swatch" style="background-color: ${bead.dmcColor.hex};"></span>
             </td>
-            <td style="font-weight: bold; font-family: monospace;">${color.dmcColor.code}</td>
-            <td>${color.dmcColor.name}</td>
-            <td style="font-weight: bold;">${color.count.toLocaleString()}</td>
-            <td>${Math.ceil(color.count / diamondsPerBag)}</td>
-            <td>${color.percentage.toFixed(1)}%</td>
+            <td style="font-weight: bold; font-family: monospace;">${bead.dmcColor.code}</td>
+            <td>${bead.dmcColor.name}</td>
+            <td style="font-weight: bold;">${bead.count.toLocaleString()}</td>
+            <td>${Math.ceil(bead.count / diamondsPerBag)}</td>
+            <td>${bead.percentage.toFixed(1)}%</td>
           </tr>
         `
           )
@@ -332,11 +333,11 @@ export function generateMaterialsListHTML(
     <div style="background: white; padding: 25px; border-radius: 8px; border: 2px solid #e5e7eb;">
       <h3 style="margin-bottom: 15px; color: #1f2937;">Essential Items:</h3>
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
-        <div>☐ High-quality adhesive canvas (${physicalSize.cm.width} × ${physicalSize.cm.height} cm)</div>
+        <div>☐ High-quality adhesive canvas (${dimensions.widthCm} × ${dimensions.heightCm} cm)</div>
         <div>☐ Diamond applicator pen/tool</div>
         <div>☐ Wax/putty for pen tip</div>
         <div>☐ Diamond tray with grooves</div>
-        <div>☐ ${colorsUsed.length} labeled storage bags/containers</div>
+        <div>☐ ${beadCounts.length} labeled storage bags/containers</div>
         <div>☐ Tweezers for corrections</div>
         <div>☐ Protective covering sheet</div>
         <div>☐ Roller or book for sealing</div>
@@ -399,7 +400,7 @@ export function generateMaterialsListHTML(
       </ul>
       <p style="margin-top: 15px; padding: 15px; background: #fef3c7; border-radius: 6px; border-left: 4px solid #f59e0b;">
         <strong>Important:</strong> When ordering, specify "DMC" color codes to ensure you receive the exact colors shown in this materials list.
-        Order <strong>${totalBags} total bags</strong> (approximately ${estimatedDiamonds.toLocaleString()} diamonds).
+        Order <strong>${totalBags} total bags</strong> (approximately ${totalBeads.toLocaleString()} diamonds).
       </p>
     </div>
   </div>
@@ -419,7 +420,7 @@ export function generateMaterialsListHTML(
 /**
  * Generate pattern legend as HTML
  */
-export function generatePatternLegendHTML(colorsUsed: DMCColorUsage[]): string {
+export function generatePatternLegendHTML(beadCounts: import('./advancedDiamondGenerator').BeadCount[]): string {
   const html = `
 <!DOCTYPE html>
 <html>
@@ -497,15 +498,15 @@ export function generatePatternLegendHTML(colorsUsed: DMCColorUsage[]): string {
 <body>
   <h1>Color Legend</h1>
   <div class="legend-grid">
-    ${colorsUsed
+    ${beadCounts
       .map(
-        (color) => `
+        (bead) => `
       <div class="legend-item">
-        <div class="symbol">${color.symbol}</div>
-        <div class="color-box" style="background-color: ${color.dmcColor.hex};"></div>
+        <div class="symbol">${bead.symbol}</div>
+        <div class="color-box" style="background-color: ${bead.dmcColor.hex};"></div>
         <div class="info">
-          <div class="dmc-code">DMC ${color.dmcColor.code}</div>
-          <div class="color-name">${color.dmcColor.name}</div>
+          <div class="dmc-code">DMC ${bead.dmcColor.code}</div>
+          <div class="color-name">${bead.dmcColor.name}</div>
         </div>
       </div>
     `
