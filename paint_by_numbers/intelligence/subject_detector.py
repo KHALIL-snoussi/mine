@@ -300,6 +300,30 @@ class SubjectDetector:
 
         return mask
 
+    def create_background_mask(self, image: np.ndarray,
+                               subject_region: SubjectRegion,
+                               feather_size: int = 30) -> np.ndarray:
+        """
+        Create mask for background (inverse of emphasis mask)
+        Background = 255 (white), Foreground/Subject = 0 (black)
+
+        Args:
+            image: Input image
+            subject_region: Subject region to exclude from background
+            feather_size: Pixels to feather edges
+
+        Returns:
+            Uint8 mask, 255=background, 0=foreground
+        """
+        # Get foreground mask first
+        foreground_mask = self.create_emphasis_mask(image, subject_region, feather_size)
+
+        # Invert: background = 1 - foreground
+        background_mask = 1.0 - foreground_mask
+
+        # Convert to uint8
+        return (background_mask * 255).astype(np.uint8)
+
     def visualize_detection(self, image: np.ndarray,
                            subject_region: SubjectRegion) -> np.ndarray:
         """

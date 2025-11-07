@@ -262,6 +262,11 @@ async def generate_template(
             detail=f"Invalid model. Available models: {', '.join(available_models)}"
         )
 
+    # INTELLIGENT MODEL SELECTION: Auto-detect portraits and suggest portrait model
+    # This prevents the terrible over-segmentation issue seen with portraits using "original" model
+    original_model = model  # Store user's choice
+    should_use_portrait_model = False
+
     # Validate paper format (common formats)
     valid_paper_formats = ["a4", "a3", "a5", "letter", "square_small", "square_medium", "square_large"]
     if paper_format not in valid_paper_formats:
@@ -337,6 +342,33 @@ async def generate_template(
     output_dir = upload_dir / f"template_{template.id}"
     output_dir.mkdir(exist_ok=True)
 
+    # INTELLIGENT PORTRAIT DETECTION: Auto-select portrait model for face images
+    # This prevents over-segmentation issues
+    try:
+        from paint_by_numbers.intelligence.subject_detector import SubjectDetector
+        import cv2
+
+        # Load image and detect faces
+        img = cv2.imread(str(file_path))
+        if img is not None:
+            detector = SubjectDetector()
+            subject_region = detector.detect_best_subject(img, expand_faces=True)
+
+            # If we detected a face and user used a non-portrait model, suggest portrait
+            if subject_region.subject_type == 'face' and model not in ['portrait', 'portrait_pro']:
+                logger.info(f"🎯 PORTRAIT DETECTED! Auto-selecting portrait_pro model (user selected: {model})")
+                logger.info(f"   Face region: ({subject_region.x}, {subject_region.y}, {subject_region.width}, {subject_region.height})")
+                model = 'portrait_pro'  # Use best portrait model
+                should_use_portrait_model = True
+
+                # Also force portrait palette if using generic palette
+                if palette_name == 'realistic_natural':
+                    palette_name = 'portrait_realistic'
+                    logger.info(f"   Also switching to portrait_realistic palette")
+    except Exception as e:
+        logger.warning(f"Portrait detection failed, using user-selected model: {e}")
+        # Continue with user's original choice
+
     # Build emphasized_region dict if coordinates provided
     emphasized_region = None
     if use_region_emphasis and all(v is not None for v in [region_x, region_y, region_width, region_height]):
@@ -355,7 +387,7 @@ async def generate_template(
         str(output_dir),
         palette_name,
         num_colors,
-        model,  # Pass model to background task
+        model,  # Pass model (potentially auto-corrected to portrait)
         paper_format,  # Pass paper format to background task
         use_region_emphasis,  # Pass emphasis flag
         emphasized_region  # Pass region coordinates

@@ -332,6 +332,66 @@ class PaintByNumbersGenerator:
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
 
+        # Step 2.4: UNIVERSAL Background Simplification (for ALL models)
+        # Backgrounds (sky, walls, etc.) should only use 2-3 colors, not 10+
+        logger.info(f"\n[2.4/8] 🌈 Simplifying background (prevents over-detailed sky/walls)...")
+        try:
+            from paint_by_numbers.intelligence.subject_detector import SubjectDetector
+            detector = SubjectDetector()
+
+            # Detect background vs foreground
+            subject_region = detector.detect_best_subject(self.processed_image)
+            background_mask = detector.create_background_mask(self.processed_image, subject_region)
+
+            # Count background vs foreground pixels
+            background_pixels = np.sum(background_mask > 127)
+            total_pixels = background_mask.size
+            background_percentage = (background_pixels / total_pixels) * 100
+
+            if background_percentage > 20:  # If >20% is background
+                logger.info(f"   Background detected: {background_percentage:.1f}% of image")
+
+                # Find the 2-3 most common colors in background
+                bg_mask_2d = background_mask.reshape(self.quantized_image.shape[:2])
+                bg_colors = {}
+
+                for y in range(self.quantized_image.shape[0]):
+                    for x in range(self.quantized_image.shape[1]):
+                        if bg_mask_2d[y, x] > 127:  # Background pixel
+                            color = tuple(self.quantized_image[y, x])
+                            bg_colors[color] = bg_colors.get(color, 0) + 1
+
+                # Get top 2 background colors
+                if len(bg_colors) > 2:
+                    sorted_bg = sorted(bg_colors.items(), key=lambda x: x[1], reverse=True)
+                    keep_colors = [c[0] for c in sorted_bg[:2]]
+
+                    # Merge other background colors to nearest of the 2 main colors
+                    merged_count = 0
+                    for y in range(self.quantized_image.shape[0]):
+                        for x in range(self.quantized_image.shape[1]):
+                            if bg_mask_2d[y, x] > 127:  # Background pixel
+                                current_color = tuple(self.quantized_image[y, x])
+                                if current_color not in keep_colors:
+                                    # Find nearest keeper color
+                                    min_dist = float('inf')
+                                    best_color = keep_colors[0]
+                                    for keep_color in keep_colors:
+                                        dist = sum((a - b) ** 2 for a, b in zip(current_color, keep_color))
+                                        if dist < min_dist:
+                                            min_dist = dist
+                                            best_color = keep_color
+
+                                    self.quantized_image[y, x] = best_color
+                                    merged_count += 1
+
+                    logger.info(f"   ✓ Simplified background: {len(bg_colors)} colors → 2 colors ({merged_count} pixels merged)")
+            else:
+                logger.info(f"   Background too small ({background_percentage:.1f}%), skipping simplification")
+
+        except Exception as e:
+            logger.warning(f"   Background simplification failed: {e}, continuing...")
+
         # Step 2.5: Portrait-specific region merging (for portrait models)
         if is_portrait_model:
             logger.info(f"\n[2.5/8] 🎨 Applying portrait-optimized region merging...")
