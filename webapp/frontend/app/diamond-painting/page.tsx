@@ -656,6 +656,89 @@ export default function DiamondPaintingPage() {
                     </div>
                   </div>
 
+                  {/* Quality Diagnostics */}
+                  <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70 p-8">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">📊 Quality Diagnostics</h3>
+                    <div className="text-xs text-slate-600 mb-4">
+                      Technical metrics for quality validation
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <div className="text-xs text-slate-500 mb-1">Foreground Coverage</div>
+                        <div className="text-lg font-bold text-slate-900">
+                          {result.diagnostics.foregroundCoverage.toFixed(1)}%
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <div className="text-xs text-slate-500 mb-1">Background</div>
+                        <div className="text-sm font-bold text-slate-900">
+                          DMC {result.diagnostics.backgroundDMCCode}
+                          <span className="text-xs font-normal text-slate-500 ml-1">
+                            ({result.diagnostics.backgroundPercentage.toFixed(1)}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className={`p-3 rounded-lg border ${
+                        result.diagnostics.paletteUsageDeviation < 10
+                          ? 'bg-green-50 border-green-200'
+                          : result.diagnostics.paletteUsageDeviation < 15
+                          ? 'bg-yellow-50 border-yellow-200'
+                          : 'bg-orange-50 border-orange-200'
+                      }`}>
+                        <div className="text-xs text-slate-600 mb-1">Palette Balance</div>
+                        <div className={`text-lg font-bold ${
+                          result.diagnostics.paletteUsageDeviation < 10
+                            ? 'text-green-700'
+                            : result.diagnostics.paletteUsageDeviation < 15
+                            ? 'text-yellow-700'
+                            : 'text-orange-700'
+                        }`}>
+                          ±{result.diagnostics.paletteUsageDeviation.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          {result.diagnostics.colorsWithinTolerance}/{result.beadCounts.length} colors within target
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <div className="text-xs text-slate-500 mb-1">Cleanup Stats</div>
+                        <div className="text-sm text-slate-900">
+                          <div>{result.diagnostics.isolatedCellsRemoved} isolated cells removed</div>
+                          <div className="text-xs text-slate-500">{result.diagnostics.smallClustersRemoved} small clusters merged</div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <div className="text-xs text-slate-500 mb-1">Edge Preservation</div>
+                        <div className="text-lg font-bold text-slate-900">
+                          {result.diagnostics.edgePixelCount.toLocaleString()}
+                        </div>
+                        <div className="text-xs text-slate-500">pixels preserved</div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        <div className="text-xs text-slate-500 mb-1">Avg Cluster Size</div>
+                        <div className="text-lg font-bold text-slate-900">
+                          {result.diagnostics.averageClusterSize.toFixed(1)}
+                        </div>
+                        <div className="text-xs text-slate-500">beads/cluster</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <div className="text-xs text-slate-500">
+                        <strong>What this means:</strong> Palette Balance shows how well colors match their target percentages.
+                        Values under ±10% indicate excellent color distribution (no single color dominates).
+                        {result.diagnostics.foregroundCoverage < 40 && (
+                          <span className="text-orange-600"> ⚠️ Subject appears small in frame - consider recropping.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Tile System Info */}
                   <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70 p-8">
                     <h3 className="text-lg font-semibold text-slate-900 mb-4">Tile System (16×16)</h3>
