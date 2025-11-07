@@ -261,14 +261,14 @@ class ModelRegistry:
             processing_time_estimate='30-50 seconds'
         ),
 
-        # MODEL 4: PORTRAIT - Professional Portrait Optimized
+        # MODEL 4: PORTRAIT - ULTRA QUALITY Portrait (2+ min processing)
         'portrait': ModelProfile(
             id='portrait',
             name='Portrait',
-            display_name='Portrait Pro 40×50 cm',
-            description='PORTRAIT-OPTIMIZED with face detection and skin smoothing. ' +
-                       'Large, paintable regions with realistic skin tones. ' +
-                       'Smooth faces, sharp details on eyes/glasses. Perfect for headshots.',
+            display_name='Portrait Ultra Quality 40×50 cm',
+            description='ULTRA QUALITY PORTRAIT with extreme smoothing and large paintable regions. ' +
+                       'Maximum bilateral filtering (25px), aggressive region merging (1500px min), ' +
+                       'multi-pass denoising. Processing time: 2-3 minutes for best results.',
             difficulty_level='beginner',
             size_label='40×50 cm',
             recommended_for=[
@@ -276,20 +276,20 @@ class ModelRegistry:
                 '✓ Headshots & selfies',
                 '✓ Family portraits',
                 '✓ Face-focused images',
-                '✓ Smooth skin tones',
-                '✓ Easy to paint (large regions)',
-                '✓ Realistic DMC colors'
+                '✓ Ultra-smooth skin tones',
+                '✓ Maximum paintability (large regions)',
+                '✓ Professional DMC colors'
             ],
-            # PORTRAIT-OPTIMIZED SETTINGS
-            num_colors=12,  # Fewer colors for smoother faces
-            min_region_size=500,  # LARGE regions - easy to paint
+            # ULTRA QUALITY SETTINGS - MAXIMUM SMOOTHNESS
+            num_colors=8,  # FEWER colors = SMOOTHER, larger regions
+            min_region_size=1500,  # VERY LARGE regions - ultra paintable
             max_image_size=(2480, 3508),  # A4 @ 300 DPI
-            edge_threshold_low=30,
-            edge_threshold_high=140,
-            bilateral_filter_d=12,  # Strong smoothing
-            bilateral_sigma_color=90,
-            bilateral_sigma_space=90,
-            morphology_kernel_size=5,  # Merge small regions
+            edge_threshold_low=50,  # Higher = fewer edges = smoother
+            edge_threshold_high=180,  # Higher = fewer edges = smoother
+            bilateral_filter_d=25,  # MAXIMUM smoothing diameter
+            bilateral_sigma_color=180,  # DOUBLE strength color smoothing
+            bilateral_sigma_space=180,  # DOUBLE strength spatial smoothing
+            morphology_kernel_size=11,  # LARGE kernels for aggressive merging
 
             # CLEAR NUMBERS
             font_scale=0.7,
@@ -303,20 +303,21 @@ class ModelRegistry:
             warmth_adjustment=5,  # Slight warmth for skin
             palette_name='portrait_realistic',
 
-            style_tags=['portrait', 'smooth', 'realistic', 'beginner-friendly', 'large-regions'],
-            color_range='10-14 colors',
-            detail_level='Smooth & Paintable',
+            style_tags=['portrait', 'ultra-smooth', 'ultra-quality', 'beginner-friendly', 'very-large-regions'],
+            color_range='7-9 colors',
+            detail_level='Ultra Smooth & Maximum Paintability',
             preview_icon='👤',
-            processing_time_estimate='45-70 seconds'
+            processing_time_estimate='2-3 minutes (ULTRA QUALITY MODE)'
         ),
 
-        # MODEL 5: PORTRAIT PRO - Ultra-Quality Portrait
+        # MODEL 5: PORTRAIT PRO - EXTREME QUALITY Portrait (3+ min processing)
         'portrait_pro': ModelProfile(
             id='portrait_pro',
             name='Portrait Pro',
-            display_name='Portrait Pro Ultra 40×50 cm',
-            description='MAXIMUM PORTRAIT QUALITY with multi-pass face detection, ' +
-                       'selective smoothing, and professional skin tones. ' +
+            display_name='Portrait Pro EXTREME Quality 40×50 cm',
+            description='EXTREME QUALITY PORTRAIT - absolute maximum smoothing, ' +
+                       'multi-pass bilateral filtering (30px diameter), extreme region merging (2000px min), ' +
+                       'professional skin tones. Processing time: 3-5 minutes for absolute best results. ' +
                        'Best quality for portraits regardless of processing time.',
             difficulty_level='intermediate',
             size_label='40×50 cm',
@@ -329,16 +330,16 @@ class ModelRegistry:
                 '✓ Best possible skin tones',
                 '✓ When time doesn\'t matter'
             ],
-            # ULTRA-QUALITY PORTRAIT SETTINGS
-            num_colors=15,  # More colors for subtle gradients
-            min_region_size=400,  # Balanced - quality + detail
-            max_image_size=(3508, 4960),  # A3 for maximum quality
-            edge_threshold_low=25,
-            edge_threshold_high=135,
-            bilateral_filter_d=15,  # Maximum smoothing
-            bilateral_sigma_color=100,
-            bilateral_sigma_space=100,
-            morphology_kernel_size=6,
+            # EXTREME QUALITY PORTRAIT SETTINGS - ABSOLUTE MAXIMUM
+            num_colors=6,  # VERY FEW colors = MAXIMUM smoothness
+            min_region_size=2000,  # EXTREME large regions - absolute paintability
+            max_image_size=(3508, 4960),  # A3 for maximum resolution
+            edge_threshold_low=60,  # Very high = very few edges = ultra smooth
+            edge_threshold_high=200,  # Very high = very few edges = ultra smooth
+            bilateral_filter_d=30,  # EXTREME smoothing diameter (30px neighborhood)
+            bilateral_sigma_color=200,  # EXTREME color smoothing strength
+            bilateral_sigma_space=200,  # EXTREME spatial smoothing strength
+            morphology_kernel_size=15,  # VERY LARGE kernels for extreme merging
 
             # CLEAR NUMBERS
             font_scale=0.65,
@@ -352,11 +353,11 @@ class ModelRegistry:
             warmth_adjustment=3,
             palette_name='portrait_realistic',
 
-            style_tags=['portrait', 'ultra-quality', 'face-detection', 'multi-pass', 'professional'],
-            color_range='12-16 colors',
-            detail_level='Ultra Professional',
+            style_tags=['portrait', 'extreme-quality', 'ultra-smooth', 'multi-pass', 'professional', 'slow'],
+            color_range='5-7 colors',
+            detail_level='EXTREME Quality - Maximum Smoothness',
             preview_icon='🎯',
-            processing_time_estimate='90-180 seconds'
+            processing_time_estimate='3-5 minutes (EXTREME QUALITY MODE - SLOW BUT BEST)'
         ),
 
         # MODEL 6: FULL COLOR HD - QBRIX Premium Quality (38 colors)

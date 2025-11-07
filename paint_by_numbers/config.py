@@ -18,14 +18,14 @@ class Config:
     AUTO_WHITE_BALANCE = True      # Apply gray-world white balance correction
     WHITE_BALANCE_CLIP = 0.01      # Clip percentile for white balance scaling
     APPLY_DENOISE = True           # Run fast denoising prior to clustering
-    DENOISE_STRENGTH = 7           # Strength for luminance denoising
-    DENOISE_COLOR_STRENGTH = 7     # Strength for chroma denoising
-    APPLY_LOCAL_CONTRAST = True    # Use CLAHE based local contrast enhancement
+    DENOISE_STRENGTH = 15          # ULTRA QUALITY: Strong luminance denoising (was 7)
+    DENOISE_COLOR_STRENGTH = 15    # ULTRA QUALITY: Strong chroma denoising (was 7)
+    APPLY_LOCAL_CONTRAST = False   # DISABLED for ULTRA quality - contrast creates edges
     CLAHE_CLIP_LIMIT = 2.5         # Clip limit for CLAHE
     CLAHE_TILE_GRID_SIZE = (8, 8)  # Tile grid for CLAHE (must be tuple)
     APPLY_TONE_BALANCE = True      # Normalize global brightness before clustering
     TONE_BALANCE_TARGET = 0.55     # Desired normalized luminance (0-1)
-    APPLY_SHARPENING = True        # Apply unsharp masking for edge clarity
+    APPLY_SHARPENING = False       # DISABLED for ULTRA quality - sharpening fragments regions
     SHARPEN_RADIUS = 3             # Radius for Gaussian blur in unsharp mask
     SHARPEN_AMOUNT = 0.6           # Sharpening amount (0-1 suggested)
 
@@ -49,14 +49,14 @@ class Config:
     # - Recurring revenue through subscriptions
     # - Lower customer acquisition cost
 
-    # Region Detection
+    # Region Detection - ULTRA QUALITY MODE
     MIN_REGION_SIZE = 100          # Minimum pixels for a region to be numbered
     MORPHOLOGY_KERNEL_SIZE = 3     # Kernel size for morphological operations
-    MORPH_CLOSE_ITERATIONS = 1     # Closing passes for mask cleanup
-    MORPH_OPEN_ITERATIONS = 1      # Opening passes for mask cleanup
-    BILATERAL_FILTER_D = 9         # Bilateral filter diameter
-    BILATERAL_SIGMA_COLOR = 75     # Bilateral filter sigma color
-    BILATERAL_SIGMA_SPACE = 75     # Bilateral filter sigma space
+    MORPH_CLOSE_ITERATIONS = 3     # ULTRA QUALITY: More closing passes (was 1)
+    MORPH_OPEN_ITERATIONS = 3      # ULTRA QUALITY: More opening passes (was 1)
+    BILATERAL_FILTER_D = 9         # Bilateral filter diameter (overridden by model profiles)
+    BILATERAL_SIGMA_COLOR = 75     # Bilateral filter sigma color (overridden by model profiles)
+    BILATERAL_SIGMA_SPACE = 75     # Bilateral filter sigma space (overridden by model profiles)
 
     # Contour Detection
     CONTOUR_THICKNESS = 2          # Thickness of contour lines
@@ -89,9 +89,9 @@ class Config:
     LOG_LEVEL = "INFO"             # Logging level (DEBUG, INFO, WARNING, ERROR)
     LOG_FILE = None                # Optional log file path
 
-    # Processing
+    # Processing - ULTRA QUALITY MODE
     USE_ANTIALIASING = True        # Use antialiasing for smoother edges
-    GAUSSIAN_BLUR_KERNEL = (3, 3)  # Kernel for Gaussian blur preprocessing
+    GAUSSIAN_BLUR_KERNEL = (7, 7)  # ULTRA QUALITY: Larger kernel for strong noise reduction (was 3x3)
     SHOW_PROGRESS = True           # Show progress bars
 
     # Intelligence & Analysis

@@ -278,14 +278,18 @@ class ImageProcessor:
             kernel = self.config.GAUSSIAN_BLUR_KERNEL
             processed = cv2.GaussianBlur(processed, kernel, 0)
 
-        # Apply bilateral filter for edge-preserving smoothing
+        # Apply MULTI-PASS bilateral filter for ULTRA edge-preserving smoothing
+        # ULTRA QUALITY MODE: 3 passes for extreme smoothness (+60-90 seconds)
         if apply_bilateral:
-            processed = cv2.bilateralFilter(
-                processed,
-                d=self.config.BILATERAL_FILTER_D,
-                sigmaColor=self.config.BILATERAL_SIGMA_COLOR,
-                sigmaSpace=self.config.BILATERAL_SIGMA_SPACE
-            )
+            num_bilateral_passes = 3  # More passes = smoother but slower
+            for pass_num in range(num_bilateral_passes):
+                processed = cv2.bilateralFilter(
+                    processed,
+                    d=self.config.BILATERAL_FILTER_D,
+                    sigmaColor=self.config.BILATERAL_SIGMA_COLOR,
+                    sigmaSpace=self.config.BILATERAL_SIGMA_SPACE
+                )
+                logger.debug(f"   Bilateral filter pass {pass_num + 1}/{num_bilateral_passes} complete")
 
         # Reinforce local contrast before quantization
         processed = self._apply_local_contrast(processed)
@@ -447,11 +451,11 @@ class ImageProcessor:
                     merged_count += 1
 
         if aggressive:
-            # Second pass: merge similar adjacent colors even if not small
-            # This further reduces region count
-            similarity_threshold = 400  # Color distance threshold (lower = more strict)
+            # ULTRA QUALITY: EXTREME aggressive merging of similar adjacent colors
+            # This dramatically reduces region count for maximum paintability
+            similarity_threshold = 1200  # ULTRA aggressive merging (3x larger threshold)
 
-            for _ in range(2):  # Multiple passes for thorough merging
+            for _ in range(5):  # ULTRA QUALITY: 5 passes for extreme merging (+30-45 seconds)
                 changed = False
                 result_gray = cv2.cvtColor(result, cv2.COLOR_RGB2GRAY)
                 _, labels = cv2.connectedComponents(result_gray)

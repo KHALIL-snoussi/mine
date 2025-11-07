@@ -224,19 +224,20 @@ class PaintByNumbersGenerator:
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
 
-        # Step 1.5: Portrait-specific smoothing (for portrait models)
+        # Step 1.5: Portrait-specific ULTRA/EXTREME smoothing (for portrait models)
         is_portrait_model = model in ['portrait', 'portrait_pro']
         if is_portrait_model:
-            logger.info(f"\n[1.5/8] 👤 Applying portrait-optimized face smoothing...")
-            logger.info("   This is KEY to smooth skin tones and fewer regions!")
+            logger.info(f"\n[1.5/8] 👤 Applying ULTRA/EXTREME portrait face smoothing...")
+            logger.info("   ULTRA QUALITY MODE: Maximum smoothing for paintable results!")
 
-            # Determine blur strength based on model
-            face_blur_kernel = 25 if model == 'portrait' else 31  # portrait_pro = stronger
+            # EXTREME blur strength for ULTRA quality (processing time: +30-60 seconds)
+            face_blur_kernel = 51 if model == 'portrait' else 71  # portrait_pro = EXTREME
+            logger.info(f"   Using {face_blur_kernel}px Gaussian blur for ultra-smooth skin")
 
             self.processed_image = self.image_processor.apply_portrait_smoothing(
                 self.processed_image,
                 face_blur_kernel=face_blur_kernel,
-                detection_margin=1.5
+                detection_margin=1.8  # Larger margin for more coverage
             )
 
         # Step 2: Intelligent Palette Selection & Color quantization
@@ -392,13 +393,14 @@ class PaintByNumbersGenerator:
         except Exception as e:
             logger.warning(f"   Background simplification failed: {e}, continuing...")
 
-        # Step 2.5: Portrait-specific region merging (for portrait models)
+        # Step 2.5: Portrait-specific ULTRA/EXTREME region merging (for portrait models)
         if is_portrait_model:
-            logger.info(f"\n[2.5/8] 🎨 Applying portrait-optimized region merging...")
-            logger.info("   This reduces 1000+ tiny regions to ~100 paintable regions!")
+            logger.info(f"\n[2.5/8] 🎨 Applying ULTRA/EXTREME portrait region merging...")
+            logger.info("   ULTRA QUALITY: Reduces 1000+ tiny regions to ~30-50 LARGE paintable regions!")
 
-            # Determine merge aggressiveness based on model
-            min_region_size = 500 if model == 'portrait' else 400  # portrait = larger regions
+            # ULTRA/EXTREME merge aggressiveness - VERY LARGE minimum regions
+            min_region_size = 1500 if model == 'portrait' else 2000  # EXTREME paintability
+            logger.info(f"   Minimum region size: {min_region_size} pixels (ULTRA quality mode)")
 
             self.quantized_image = self.image_processor.merge_small_regions(
                 self.quantized_image,
