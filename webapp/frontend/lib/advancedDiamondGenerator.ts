@@ -33,6 +33,9 @@ import {
   applySegmentedToneCurves,
   quantizeWithTargetPercentages,
   errorDiffusionWithMask,
+  maskAwareUnsharpMask,
+  enhanceEdgeDetail,
+  applyStochasticDither,
 } from './colorUtils'
 
 export interface AdvancedDiamondOptions {
@@ -84,6 +87,7 @@ export interface ProcessingDiagnostics {
   foregroundCoverage: number // % of canvas identified as subject (from segmentation)
   paletteUsageDeviation: number // Average deviation from target percentages
   colorsWithinTolerance: number // Number of colors within ±15% of target
+  foregroundPaletteCoverage: { [dmcCode: string]: number } // Per-color % in foreground only
 }
 
 export interface AdvancedDiamondResult {
@@ -278,14 +282,27 @@ export async function generateAdvancedDiamondPainting(
         const clipLimit = foregroundCoverage > 50 ? 2.5 : 2.0 // Adaptive based on subject size
         imageData = applyCLAHE(imageData, clipLimit, 8)
 
-        // Step 9: Apply segmented tone curves (brighten subject, desaturate background)
+        // Step 9: Apply segmented tone curves (stronger lift for subject, keep background light)
         console.log('Applying segmented tone curves...')
-        imageData = applySegmentedToneCurves(imageData, segmentationMask, 1.15, 0.7)
+        // Lift highlights and deepen shadows on foreground only
+        imageData = applySegmentedToneCurves(imageData, segmentationMask, 1.25, 0.6)
+
+        // Step 9b: Apply mask-aware sharpening (only sharpens foreground faces)
+        console.log('Applying mask-aware sharpening...')
+        imageData = maskAwareUnsharpMask(imageData, segmentationMask, 1.2, 2, 5)
+
+        // Step 9c: Enhance edge detail at high-gradient pixels
+        console.log('Enhancing edge detail...')
+        imageData = enhanceEdgeDetail(imageData, edgeMask, 85, 0.4)
 
         // Step 10: Force background to lightest color in palette
         console.log('Separating background...')
         const lightestColor = findLightestColor(palette)
         forceBackgroundColor(imageData, bgColor, lightestColor)
+
+        // Step 10b: Apply stochastic dither to prevent banding in flat regions
+        console.log('Applying stochastic dither...')
+        imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
 
         // Step 11: Histogram-aware quantization with target percentages
         console.log('Quantizing with histogram balancing...')
@@ -295,7 +312,8 @@ export async function generateAdvancedDiamondPainting(
           palette,
           targetPercentages,
           segmentationMask,
-          15 // ±15% tolerance
+          15, // ±15% tolerance
+          5   // Under-use penalty (favors under-used colors)
         )
 
         // Step 12: Blend edges back for crisp details
@@ -362,6 +380,30 @@ export async function generateAdvancedDiamondPainting(
 
         const averageDeviation = totalDeviation / beadCounts.length
 
+        // Calculate foreground palette coverage (per-color usage in foreground only)
+        const foregroundPaletteCoverage: { [dmcCode: string]: number } = {}
+        const foregroundColorCounts: { [dmcCode: string]: number } = {}
+        let totalForegroundPixels = 0
+
+        for (let y = 0; y < gridHeight; y++) {
+          for (let x = 0; x < gridWidth; x++) {
+            const idx = y * gridWidth + x
+            // Only count foreground pixels
+            if (segmentationMask[idx] > 127) {
+              totalForegroundPixels++
+              const cell = gridData.cells[y][x]
+              const code = cell.dmcCode
+              foregroundColorCounts[code] = (foregroundColorCounts[code] || 0) + 1
+            }
+          }
+        }
+
+        // Convert counts to percentages
+        for (const code in foregroundColorCounts) {
+          foregroundPaletteCoverage[code] =
+            Math.round((foregroundColorCounts[code] / totalForegroundPixels) * 1000) / 10
+        }
+
         const diagnostics: ProcessingDiagnostics = {
           isolatedCellsRemoved: stats.isolated,
           smallClustersRemoved: stats.smallClusters,
@@ -372,6 +414,7 @@ export async function generateAdvancedDiamondPainting(
           foregroundCoverage: Math.round(foregroundCoverage * 10) / 10,
           paletteUsageDeviation: Math.round(averageDeviation * 10) / 10,
           colorsWithinTolerance,
+          foregroundPaletteCoverage,
         }
 
         // Step 16: Generate high-res preview

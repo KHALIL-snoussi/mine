@@ -909,13 +909,16 @@ export function applySegmentedToneCurves(
 
 /**
  * Histogram-aware quantization with target percentage enforcement
+ * Supports both over-use penalties (push away from saturated colors)
+ * and under-use bonuses (favor colors below target to prevent collapse)
  */
 export function quantizeWithTargetPercentages(
   imageData: ImageData,
   palette: RGB[],
   targetPercentages: number[],
   mask: Uint8Array,
-  tolerance: number = 15
+  tolerance: number = 15,
+  underUsePenalty: number = 5 // Negative penalty (bonus) for under-used colors
 ): ImageData {
   const { width, height, data } = imageData
   const output = new Uint8ClampedArray(data)
@@ -948,11 +951,19 @@ export function quantizeWithTargetPercentages(
         // Calculate Delta E
         const deltaE = deltaE2000(pixelLab, paletteLab[p])
 
-        // Calculate penalty if over target
-        const targetCount = (targetPercentages[p] / 100) * totalPixels
+        // Calculate penalty/bonus based on target deviation
         const currentPercent = (currentCounts[p] / totalPixels) * 100
-        const overTarget = Math.max(0, currentPercent - targetPercentages[p])
-        const penalty = overTarget > tolerance ? overTarget * 10 : 0
+        const deviation = currentPercent - targetPercentages[p]
+
+        let penalty = 0
+        if (deviation > tolerance) {
+          // Over target: strong penalty to push pixels away
+          penalty = deviation * 10
+        } else if (deviation < -tolerance) {
+          // Under target: negative penalty (bonus) to favor this color
+          // This prevents midtones from collapsing to a single color
+          penalty = deviation * underUsePenalty // Will be negative, reducing score
+        }
 
         const score = deltaE + penalty
 
@@ -980,6 +991,168 @@ export function quantizeWithTargetPercentages(
     output[idx] = color.r
     output[idx + 1] = color.g
     output[idx + 2] = color.b
+  }
+
+  return new ImageData(output, width, height)
+}
+
+/**
+ * Apply stochastic dither to flat regions (prevents banding in cheeks, sky)
+ * Adds tiny random LAB variation only where gradients are low
+ */
+export function applyStochasticDither(
+  imageData: ImageData,
+  edgeMask: Uint8Array,
+  ditherAmount: number = 3,
+  edgeThreshold: number = 30
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  for (let i = 0; i < edgeMask.length; i++) {
+    // Skip edges (high gradient areas)
+    if (edgeMask[i] > edgeThreshold) continue
+
+    const idx = i * 4
+    const rgb = { r: data[idx], g: data[idx + 1], b: data[idx + 2] }
+    const lab = rgbToLab(rgb)
+
+    // Add small random offset in LAB space
+    const randomOffset = () => (Math.random() - 0.5) * ditherAmount * 2
+    lab.l = Math.max(0, Math.min(100, lab.l + randomOffset()))
+    lab.a = lab.a + randomOffset()
+    lab.b = lab.b + randomOffset()
+
+    const dithered = labToRgb(lab)
+    output[idx] = Math.max(0, Math.min(255, dithered.r))
+    output[idx + 1] = Math.max(0, Math.min(255, dithered.g))
+    output[idx + 2] = Math.max(0, Math.min(255, dithered.b))
+    output[idx + 3] = 255
+  }
+
+  return new ImageData(output, width, height)
+}
+
+/**
+ * Mask-aware unsharp mask (only sharpens foreground to preserve face detail)
+ */
+export function maskAwareUnsharpMask(
+  imageData: ImageData,
+  segmentationMask: Uint8Array,
+  amount: number = 1.0,
+  radius: number = 1,
+  threshold: number = 0
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  // Create blurred version using simple box blur
+  const blurred = new Uint8ClampedArray(data)
+  const kernelSize = Math.floor(radius) * 2 + 1
+  const halfKernel = Math.floor(kernelSize / 2)
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const pixelIdx = y * width + x
+
+      // Only sharpen foreground pixels
+      if (segmentationMask[pixelIdx] < 127) {
+        continue
+      }
+
+      const idx = pixelIdx * 4
+
+      let rSum = 0, gSum = 0, bSum = 0, count = 0
+
+      for (let ky = -halfKernel; ky <= halfKernel; ky++) {
+        for (let kx = -halfKernel; kx <= halfKernel; kx++) {
+          const ny = Math.min(Math.max(y + ky, 0), height - 1)
+          const nx = Math.min(Math.max(x + kx, 0), width - 1)
+          const nIdx = (ny * width + nx) * 4
+
+          rSum += data[nIdx]
+          gSum += data[nIdx + 1]
+          bSum += data[nIdx + 2]
+          count++
+        }
+      }
+
+      blurred[idx] = rSum / count
+      blurred[idx + 1] = gSum / count
+      blurred[idx + 2] = bSum / count
+    }
+  }
+
+  // Apply unsharp mask
+  for (let i = 0; i < data.length; i += 4) {
+    const pixelIdx = Math.floor(i / 4)
+
+    // Only sharpen foreground
+    if (segmentationMask[pixelIdx] < 127) {
+      output[i] = data[i]
+      output[i + 1] = data[i + 1]
+      output[i + 2] = data[i + 2]
+      output[i + 3] = 255
+      continue
+    }
+
+    for (let c = 0; c < 3; c++) {
+      const original = data[i + c]
+      const blur = blurred[i + c]
+      const diff = original - blur
+
+      if (Math.abs(diff) > threshold) {
+        output[i + c] = Math.max(0, Math.min(255, original + diff * amount))
+      } else {
+        output[i + c] = original
+      }
+    }
+    output[i + 3] = 255
+  }
+
+  return new ImageData(output, width, height)
+}
+
+/**
+ * Blend thin dark outline back at strong edges (enhances jawline, eyes, seams)
+ */
+export function enhanceEdgeDetail(
+  imageData: ImageData,
+  edgeMask: Uint8Array,
+  percentile: number = 85,
+  blendStrength: number = 0.4
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  // Calculate percentile threshold
+  const sortedEdges = Array.from(edgeMask).sort((a, b) => a - b)
+  const thresholdIdx = Math.floor((percentile / 100) * sortedEdges.length)
+  const edgeThreshold = sortedEdges[thresholdIdx]
+
+  for (let i = 0; i < edgeMask.length; i++) {
+    const idx = i * 4
+
+    if (edgeMask[i] > edgeThreshold) {
+      // Strong edge: darken slightly in LAB space
+      const rgb = { r: data[idx], g: data[idx + 1], b: data[idx + 2] }
+      const lab = rgbToLab(rgb)
+
+      // Darken L channel and increase saturation slightly
+      lab.l = Math.max(0, lab.l - 10 * blendStrength)
+      lab.a *= (1 + 0.2 * blendStrength)
+      lab.b *= (1 + 0.2 * blendStrength)
+
+      const enhanced = labToRgb(lab)
+      output[idx] = Math.max(0, Math.min(255, enhanced.r))
+      output[idx + 1] = Math.max(0, Math.min(255, enhanced.g))
+      output[idx + 2] = Math.max(0, Math.min(255, enhanced.b))
+    } else {
+      output[idx] = data[idx]
+      output[idx + 1] = data[idx + 1]
+      output[idx + 2] = data[idx + 2]
+    }
+    output[idx + 3] = 255
   }
 
   return new ImageData(output, width, height)
