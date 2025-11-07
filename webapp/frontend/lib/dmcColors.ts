@@ -40,9 +40,7 @@ export const DMC_COLORS: DMCColor[] = [
   { code: '817', name: 'Very Dark Coral Red', rgb: [187, 0, 0], hex: '#BB0000', category: 'Red' },
   { code: '815', name: 'Medium Garnet', rgb: [131, 0, 0], hex: '#830000', category: 'Red' },
   { code: '902', name: 'Very Dark Garnet', rgb: [115, 0, 38], hex: '#730026', category: 'Red' },
-  { code: '3
-
-, name: 'Medium Dusty Rose', rgb: [204, 102, 119], hex: '#CC6677', category: 'Pink' },
+  { code: '3350', name: 'Medium Dusty Rose', rgb: [204, 102, 119], hex: '#CC6677', category: 'Pink' },
   { code: '3687', name: 'Mauve', rgb: [188, 89, 102], hex: '#BC5966', category: 'Pink' },
 
   // Pinks

@@ -54,6 +54,7 @@ webapp/frontend/.next/
 webapp/frontend/out/
 webapp/frontend/build/
 *.tsbuildinfo
+next-env.d.ts
 
 # Environment files (may contain secrets)
 .env
