@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import DiamondCropSelector from '@/components/DiamondCropSelector'
 import { generateDiamondPainting, DiamondPaintingResult, DiamondPaintingOptions } from '@/lib/diamondPaintingGenerator'
 import { downloadMaterialsList, printMaterialsList } from '@/lib/diamondPaintingPDF'
-import { getAllStylePacks, detectStylePack, StylePack } from '@/lib/diamondStylePacks'
+import { getAllStylePacks } from '@/lib/diamondStylePacks'
 
 function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
@@ -27,10 +27,9 @@ export default function DiamondPaintingPage() {
   const [generationProgress, setGenerationProgress] = useState(0)
   const [result, setResult] = useState<DiamondPaintingResult | null>(null)
 
-  // Diamond painting options - Qbrix style (simplified)
+  // Diamond painting options - Qbrix style (manual selection)
   const [canvasFormat, setCanvasFormat] = useState<'a4_portrait' | 'a4_landscape' | 'a4_square'>('a4_square')
-  const [detectedStylePack, setDetectedStylePack] = useState<StylePack | null>(null)
-  const [isDetecting, setIsDetecting] = useState(false)
+  const [selectedStylePack, setSelectedStylePack] = useState<string>('a4_original') // Manual style selection
 
   const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
     console.log('Drop triggered - Accepted:', acceptedFiles, 'Rejected:', rejectedFiles)
@@ -87,18 +86,6 @@ export default function DiamondPaintingPage() {
     setCroppedImage(croppedImageUrl)
     setPreview(croppedImageUrl)
     setShowCropSelector(false)
-
-    // Auto-detect style pack from cropped image
-    setIsDetecting(true)
-    try {
-      const stylePack = await detectStylePack(croppedImageUrl)
-      setDetectedStylePack(stylePack)
-      console.log('Auto-detected style pack:', stylePack.name)
-    } catch (error) {
-      console.error('Style detection error:', error)
-    } finally {
-      setIsDetecting(false)
-    }
   }
 
   // Handle crop cancel
@@ -125,7 +112,7 @@ export default function DiamondPaintingPage() {
     try {
       const options: DiamondPaintingOptions = {
         canvasFormat,
-        stylePack: detectedStylePack?.id || 'a4_original',
+        stylePack: selectedStylePack,
       }
 
       const diamondResult = await generateDiamondPainting(imageToProcess, options)
@@ -316,45 +303,37 @@ export default function DiamondPaintingPage() {
                       <p className="text-xs text-slate-500 mt-2">All formats: ~10,000 diamonds for optimal quality</p>
                     </div>
 
-                    {/* Auto-detected Style Pack */}
-                    {isDetecting && (
-                      <div className="rounded-lg border-2 border-primary-200 bg-primary-50/50 p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-600 border-t-transparent"></div>
-                          <p className="text-sm font-medium text-primary-800">Analyzing image style...</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {detectedStylePack && !isDetecting && (
-                      <div className="rounded-lg border-2 border-primary-300 bg-gradient-to-br from-primary-50 to-secondary-50 p-6">
-                        <div className="flex items-start gap-3">
-                          <span className="text-3xl">✨</span>
-                          <div className="flex-1">
-                            <h3 className="text-lg font-bold text-slate-900 mb-1">Style Pack: {detectedStylePack.name}</h3>
-                            <p className="text-sm text-slate-600 mb-3">{detectedStylePack.description}</p>
-                            <div className="flex flex-wrap gap-2">
-                              {detectedStylePack.colors.slice(0, 12).map((color) => (
+                    {/* Style Pack Selection - Manual */}
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-900 mb-3">Choose Style</label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {getAllStylePacks().map((pack) => (
+                          <button
+                            key={pack.id}
+                            onClick={() => setSelectedStylePack(pack.id)}
+                            className={`rounded-lg border-2 p-4 text-left transition-all ${
+                              selectedStylePack === pack.id
+                                ? 'border-primary-500 bg-primary-50'
+                                : 'border-slate-200 hover:border-primary-200'
+                            }`}
+                          >
+                            <div className="font-semibold text-slate-900 mb-2">{pack.name}</div>
+                            <div className="text-xs text-slate-600 mb-3 line-clamp-2">{pack.description}</div>
+                            <div className="flex flex-wrap gap-1">
+                              {pack.colors.map((color) => (
                                 <div
                                   key={color.code}
-                                  className="w-7 h-7 rounded border-2 border-white shadow-sm"
+                                  className="w-5 h-5 rounded border border-slate-300"
                                   style={{ backgroundColor: color.hex }}
                                   title={`DMC ${color.code}: ${color.name}`}
                                 />
                               ))}
-                              {detectedStylePack.colors.length > 12 && (
-                                <div className="w-7 h-7 rounded border-2 border-slate-200 bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
-                                  +{detectedStylePack.colors.length - 12}
-                                </div>
-                              )}
                             </div>
-                            <p className="text-xs text-slate-500 mt-2">
-                              {detectedStylePack.colors.length} colors · Auto-detected from your image
-                            </p>
-                          </div>
-                        </div>
+                            <p className="text-xs text-slate-500 mt-2">{pack.colors.length} colors</p>
+                          </button>
+                        ))}
                       </div>
-                    )}
+                    </div>
 
                     {/* Generate Button */}
                     <div className="pt-4">

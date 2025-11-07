@@ -107,7 +107,10 @@ export async function generateDiamondPainting(
         const imageData = ctx.getImageData(0, 0, gridWidth, gridHeight)
         const data = imageData.data
 
-        // Use fixed palette from style pack (20-30 colors)
+        // Apply style-specific preprocessing
+        applyStyleProcessing(data, stylePackId)
+
+        // Use fixed palette from style pack (7 colors)
         const dmcPalette = stylePack.colors
 
         // Map image pixels directly to fixed DMC palette
@@ -339,6 +342,72 @@ function calculateDifficulty(
   if (complexity < 250) return 'Medium'
   if (complexity < 400) return 'Hard'
   return 'Expert'
+}
+
+/**
+ * Apply style-specific image processing (QBRIX-style)
+ * Modifies pixel data in-place based on the selected style
+ */
+function applyStyleProcessing(data: Uint8ClampedArray, styleId: string): void {
+  if (styleId === 'a4_vintage') {
+    // VINTAGE: Muted, warm sepia tones, soft contrast
+    for (let i = 0; i < data.length; i += 4) {
+      let r = data[i]
+      let g = data[i + 1]
+      let b = data[i + 2]
+
+      // Desaturate (70% saturation)
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b
+      r = gray + (r - gray) * 0.7
+      g = gray + (g - gray) * 0.7
+      b = gray + (b - gray) * 0.7
+
+      // Warm sepia shift (add yellow/red tint)
+      r = Math.min(255, r * 1.1 + 25)
+      g = Math.min(255, g * 1.05 + 15)
+      b = Math.max(0, b * 0.9 - 10)
+
+      // Reduce contrast (softer)
+      const midpoint = 128
+      r = midpoint + (r - midpoint) * 0.8
+      g = midpoint + (g - midpoint) * 0.8
+      b = midpoint + (b - midpoint) * 0.8
+
+      data[i] = Math.round(Math.max(0, Math.min(255, r)))
+      data[i + 1] = Math.round(Math.max(0, Math.min(255, g)))
+      data[i + 2] = Math.round(Math.max(0, Math.min(255, b)))
+    }
+  } else if (styleId === 'a4_pop_art') {
+    // POP ART: High saturation, high contrast, posterized
+    for (let i = 0; i < data.length; i += 4) {
+      let r = data[i]
+      let g = data[i + 1]
+      let b = data[i + 2]
+
+      // Boost saturation (+50%)
+      const gray = 0.299 * r + 0.587 * g + 0.114 * b
+      r = gray + (r - gray) * 1.5
+      g = gray + (g - gray) * 1.5
+      b = gray + (b - gray) * 1.5
+
+      // Increase contrast
+      const midpoint = 128
+      r = midpoint + (r - midpoint) * 1.3
+      g = midpoint + (g - midpoint) * 1.3
+      b = midpoint + (b - midpoint) * 1.3
+
+      // Posterize (reduce to fewer levels for flat color blocks)
+      const levels = 4 // Number of levels per channel
+      r = Math.round(r / 255 * (levels - 1)) * (255 / (levels - 1))
+      g = Math.round(g / 255 * (levels - 1)) * (255 / (levels - 1))
+      b = Math.round(b / 255 * (levels - 1)) * (255 / (levels - 1))
+
+      data[i] = Math.round(Math.max(0, Math.min(255, r)))
+      data[i + 1] = Math.round(Math.max(0, Math.min(255, g)))
+      data[i + 2] = Math.round(Math.max(0, Math.min(255, b)))
+    }
+  }
+  // ORIGINAL: No preprocessing - photo-faithful, balanced
 }
 
 /**
