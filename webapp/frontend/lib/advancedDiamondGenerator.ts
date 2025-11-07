@@ -301,7 +301,8 @@ export async function generateAdvancedDiamondPainting(
           targetPercentages,
           segmentationMask,
           15, // ±15% tolerance
-          5   // Under-use penalty (favors under-used colors)
+          5,  // Under-use penalty (favors under-used colors)
+          stylePack.minColorPercent // Floor: no color drops below this %
         )
 
         // Step 14: Force background to lightest color (AFTER quantization)
