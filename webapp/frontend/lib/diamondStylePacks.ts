@@ -46,7 +46,7 @@ export const A4_ORIGINAL_PACK: StylePack = {
   ],
   foregroundTarget: 45,
   backgroundTarget: 55,
-  minColorPercent: 5, // All 7 colors must appear with at least 5%
+  minColorPercent: 1, // Gentle floor - only require 1% minimum (was 5%)
   contrastBoost: 1.0, // Neutral - no boost
   saturationBias: 0.0, // Neutral - preserve natural colors
 }
@@ -70,7 +70,7 @@ export const A4_VINTAGE_PACK: StylePack = {
   ],
   foregroundTarget: 42,
   backgroundTarget: 58,
-  minColorPercent: 4, // Softer floor - warm browns can overlap
+  minColorPercent: 1, // Gentle floor - only require 1% minimum (was 4%)
   contrastBoost: 0.85, // Softer contrast for vintage feel
   saturationBias: -0.15, // Slight desaturation for aged look
 }
@@ -94,7 +94,7 @@ export const A4_POP_ART_PACK: StylePack = {
   ],
   foregroundTarget: 50,
   backgroundTarget: 50,
-  minColorPercent: 7, // ALL colors must be visible (comic style)
+  minColorPercent: 1, // Gentle floor - only require 1% minimum (was 7%)
   contrastBoost: 1.6, // High contrast for punchy pop-art look
   saturationBias: 0.4, // Strong saturation boost
 }

@@ -958,14 +958,14 @@ export function quantizeWithTargetPercentages(
 
         let penalty = 0
 
-        // FLOOR ENFORCEMENT: If color is below minColorPercent, apply MASSIVE bonus
+        // FLOOR ENFORCEMENT: If color is below minColorPercent, apply GENTLE bonus
         if (currentPercent < minColorPercent) {
-          // Huge bonus (negative penalty) to ensure it reaches the floor
-          penalty = (minColorPercent - currentPercent) * -50
+          // Gentle bonus (negative penalty) - 10x gentler to prevent forcing unwanted colors
+          penalty = (minColorPercent - currentPercent) * -5
         } else if (deviation > tolerance) {
-          // Over target: STRONG penalty to push pixels away
-          // Increased from 10 to 25 for more aggressive balancing
-          penalty = deviation * 25
+          // Over target: Moderate penalty to push pixels away
+          // Reduced from 25 to 10 for gentler balancing (was too aggressive)
+          penalty = deviation * 10
         } else if (deviation < -tolerance) {
           // Under target: negative penalty (bonus) to favor this color
           // This prevents midtones from collapsing to a single color

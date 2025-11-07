@@ -286,11 +286,19 @@ export async function generateAdvancedDiamondPainting(
 
         // Step 11: Enhance edge detail at high-gradient pixels
         console.log('Step 11: Enhancing edge detail...')
-        imageData = enhanceEdgeDetail(imageData, edgeMask, 85, 0.4)
+        // Reduced threshold (85→70) and increased blend (0.4→0.6) for better edge preservation
+        imageData = enhanceEdgeDetail(imageData, edgeMask, 70, 0.6)
 
-        // Step 12: Apply stochastic dither to prevent banding in flat regions
-        console.log('Step 12: Applying stochastic dither...')
-        imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
+        // Step 12: Apply stochastic dither to prevent banding (conditional for portraits)
+        console.log('Step 12: Checking if dithering needed...')
+        // Only apply dithering if foregroundCoverage < 40% (landscape/object images)
+        // For portraits (>40% foreground), skip dithering to prevent grainy skin texture
+        if (foregroundCoverage < 40) {
+          console.log('  → Applying stochastic dither (non-portrait image)...')
+          imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
+        } else {
+          console.log(`  → Skipping dithering (portrait detected: ${foregroundCoverage.toFixed(1)}% foreground)`)
+        }
 
         // Step 13: Histogram-aware quantization with target percentages
         console.log('Step 13: Quantizing with histogram balancing...')
