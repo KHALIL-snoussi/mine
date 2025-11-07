@@ -28,6 +28,11 @@ import {
   majorityFilter,
   detectBackgroundColor,
   blendEdges,
+  kMeansSegmentation,
+  applyCLAHE,
+  applySegmentedToneCurves,
+  quantizeWithTargetPercentages,
+  errorDiffusionWithMask,
 } from './colorUtils'
 
 export interface AdvancedDiamondOptions {
@@ -76,6 +81,9 @@ export interface ProcessingDiagnostics {
   backgroundDMCCode: string // DMC code used for background
   edgePixelCount: number // Number of edge pixels preserved
   averageClusterSize: number // Average size of color clusters
+  foregroundCoverage: number // % of canvas identified as subject (from segmentation)
+  paletteUsageDeviation: number // Average deviation from target percentages
+  colorsWithinTolerance: number // Number of colors within ±15% of target
 }
 
 export interface AdvancedDiamondResult {
@@ -254,20 +262,43 @@ export async function generateAdvancedDiamondPainting(
           edgeMask[i] = downsampledEdgeMask.data[i * 4]
         }
 
-        // Step 7: Force background to lightest color in palette
+        // Step 7: Generate foreground/background segmentation mask
+        console.log('Generating segmentation mask...')
+        const segmentationMask = kMeansSegmentation(imageData, 2)
+
+        // Calculate foreground coverage
+        let foregroundPixels = 0
+        for (let i = 0; i < segmentationMask.length; i++) {
+          if (segmentationMask[i] > 127) foregroundPixels++
+        }
+        const foregroundCoverage = (foregroundPixels / segmentationMask.length) * 100
+
+        // Step 8: Apply CLAHE to foreground regions for midtone recovery
+        console.log('Applying CLAHE for local contrast...')
+        const clipLimit = foregroundCoverage > 50 ? 2.5 : 2.0 // Adaptive based on subject size
+        imageData = applyCLAHE(imageData, clipLimit, 8)
+
+        // Step 9: Apply segmented tone curves (brighten subject, desaturate background)
+        console.log('Applying segmented tone curves...')
+        imageData = applySegmentedToneCurves(imageData, segmentationMask, 1.15, 0.7)
+
+        // Step 10: Force background to lightest color in palette
         console.log('Separating background...')
         const lightestColor = findLightestColor(palette)
         forceBackgroundColor(imageData, bgColor, lightestColor)
 
-        // Step 8: LAB-based quantization with error diffusion
-        console.log('Quantizing to 7-color palette...')
-        let quantized = quantizeWithErrorDiffusion(
+        // Step 11: Histogram-aware quantization with target percentages
+        console.log('Quantizing with histogram balancing...')
+        const targetPercentages = stylePack.colors.map(c => c.targetPercentage)
+        let quantized = quantizeWithTargetPercentages(
           imageData,
           palette,
-          quality.ditheringStrength || 0.5
+          targetPercentages,
+          segmentationMask,
+          15 // ±15% tolerance
         )
 
-        // Step 9: Blend edges back for crisp details
+        // Step 12: Blend edges back for crisp details
         console.log('Blending edges for detail...')
         const downsampledOriginal = lanczosResample(originalData, gridWidth, gridHeight, 3)
         quantized = blendEdges(quantized, downsampledOriginal, edgeMask, 0.3)
@@ -318,6 +349,19 @@ export async function generateAdvancedDiamondPainting(
           if (edgeMask[i] > 30) edgePixelCount++
         }
 
+        // Calculate palette usage deviation from targets
+        let totalDeviation = 0
+        let colorsWithinTolerance = 0
+        const tolerance = 15 // ±15%
+
+        beadCounts.forEach((bead) => {
+          const deviation = Math.abs(bead.percentage - bead.dmcColor.targetPercentage)
+          totalDeviation += deviation
+          if (deviation <= tolerance) colorsWithinTolerance++
+        })
+
+        const averageDeviation = totalDeviation / beadCounts.length
+
         const diagnostics: ProcessingDiagnostics = {
           isolatedCellsRemoved: stats.isolated,
           smallClustersRemoved: stats.smallClusters,
@@ -325,6 +369,9 @@ export async function generateAdvancedDiamondPainting(
           backgroundDMCCode: backgroundDMC.code,
           edgePixelCount,
           averageClusterSize: Math.round(clusterStats.avgSize * 10) / 10,
+          foregroundCoverage: Math.round(foregroundCoverage * 10) / 10,
+          paletteUsageDeviation: Math.round(averageDeviation * 10) / 10,
+          colorsWithinTolerance,
         }
 
         // Step 16: Generate high-res preview
