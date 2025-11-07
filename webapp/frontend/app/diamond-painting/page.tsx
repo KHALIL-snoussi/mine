@@ -596,26 +596,6 @@ export default function DiamondPaintingPage() {
                     </div>
                   </div>
 
-                  {/* Old color legend - keeping only the container for reference */}
-                  <div className="hidden">
-                    <div className="flex-1">
-                              <div className="font-semibold text-slate-900">DMC {color.dmcColor.code}</div>
-                              <div className="text-xs text-slate-500">{color.dmcColor.name}</div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-bold text-slate-900">{color.count}</div>
-                              <div className="text-xs text-slate-500">{color.percentage.toFixed(1)}%</div>
-                            </div>
-                          </div>
-                        ))}
-                        {result.colorsUsed.length > 10 && (
-                          <div className="text-center text-sm text-slate-500 py-2">
-                            + {result.colorsUsed.length - 10} more colors (see materials list)
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
