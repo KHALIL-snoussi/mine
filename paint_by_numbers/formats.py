@@ -393,3 +393,73 @@ def get_format_comparison() -> dict:
             'square': ['square_medium', 'square_large'],
         }
     }
+
+
+@dataclass
+class GridSpec:
+    """Grid specification for region snapping and tile-based instructions"""
+    tile_rows: int  # Number of tile rows (e.g., 4)
+    tile_cols: int  # Number of tile columns (e.g., 4)
+    total_tiles: int  # Total tiles (tile_rows × tile_cols)
+    target_regions: int  # Target number of paintable regions
+    regions_per_tile: int  # Approximate regions per tile
+
+    def get_tile_index(self, row: int, col: int) -> int:
+        """Get linear tile index from row/col (1-based)"""
+        return (row - 1) * self.tile_cols + col
+
+
+def calculate_grid_spec(
+    paper_format: PaperFormat,
+    target_regions: int = 10000,
+    tile_rows: int = 4,
+    tile_cols: int = 4
+) -> GridSpec:
+    """
+    Calculate optimal grid specification for a paper format.
+    Used for tile-based instruction booklets similar to QBRIX diamond paintings.
+
+    Args:
+        paper_format: Paper format to use
+        target_regions: Target number of paintable regions (~10k for A4)
+        tile_rows: Number of tile rows for instructions (default 4)
+        tile_cols: Number of tile columns for instructions (default 4)
+
+    Returns:
+        GridSpec with tile layout information
+    """
+    total_tiles = tile_rows * tile_cols
+    regions_per_tile = target_regions // total_tiles
+
+    return GridSpec(
+        tile_rows=tile_rows,
+        tile_cols=tile_cols,
+        total_tiles=total_tiles,
+        target_regions=target_regions,
+        regions_per_tile=regions_per_tile
+    )
+
+
+def get_default_grid_spec(format_name: str) -> GridSpec:
+    """
+    Get default grid specification for a format.
+
+    Args:
+        format_name: Format name (e.g., 'a4', 'a3')
+
+    Returns:
+        GridSpec with sensible defaults
+    """
+    paper_format = FormatRegistry.get_format(format_name)
+
+    # A4 formats: 4×4 tiles, ~10k regions
+    if format_name in ['a4', 'a4_landscape', 'square_medium']:
+        return calculate_grid_spec(paper_format, target_regions=10000, tile_rows=4, tile_cols=4)
+
+    # A3 formats: 5×5 tiles, ~20k regions (more detail for larger canvas)
+    elif format_name in ['a3', 'a3_landscape', 'square_large']:
+        return calculate_grid_spec(paper_format, target_regions=20000, tile_rows=5, tile_cols=5)
+
+    # Default fallback
+    else:
+        return calculate_grid_spec(paper_format, target_regions=10000, tile_rows=4, tile_cols=4)

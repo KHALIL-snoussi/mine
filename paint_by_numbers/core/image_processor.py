@@ -360,6 +360,52 @@ class ImageProcessor:
 
         return edges
 
+    def apply_majority_filter(self, image: np.ndarray,
+                             edge_mask: Optional[np.ndarray] = None,
+                             edge_threshold: int = 30) -> np.ndarray:
+        """
+        Apply 3×3 majority filter to remove single-pixel noise.
+        Only affects non-edge pixels to preserve important details.
+
+        Args:
+            image: Input quantized image
+            edge_mask: Optional edge strength map (0-255)
+            edge_threshold: Threshold above which pixels are considered edges
+
+        Returns:
+            Filtered image
+        """
+        cv2 = require_cv2()
+        h, w = image.shape[:2]
+
+        # Generate edge mask if not provided
+        if edge_mask is None:
+            gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            edge_mask = cv2.Canny(gray, 30, 100)
+
+        output = image.copy()
+
+        for y in range(1, h - 1):
+            for x in range(1, w - 1):
+                # Skip edge pixels
+                if edge_mask[y, x] > edge_threshold:
+                    continue
+
+                # Count color occurrences in 3×3 neighborhood
+                color_counts = {}
+
+                for ky in range(-1, 2):
+                    for kx in range(-1, 2):
+                        ny, nx = y + ky, x + kx
+                        color = tuple(image[ny, nx])
+                        color_counts[color] = color_counts.get(color, 0) + 1
+
+                # Find majority color
+                majority_color = max(color_counts.items(), key=lambda x: x[1])[0]
+                output[y, x] = majority_color
+
+        return output
+
     def get_image_info(self) -> dict:
         """
         Get information about the loaded image
