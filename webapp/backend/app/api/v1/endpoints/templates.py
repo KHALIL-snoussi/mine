@@ -191,7 +191,7 @@ async def generate_template_background(
 async def generate_template(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    palette_name: str = "classic_18",
+    palette_name: str = "realistic_natural",
     num_colors: Optional[int] = None,
     model: str = "original",
     paper_format: str = "a4",
@@ -214,7 +214,7 @@ async def generate_template(
 
     Args:
         file: Image file to convert
-        palette_name: Color palette to use
+        palette_name: Color palette to use (realistic_natural, vintage_warm, pop_art_bold, full_color_hd_38, etc.)
         num_colors: Number of colors (optional, model determines default)
         model: Processing model (original, vintage, pop_art, full_color_hd)
         paper_format: Paper format (a4, a3, square_medium, etc.)
@@ -238,11 +238,11 @@ async def generate_template(
             detail=f"Invalid file extension. Allowed extensions: {', '.join(allowed_extensions)}"
         )
 
-    # Validate num_colors range
-    if num_colors is not None and not (5 <= num_colors <= 30):
+    # Validate num_colors range (38 max for Full Color HD model)
+    if num_colors is not None and not (5 <= num_colors <= 38):
         raise HTTPException(
             status_code=400,
-            detail="num_colors must be between 5 and 30"
+            detail="num_colors must be between 5 and 38 (38 for Full Color HD model)"
         )
 
     # Validate palette exists
@@ -567,35 +567,35 @@ async def list_palettes():
 
 @router.get("/presets/list", response_model=List[DifficultyPreset])
 async def list_presets():
-    """Get list of difficulty presets"""
+    """Get list of style presets (maps to our 4 premium models)"""
     presets = [
         {
-            "name": "beginner",
-            "display_name": "Beginner",
-            "num_colors": 12,
-            "min_region_size": 200,
-            "description": "Large regions, fewer colors, perfect for first-timers"
+            "name": "original",
+            "display_name": "Original 40×50 cm",
+            "num_colors": 20,
+            "min_region_size": 80,
+            "description": "Natural photorealistic colors for portraits & photos"
         },
         {
-            "name": "intermediate",
-            "display_name": "Intermediate",
+            "name": "vintage",
+            "display_name": "Vintage 40×50 cm",
             "num_colors": 18,
-            "min_region_size": 100,
-            "description": "Balanced complexity for regular painters"
+            "min_region_size": 95,
+            "description": "Warm nostalgic tones with retro aesthetic"
         },
         {
-            "name": "advanced",
-            "display_name": "Advanced",
-            "num_colors": 24,
-            "min_region_size": 75,
-            "description": "More detail for experienced artists"
+            "name": "pop_art",
+            "display_name": "Pop-Art 40×50 cm",
+            "num_colors": 16,
+            "min_region_size": 110,
+            "description": "Bold vibrant colors for statement pieces"
         },
         {
-            "name": "professional",
-            "display_name": "Professional",
-            "num_colors": 24,
+            "name": "full_color_hd",
+            "display_name": "Full Color HD 40×50 cm",
+            "num_colors": 38,
             "min_region_size": 50,
-            "description": "Maximum detail and complexity"
+            "description": "QBRIX-quality maximum realism with 38 colors"
         }
     ]
     return presets
