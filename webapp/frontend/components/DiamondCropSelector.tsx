@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react'
 import { Button } from './ui/Button'
+import { kMeansSegmentation } from '@/lib/colorUtils'
 
 interface DiamondCropSelectorProps {
   imageUrl: string
@@ -30,6 +31,11 @@ export default function DiamondCropSelector({
     width: 0.7, // 70% width
     height: 0.7, // 70% height
   })
+
+  // Segmentation warnings
+  const [foregroundCoverage, setForegroundCoverage] = useState<number | null>(null)
+  const [croppedOutPercentage, setCroppedOutPercentage] = useState<number | null>(null)
+  const [optimalCrop, setOptimalCrop] = useState<typeof cropArea | null>(null)
 
   // Load image
   useEffect(() => {
@@ -142,6 +148,116 @@ export default function DiamondCropSelector({
     ctx.strokeText(dimText, cropX + cropW / 2, cropY - 15)
     ctx.fillText(dimText, cropX + cropW / 2, cropY - 15)
   }, [image, cropArea])
+
+  // Analyze segmentation and calculate warnings
+  useEffect(() => {
+    if (!image || !canvasRef.current) return
+
+    const analyzeSegmentation = async () => {
+      try {
+        // Create a temporary canvas to get full image data
+        const tempCanvas = document.createElement('canvas')
+        tempCanvas.width = image.width
+        tempCanvas.height = image.height
+        const tempCtx = tempCanvas.getContext('2d')
+        if (!tempCtx) return
+
+        tempCtx.drawImage(image, 0, 0)
+        const fullImageData = tempCtx.getImageData(0, 0, image.width, image.height)
+
+        // Run segmentation on full image
+        const mask = kMeansSegmentation(fullImageData, 2)
+
+        // Count total foreground pixels in full image
+        let totalForegroundPixels = 0
+        for (let i = 0; i < mask.length; i++) {
+          if (mask[i] > 127) totalForegroundPixels++
+        }
+
+        // Calculate which foreground pixels are in the crop area
+        const cropX = Math.floor(cropArea.x * image.width)
+        const cropY = Math.floor(cropArea.y * image.height)
+        const cropW = Math.floor(cropArea.width * image.width)
+        const cropH = Math.floor(cropArea.height * image.height)
+
+        let foregroundInCrop = 0
+        let totalPixelsInCrop = 0
+
+        for (let y = cropY; y < cropY + cropH && y < image.height; y++) {
+          for (let x = cropX; x < cropX + cropW && x < image.width; x++) {
+            const idx = y * image.width + x
+            totalPixelsInCrop++
+            if (mask[idx] > 127) foregroundInCrop++
+          }
+        }
+
+        // Calculate metrics
+        const fgCoverage = (foregroundInCrop / totalPixelsInCrop) * 100
+        const croppedOut = ((totalForegroundPixels - foregroundInCrop) / totalForegroundPixels) * 100
+
+        setForegroundCoverage(fgCoverage)
+        setCroppedOutPercentage(croppedOut)
+
+        // Find optimal crop by finding bounding box of foreground
+        let minX = image.width
+        let maxX = 0
+        let minY = image.height
+        let maxY = 0
+
+        for (let y = 0; y < image.height; y++) {
+          for (let x = 0; x < image.width; x++) {
+            const idx = y * image.width + x
+            if (mask[idx] > 127) {
+              minX = Math.min(minX, x)
+              maxX = Math.max(maxX, x)
+              minY = Math.min(minY, y)
+              maxY = Math.max(maxY, y)
+            }
+          }
+        }
+
+        // Add padding (10% on each side)
+        const padding = 0.1
+        const fgWidth = maxX - minX
+        const fgHeight = maxY - minY
+        minX = Math.max(0, minX - fgWidth * padding)
+        maxX = Math.min(image.width, maxX + fgWidth * padding)
+        minY = Math.max(0, minY - fgHeight * padding)
+        maxY = Math.min(image.height, maxY + fgHeight * padding)
+
+        // Calculate optimal crop maintaining aspect ratio
+        let optWidth = (maxX - minX) / image.width
+        let optHeight = (maxY - minY) / image.height
+
+        // Adjust to match aspect ratio
+        if (aspectRatio === 'square') {
+          const size = Math.max(optWidth, optHeight)
+          optWidth = size
+          optHeight = size
+        } else if (aspectRatio === 'portrait') {
+          optHeight = optWidth * 1.4
+        } else if (aspectRatio === 'landscape') {
+          optWidth = optHeight * 1.4
+        }
+
+        // Center on foreground
+        let optX = (minX / image.width) - (optWidth - (maxX - minX) / image.width) / 2
+        let optY = (minY / image.height) - (optHeight - (maxY - minY) / image.height) / 2
+
+        // Constrain to image bounds
+        optX = Math.max(0, Math.min(optX, 1 - optWidth))
+        optY = Math.max(0, Math.min(optY, 1 - optHeight))
+        optWidth = Math.min(optWidth, 1 - optX)
+        optHeight = Math.min(optHeight, 1 - optY)
+
+        setOptimalCrop({ x: optX, y: optY, width: optWidth, height: optHeight })
+      } catch (error) {
+        console.error('Segmentation analysis failed:', error)
+      }
+    }
+
+    analyzeSegmentation()
+  }, [image, cropArea, aspectRatio])
 
   // Mouse down handler
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -257,6 +373,13 @@ export default function DiamondCropSelector({
     setResizeHandle(null)
   }
 
+  // Auto-center on subject
+  const handleAutoCenter = () => {
+    if (optimalCrop) {
+      setCropArea(optimalCrop)
+    }
+  }
+
   // Crop and complete
   const handleCrop = () => {
     if (!image || !canvasRef.current) return
@@ -317,6 +440,68 @@ export default function DiamondCropSelector({
             className="rounded-lg shadow-lg"
           />
         </div>
+
+        {/* Segmentation Warnings */}
+        {foregroundCoverage !== null && croppedOutPercentage !== null && (
+          <div className="mt-4 space-y-2">
+            {/* Subject too small warning */}
+            {foregroundCoverage < 40 && (
+              <div className="rounded-lg bg-orange-50 border-2 border-orange-200 p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">⚠️</span>
+                  <div className="flex-1">
+                    <div className="font-semibold text-orange-900">Subject appears small in frame</div>
+                    <div className="text-sm text-orange-700 mt-1">
+                      Subject occupies only {foregroundCoverage.toFixed(1)}% of the crop area.
+                      Consider zooming in or using auto-center for better detail in your diamond painting.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Too much cropped out warning */}
+            {croppedOutPercentage > 30 && (
+              <div className="rounded-lg bg-yellow-50 border-2 border-yellow-200 p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">💡</span>
+                  <div className="flex-1">
+                    <div className="font-semibold text-yellow-900">Part of subject is cropped out</div>
+                    <div className="text-sm text-yellow-700 mt-1">
+                      {croppedOutPercentage.toFixed(1)}% of the detected subject is outside the crop area.
+                      Try auto-centering to include more of the subject.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Auto-center button */}
+            {optimalCrop && (foregroundCoverage < 40 || croppedOutPercentage > 30) && (
+              <button
+                onClick={handleAutoCenter}
+                className="w-full rounded-lg bg-indigo-500 text-white px-4 py-2.5 text-sm font-semibold hover:bg-indigo-600 transition-colors"
+              >
+                🎯 Auto-Center on Subject
+              </button>
+            )}
+
+            {/* Success state */}
+            {foregroundCoverage >= 40 && croppedOutPercentage <= 30 && (
+              <div className="rounded-lg bg-green-50 border-2 border-green-200 p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg">✓</span>
+                  <div className="flex-1">
+                    <div className="font-semibold text-green-900">Good crop composition</div>
+                    <div className="text-sm text-green-700 mt-1">
+                      Subject coverage: {foregroundCoverage.toFixed(1)}% • Cropped out: {croppedOutPercentage.toFixed(1)}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="mt-6 flex gap-3">
           <Button onClick={handleCrop} className="flex-1">
