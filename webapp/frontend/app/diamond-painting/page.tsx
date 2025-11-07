@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import DiamondCropSelector from '@/components/DiamondCropSelector'
 import { generateDiamondPainting, DiamondPaintingResult, DiamondPaintingOptions } from '@/lib/diamondPaintingGenerator'
 import { downloadMaterialsList, printMaterialsList } from '@/lib/diamondPaintingPDF'
-import { getDMCCategories } from '@/lib/dmcColors'
+import { getAllStylePacks, detectStylePack, StylePack } from '@/lib/diamondStylePacks'
 
 function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
@@ -27,11 +27,10 @@ export default function DiamondPaintingPage() {
   const [generationProgress, setGenerationProgress] = useState(0)
   const [result, setResult] = useState<DiamondPaintingResult | null>(null)
 
-  // Diamond painting options
-  const [canvasSize, setCanvasSize] = useState<'small' | 'medium' | 'large' | 'xlarge'>('medium')
-  const [quality, setQuality] = useState<'standard' | 'high' | 'ultra'>('high')
-  const [drillShape, setDrillShape] = useState<'square' | 'round'>('square')
-  const [maxColors, setMaxColors] = useState(40)
+  // Diamond painting options - Qbrix style (simplified)
+  const [canvasFormat, setCanvasFormat] = useState<'a4_portrait' | 'a4_landscape' | 'a4_square'>('a4_square')
+  const [detectedStylePack, setDetectedStylePack] = useState<StylePack | null>(null)
+  const [isDetecting, setIsDetecting] = useState(false)
 
   const onDrop = useCallback(async (acceptedFiles: File[], rejectedFiles: any[]) => {
     console.log('Drop triggered - Accepted:', acceptedFiles, 'Rejected:', rejectedFiles)
@@ -84,10 +83,22 @@ export default function DiamondPaintingPage() {
   })
 
   // Handle crop completion
-  const handleCropComplete = (croppedImageUrl: string) => {
+  const handleCropComplete = async (croppedImageUrl: string) => {
     setCroppedImage(croppedImageUrl)
     setPreview(croppedImageUrl)
     setShowCropSelector(false)
+
+    // Auto-detect style pack from cropped image
+    setIsDetecting(true)
+    try {
+      const stylePack = await detectStylePack(croppedImageUrl)
+      setDetectedStylePack(stylePack)
+      console.log('Auto-detected style pack:', stylePack.name)
+    } catch (error) {
+      console.error('Style detection error:', error)
+    } finally {
+      setIsDetecting(false)
+    }
   }
 
   // Handle crop cancel
@@ -113,10 +124,8 @@ export default function DiamondPaintingPage() {
 
     try {
       const options: DiamondPaintingOptions = {
-        canvasSize,
-        quality,
-        drillShape,
-        maxColors,
+        canvasFormat,
+        stylePack: detectedStylePack?.id || 'a4_original',
       }
 
       const diamondResult = await generateDiamondPainting(imageToProcess, options)
@@ -275,85 +284,77 @@ export default function DiamondPaintingPage() {
               {selectedFile && !result && !showCropSelector && preview && (
                 <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
                   <div className="border-b border-slate-200/70 p-8">
-                    <h2 className="text-2xl font-semibold text-slate-900">Step 2 · Customize settings</h2>
-                    <p className="mt-1 text-sm text-slate-500">Adjust these settings to match your preferences</p>
+                    <h2 className="text-2xl font-semibold text-slate-900">Step 2 · Select A4 Format</h2>
+                    <p className="mt-1 text-slate-500">Choose your canvas orientation - fixed professional format</p>
                   </div>
 
                   <div className="space-y-6 p-8">
-                    {/* Canvas Size */}
+                    {/* A4 Format Selection */}
                     <div>
-                      <label className="block text-sm font-semibold text-slate-900 mb-3">Canvas Size</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { value: 'small', label: 'Small', desc: '~60x60 diamonds' },
-                          { value: 'medium', label: 'Medium', desc: '~100x100 diamonds' },
-                          { value: 'large', label: 'Large', desc: '~150x150 diamonds' },
-                          { value: 'xlarge', label: 'X-Large', desc: '~200x200 diamonds' },
-                        ].map((size) => (
-                          <button
-                            key={size.value}
-                            onClick={() => setCanvasSize(size.value as any)}
-                            className={`rounded-lg border-2 p-4 text-left transition-all ${
-                              canvasSize === size.value
-                                ? 'border-primary-500 bg-primary-50'
-                                : 'border-slate-200 hover:border-primary-200'
-                            }`}
-                          >
-                            <div className="font-semibold text-slate-900">{size.label}</div>
-                            <div className="text-xs text-slate-500">{size.desc} diamonds</div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Quality */}
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-900 mb-3">Quality</label>
+                      <label className="block text-sm font-semibold text-slate-900 mb-3">A4 Canvas Format</label>
                       <div className="grid grid-cols-3 gap-3">
                         {[
-                          { value: 'standard', label: 'Standard', colors: '~35 colors' },
-                          { value: 'high', label: 'High', colors: '~45 colors' },
-                          { value: 'ultra', label: 'Ultra HD', colors: '~60 colors' },
-                        ].map((q) => (
+                          { value: 'a4_portrait', label: 'A4 Portrait', desc: '84 × 119 diamonds', size: '21 × 29.7 cm' },
+                          { value: 'a4_landscape', label: 'A4 Landscape', desc: '119 × 84 diamonds', size: '29.7 × 21 cm' },
+                          { value: 'a4_square', label: 'A4 Square', desc: '100 × 100 diamonds', size: '25 × 25 cm' },
+                        ].map((format) => (
                           <button
-                            key={q.value}
-                            onClick={() => setQuality(q.value as any)}
+                            key={format.value}
+                            onClick={() => setCanvasFormat(format.value as any)}
                             className={`rounded-lg border-2 p-4 text-center transition-all ${
-                              quality === q.value
+                              canvasFormat === format.value
                                 ? 'border-primary-500 bg-primary-50'
                                 : 'border-slate-200 hover:border-primary-200'
                             }`}
                           >
-                            <div className="font-semibold text-slate-900">{q.label}</div>
-                            <div className="text-xs text-slate-500">{q.colors}</div>
+                            <div className="font-semibold text-slate-900 mb-2">{format.label}</div>
+                            <div className="text-xs text-slate-600 mb-1">{format.desc}</div>
+                            <div className="text-xs text-slate-500">{format.size}</div>
                           </button>
                         ))}
                       </div>
+                      <p className="text-xs text-slate-500 mt-2">All formats: ~10,000 diamonds for optimal quality</p>
                     </div>
 
-                    {/* Drill Shape */}
-                    <div>
-                      <label className="block text-sm font-semibold text-slate-900 mb-3">Diamond Shape</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { value: 'square', label: 'Square', desc: 'More coverage' },
-                          { value: 'round', label: 'Round', desc: 'Classic sparkle' },
-                        ].map((shape) => (
-                          <button
-                            key={shape.value}
-                            onClick={() => setDrillShape(shape.value as any)}
-                            className={`rounded-lg border-2 p-4 text-left transition-all ${
-                              drillShape === shape.value
-                                ? 'border-primary-500 bg-primary-50'
-                                : 'border-slate-200 hover:border-primary-200'
-                            }`}
-                          >
-                            <div className="font-semibold text-slate-900">{shape.label}</div>
-                            <div className="text-xs text-slate-500">{shape.desc}</div>
-                          </button>
-                        ))}
+                    {/* Auto-detected Style Pack */}
+                    {isDetecting && (
+                      <div className="rounded-lg border-2 border-primary-200 bg-primary-50/50 p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-600 border-t-transparent"></div>
+                          <p className="text-sm font-medium text-primary-800">Analyzing image style...</p>
+                        </div>
                       </div>
-                    </div>
+                    )}
+
+                    {detectedStylePack && !isDetecting && (
+                      <div className="rounded-lg border-2 border-primary-300 bg-gradient-to-br from-primary-50 to-secondary-50 p-6">
+                        <div className="flex items-start gap-3">
+                          <span className="text-3xl">✨</span>
+                          <div className="flex-1">
+                            <h3 className="text-lg font-bold text-slate-900 mb-1">Style Pack: {detectedStylePack.name}</h3>
+                            <p className="text-sm text-slate-600 mb-3">{detectedStylePack.description}</p>
+                            <div className="flex flex-wrap gap-2">
+                              {detectedStylePack.colors.slice(0, 12).map((color) => (
+                                <div
+                                  key={color.code}
+                                  className="w-7 h-7 rounded border-2 border-white shadow-sm"
+                                  style={{ backgroundColor: color.hex }}
+                                  title={`DMC ${color.code}: ${color.name}`}
+                                />
+                              ))}
+                              {detectedStylePack.colors.length > 12 && (
+                                <div className="w-7 h-7 rounded border-2 border-slate-200 bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600">
+                                  +{detectedStylePack.colors.length - 12}
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-2">
+                              {detectedStylePack.colors.length} colors · Auto-detected from your image
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Generate Button */}
                     <div className="pt-4">
@@ -443,6 +444,14 @@ export default function DiamondPaintingPage() {
                   {/* Stats */}
                   <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70 p-8">
                     <h3 className="text-lg font-semibold text-slate-900 mb-4">Pattern Details</h3>
+
+                    {/* Style Pack Info */}
+                    <div className="mb-4 rounded-lg border-2 border-primary-200 bg-primary-50 p-4">
+                      <div className="text-xs text-primary-700 font-semibold uppercase mb-1">Style Pack</div>
+                      <div className="text-lg font-bold text-primary-900">{result.stylePack.name}</div>
+                      <div className="text-xs text-primary-600 mt-1">{result.stylePack.description}</div>
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="rounded-lg bg-slate-50 p-4 border-2 border-slate-200">
                         <div className="text-xs text-slate-500 font-semibold uppercase">Dimensions</div>
