@@ -1,17 +1,14 @@
 /**
- * Diamond Painting Generator
- * Creates pixelated/mosaic-style diamond painting patterns
- * Different from paint-by-numbers: uses smaller "pixels" and more colors
+ * Diamond Painting Generator - Qbrix Style
+ * Fixed A4 canvas sizes with curated style packs
  */
 
-import { DMCColor, findClosestDMCColor, getPopularDMCPalette } from './dmcColors'
+import { DMCColor, findClosestDMCColor } from './dmcColors'
+import { StylePack, getStylePackById } from './diamondStylePacks'
 
 export interface DiamondPaintingOptions {
-  gridSize?: number // Size of each diamond in pixels (default: 8-16)
-  maxColors?: number // Maximum number of DMC colors to use (default: 40)
-  canvasSize?: 'small' | 'medium' | 'large' | 'xlarge' // Final canvas size
-  drillShape?: 'square' | 'round' // Diamond drill shape
-  quality?: 'standard' | 'high' | 'ultra' // Quality preset
+  canvasFormat?: 'a4_portrait' | 'a4_landscape' | 'a4_square' // Fixed A4 formats
+  stylePack?: string // Style pack ID
 }
 
 export interface DiamondPaintingResult {
@@ -27,6 +24,7 @@ export interface DiamondPaintingResult {
   estimatedDiamonds: number // Total number of diamonds needed
   difficulty: 'Easy' | 'Medium' | 'Hard' | 'Expert'
   estimatedTime: string // Estimated completion time
+  stylePack: StylePack // Style pack used
 }
 
 export interface DiamondGrid {
@@ -50,36 +48,36 @@ export interface DMCColorUsage {
   percentage: number // Percentage of total diamonds
 }
 
-// Quality presets - MAXIMIZED FOR CLARITY
-const QUALITY_PRESETS = {
-  standard: { gridSize: 8, maxColors: 35 },
-  high: { gridSize: 6, maxColors: 45 },
-  ultra: { gridSize: 4, maxColors: 60 },  // MAXIMUM QUALITY
-}
-
-// Canvas size presets (in diamonds) - INCREASED DIMENSIONS
-const CANVAS_SIZES = {
-  small: { maxDimension: 60 },   // ~60x60 diamonds
-  medium: { maxDimension: 100 },  // ~100x100 diamonds
-  large: { maxDimension: 150 },   // ~150x150 diamonds
-  xlarge: { maxDimension: 200 },  // ~200x200 diamonds - HUGE!
+// Fixed A4 canvas presets (~10,000 diamonds each for optimal quality)
+// Based on real A4 dimensions (21cm x 29.7cm) with 2.5mm diamond drills
+const A4_CANVAS_PRESETS = {
+  a4_portrait: { width: 84, height: 119 },    // 21cm x 29.7cm = 9,996 diamonds
+  a4_landscape: { width: 119, height: 84 },   // 29.7cm x 21cm = 9,996 diamonds
+  a4_square: { width: 100, height: 100 },     // 25cm x 25cm = 10,000 diamonds
 }
 
 /**
- * Generate diamond painting pattern from an image
+ * Generate diamond painting pattern from an image - Qbrix Style
+ * Uses fixed A4 canvas and curated style packs
  */
 export async function generateDiamondPainting(
   imageUrl: string,
   options: DiamondPaintingOptions = {}
 ): Promise<DiamondPaintingResult> {
-  return new Promise((resolve, reject) => {
-    // Set defaults
-    const quality = options.quality || 'high'
-    const preset = QUALITY_PRESETS[quality]
-    const gridSize = options.gridSize || preset.gridSize
-    const maxColors = options.maxColors || preset.maxColors
-    const canvasSize = options.canvasSize || 'medium'
-    const drillShape = options.drillShape || 'square'
+  return new Promise(async (resolve, reject) => {
+    // Set defaults - Fixed A4 format
+    const canvasFormat = options.canvasFormat || 'a4_square'
+    const stylePackId = options.stylePack || 'a4_original'
+
+    // Get style pack
+    const stylePack = getStylePackById(stylePackId)
+    if (!stylePack) {
+      reject(new Error('Invalid style pack'))
+      return
+    }
+
+    // Get fixed A4 dimensions
+    const { width: gridWidth, height: gridHeight } = A4_CANVAS_PRESETS[canvasFormat]
 
     // Load image
     const img = new Image()
@@ -87,19 +85,8 @@ export async function generateDiamondPainting(
 
     img.onload = () => {
       try {
-        // Calculate dimensions based on canvas size
-        const maxDim = CANVAS_SIZES[canvasSize].maxDimension
-        let gridWidth = Math.floor(img.width / gridSize)
-        let gridHeight = Math.floor(img.height / gridSize)
-
-        // Scale to canvas size
-        if (gridWidth > gridHeight && gridWidth > maxDim) {
-          gridHeight = Math.floor((gridHeight / gridWidth) * maxDim)
-          gridWidth = maxDim
-        } else if (gridHeight > maxDim) {
-          gridWidth = Math.floor((gridWidth / gridHeight) * maxDim)
-          gridHeight = maxDim
-        }
+        // Use fixed A4 grid dimensions (no scaling needed)
+        // gridWidth and gridHeight are already set from A4_CANVAS_PRESETS
 
         // Create canvas for processing
         const canvas = document.createElement('canvas')
@@ -120,36 +107,11 @@ export async function generateDiamondPainting(
         const imageData = ctx.getImageData(0, 0, gridWidth, gridHeight)
         const data = imageData.data
 
-        // Extract colors from image
-        const colorMap = new Map<string, { rgb: [number, number, number]; count: number }>()
+        // Use fixed palette from style pack (20-30 colors)
+        const dmcPalette = stylePack.colors
 
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i]
-          const g = data[i + 1]
-          const b = data[i + 2]
-          const key = `${r},${g},${b}`
-
-          if (!colorMap.has(key)) {
-            colorMap.set(key, { rgb: [r, g, b], count: 0 })
-          }
-          colorMap.get(key)!.count++
-        }
-
-        // Convert to array and sort by frequency
-        const colors = Array.from(colorMap.values())
-          .sort((a, b) => b.count - a.count)
-          .slice(0, maxColors * 2) // Get more colors than needed for better quantization
-
-        // Create color palette from DMC colors
-        const dmcPalette = getPopularDMCPalette(maxColors)
-
-        // Map image colors to DMC colors
-        const colorToDMC = new Map<string, DMCColor>()
-        for (const color of colors) {
-          const key = color.rgb.join(',')
-          const dmcColor = findClosestDMCColor(color.rgb)
-          colorToDMC.set(key, dmcColor)
-        }
+        // Map image pixels directly to fixed DMC palette
+        // No color extraction - we quantize directly to the style pack colors
 
         // Build grid data with DMC colors
         const grid: DiamondGrid = {
@@ -169,13 +131,8 @@ export async function generateDiamondPainting(
             const g = data[idx + 1]
             const b = data[idx + 2]
 
-            const key = `${r},${g},${b}`
-            let dmcColor = colorToDMC.get(key)
-
-            // If not in map, find closest
-            if (!dmcColor) {
-              dmcColor = findClosestDMCColor([r, g, b])
-            }
+            // Find closest color in the fixed style pack palette
+            const dmcColor = findClosestColorInPalette([r, g, b], dmcPalette)
 
             uniqueDMCs.add(dmcColor.code)
 
@@ -207,22 +164,24 @@ export async function generateDiamondPainting(
         })
 
         for (const [dmcCode, count] of dmcUsageMap) {
-          const dmcColor = dmcPalette.find(c => c.code === dmcCode) || findClosestDMCColor([0, 0, 0])
-          colorsUsed.push({
-            dmcColor,
-            count,
-            symbol: dmcCodeToSymbol.get(dmcCode) || '?',
-            percentage: (count / totalDiamonds) * 100,
-          })
+          const dmcColor = dmcPalette.find(c => c.code === dmcCode)
+          if (dmcColor) {
+            colorsUsed.push({
+              dmcColor,
+              count,
+              symbol: dmcCodeToSymbol.get(dmcCode) || '?',
+              percentage: (count / totalDiamonds) * 100,
+            })
+          }
         }
 
         // Sort by usage (most used first)
         colorsUsed.sort((a, b) => b.count - a.count)
 
-        // Generate preview image (with diamond effect) - HIGH RESOLUTION
+        // Generate preview image at high resolution
         const previewCanvas = document.createElement('canvas')
-        const previewSize = 2000 // INCREASED from 800 to 2000 for crystal clear output
-        const diamondSize = Math.max(2, Math.floor(previewSize / Math.max(gridWidth, gridHeight)))
+        const previewSize = 2000 // High resolution output
+        const diamondSize = Math.floor(previewSize / Math.max(gridWidth, gridHeight))
 
         previewCanvas.width = gridWidth * diamondSize
         previewCanvas.height = gridHeight * diamondSize
@@ -242,16 +201,15 @@ export async function generateDiamondPainting(
             previewCtx.fillStyle = `rgb(${r},${g},${b})`
             previewCtx.fillRect(x * diamondSize, y * diamondSize, diamondSize, diamondSize)
 
-            // Add diamond effect (MORE VISIBLE)
+            // Add diamond grid effect
             if (diamondSize > 2) {
-              previewCtx.strokeStyle = `rgba(0,0,0,0.15)` // Slightly darker border
-              previewCtx.lineWidth = Math.max(1, diamondSize * 0.08) // Scale line width with diamond size
+              previewCtx.strokeStyle = `rgba(0,0,0,0.12)`
+              previewCtx.lineWidth = Math.max(1, diamondSize * 0.06)
               previewCtx.strokeRect(x * diamondSize, y * diamondSize, diamondSize, diamondSize)
 
-              // Add slight highlight for realism
+              // Add subtle highlight
               if (diamondSize > 4) {
-                const highlight = drillShape === 'round' ? drawRoundHighlight : drawSquareHighlight
-                highlight(previewCtx, x * diamondSize, y * diamondSize, diamondSize)
+                drawSquareHighlight(previewCtx, x * diamondSize, y * diamondSize, diamondSize)
               }
             }
           }
@@ -278,6 +236,7 @@ export async function generateDiamondPainting(
           estimatedDiamonds: totalDiamonds,
           difficulty,
           estimatedTime,
+          stylePack,
         })
       } catch (error) {
         reject(error)
@@ -290,6 +249,42 @@ export async function generateDiamondPainting(
 
     img.src = imageUrl
   })
+}
+
+/**
+ * Find the closest color in a specific palette
+ */
+function findClosestColorInPalette(
+  rgb: [number, number, number],
+  palette: DMCColor[]
+): DMCColor {
+  let minDistance = Infinity
+  let closestColor = palette[0]
+
+  for (const dmcColor of palette) {
+    const distance = colorDistance(rgb, dmcColor.rgb)
+    if (distance < minDistance) {
+      minDistance = distance
+      closestColor = dmcColor
+    }
+  }
+
+  return closestColor
+}
+
+/**
+ * Calculate Euclidean distance between two colors
+ */
+function colorDistance(rgb1: [number, number, number], rgb2: [number, number, number]): number {
+  const [r1, g1, b1] = rgb1
+  const [r2, g2, b2] = rgb2
+
+  // Weighted Euclidean distance (more perceptually accurate)
+  const dr = r1 - r2
+  const dg = g1 - g2
+  const db = b1 - b2
+
+  return Math.sqrt(2 * dr * dr + 4 * dg * dg + 3 * db * db)
 }
 
 /**
