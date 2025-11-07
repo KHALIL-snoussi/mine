@@ -1,0 +1,73 @@
+{
+  "recommended_kit": {
+    "id": "creative_kit",
+    "name": "Paint by Numbers - Creative Kit",
+    "price_usd": 39.99,
+    "num_colors": 18,
+    "palette_name": "classic_18",
+    "sku": "PBN-CREATE-18",
+    "description": "For the passionate painter! More colors for richer, more detailed artwork.",
+    "best_for": [
+      "Detailed portraits",
+      "Landscape paintings",
+      "Pet portraits",
+      "Home decor projects"
+    ],
+    "includes": [
+      "18 premium acrylic paint bottles (30ml each)",
+      "5 quality paint brushes (various sizes)",
+      "Color mixing guide",
+      "Printed color reference card",
+      "Palette tray for mixing",
+      "Premium: 10 digital template credits"
+    ],
+    "estimated_projects": 5
+  },
+  "upsell_opportunities": [
+    {
+      "type": "upgrade",
+      "product": "PaintKit(id='professional_kit', name='Professional Kit', display_name='Paint by Numbers - Professional Kit', description='The ultimate collection for serious artists. Professional-grade paints and maximum color range.', palette_name='classic_24', num_colors=24, price_usd=59.99, sku='PBN-PRO-24', target_audience='Advanced Painters, Professional Artists, Sellers', difficulty_level='Advanced', best_for=['Complex artwork', 'Gallery-quality pieces', 'Commission work', 'Multiple large projects', 'Teaching workshops'], includes=['24 professional acrylic paint bottles (50ml each)', '8 premium paint brushes (complete range)', 'Advanced color mixing guide', 'Professional color reference poster', 'Large palette tray', 'Paint storage organizer', 'Premium: Unlimited digital templates for 1 year'], paint_volume_ml=50, estimated_projects=10, shopify_product_id=None, stripe_price_id=None, weight_grams=1200, upgrade_to=None, complementary_products=['canvas_pack_xl', 'frame_custom', 'easel_professional', 'varnish_kit'])",
+      "message": "Upgrade to Paint by Numbers - Professional Kit for 6 more colors!"
+    },
+    {
+      "type": "accessory",
+      "product": {
+        "name": "Large Canvas Pack (3 pack)",
+        "price_usd": 29.99,
+        "sku": "PBN-CANVAS-L3",
+        "description": "3 pre-stretched canvases, 16x20 inches"
+      },
+      "message": "Complete your setup!"
+    },
+    {
+      "type": "accessory",
+      "product": {
+        "name": "Adjustable Tabletop Easel",
+        "price_usd": 24.99,
+        "sku": "PBN-EASEL-ADJ"
+      },
+      "message": "Complete your setup!"
+    },
+    {
+      "type": "subscription",
+      "product": "SubscriptionPlan(id='creative_monthly', name='Creative Monthly', description='Paint a new masterpiece every month!', price_monthly_usd=29.99, paint_kit_included='creative_kit', template_credits_monthly=4, paint_refill_frequency='quarterly', savings_percent=25, includes=['Creative Kit on signup (18 colors)', '4 new premium templates monthly', 'Paint refills every quarter', 'Exclusive member-only templates', '10% discount on accessories', 'Priority customer support'], stripe_subscription_id=None)",
+      "message": "Save 25% with monthly subscription!"
+    }
+  ],
+  "lifetime_value": {
+    "initial_revenue": 39.99,
+    "ltv_1year": 63.99,
+    "estimated_margin": 41.593500000000006,
+    "churn_risk": 1.0
+  },
+  "marketing_copy": {
+    "headline": "\ud83c\udfa8 Paint by Numbers - Creative Kit - $39.99",
+    "subheadline": "For the passionate painter! More colors for richer, more detailed artwork.",
+    "value_prop": "Paint 5+ beautiful artworks with 18 perfect colors",
+    "cta_primary": "Add to Cart - Start Painting Today!",
+    "cta_secondary": "Upgrade to Professional Kit",
+    "social_proof": "Perfect for Hobbyists, Art Enthusiasts, Adults",
+    "urgency": "\ud83c\udf81 Free shipping on orders over $50!",
+    "guarantee": "30-day money-back guarantee \u2022 100% satisfaction"
+  }
+}

@@ -1,0 +1,200 @@
+{
+  "1": {
+    "color_name": "White",
+    "rgb": [
+      255,
+      255,
+      255
+    ],
+    "hex": "#ffffff",
+    "mixing_recipe": "Pure White",
+    "alternative": "White"
+  },
+  "2": {
+    "color_name": "Black",
+    "rgb": [
+      0,
+      0,
+      0
+    ],
+    "hex": "#000000",
+    "mixing_recipe": "Pure Black",
+    "alternative": "Black"
+  },
+  "3": {
+    "color_name": "Red",
+    "rgb": [
+      255,
+      0,
+      0
+    ],
+    "hex": "#ff0000",
+    "mixing_recipe": "Pure Red",
+    "alternative": "Red"
+  },
+  "4": {
+    "color_name": "Green",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "hex": "#00ff00",
+    "mixing_recipe": "Pure Green",
+    "alternative": "Green"
+  },
+  "5": {
+    "color_name": "Blue",
+    "rgb": [
+      0,
+      0,
+      255
+    ],
+    "hex": "#0000ff",
+    "mixing_recipe": "Pure Blue",
+    "alternative": "Blue"
+  },
+  "6": {
+    "color_name": "Yellow",
+    "rgb": [
+      255,
+      255,
+      0
+    ],
+    "hex": "#ffff00",
+    "mixing_recipe": "Pure Yellow",
+    "alternative": "Yellow"
+  },
+  "7": {
+    "color_name": "Orange",
+    "rgb": [
+      255,
+      165,
+      0
+    ],
+    "hex": "#ffa500",
+    "mixing_recipe": "mix Yellow, + Black (shade)",
+    "alternative": "Orange"
+  },
+  "8": {
+    "color_name": "Purple",
+    "rgb": [
+      128,
+      0,
+      128
+    ],
+    "hex": "#800080",
+    "mixing_recipe": "Pure Black",
+    "alternative": "Purple"
+  },
+  "9": {
+    "color_name": "Pink",
+    "rgb": [
+      255,
+      192,
+      203
+    ],
+    "hex": "#ffc0cb",
+    "mixing_recipe": "Start with Black, + Black (shade)",
+    "alternative": "Pink"
+  },
+  "10": {
+    "color_name": "Brown",
+    "rgb": [
+      165,
+      42,
+      42
+    ],
+    "hex": "#a52a2a",
+    "mixing_recipe": "add Red",
+    "alternative": "Brown"
+  },
+  "11": {
+    "color_name": "Gray",
+    "rgb": [
+      128,
+      128,
+      128
+    ],
+    "hex": "#808080",
+    "mixing_recipe": "Start with Black, + Black (shade)",
+    "alternative": "Gray"
+  },
+  "12": {
+    "color_name": "Gold",
+    "rgb": [
+      255,
+      215,
+      0
+    ],
+    "hex": "#ffd700",
+    "mixing_recipe": "mix Yellow, + Black (shade)",
+    "alternative": "Yellow"
+  },
+  "13": {
+    "color_name": "Teal",
+    "rgb": [
+      0,
+      128,
+      128
+    ],
+    "hex": "#008080",
+    "mixing_recipe": "Pure Black",
+    "alternative": "Similar to Navy"
+  },
+  "14": {
+    "color_name": "Lavender",
+    "rgb": [
+      230,
+      230,
+      250
+    ],
+    "hex": "#e6e6fa",
+    "mixing_recipe": "+ Black (shade)",
+    "alternative": "White"
+  },
+  "15": {
+    "color_name": "Bisque",
+    "rgb": [
+      255,
+      228,
+      196
+    ],
+    "hex": "#ffe4c4",
+    "mixing_recipe": "+ Black (shade)",
+    "alternative": "Pink"
+  },
+  "16": {
+    "color_name": "Dark Slate",
+    "rgb": [
+      47,
+      79,
+      79
+    ],
+    "hex": "#2f4f4f",
+    "mixing_recipe": "+ Black (shade)",
+    "alternative": "Similar to Dark Green"
+  },
+  "17": {
+    "color_name": "Powder Blue",
+    "rgb": [
+      176,
+      224,
+      230
+    ],
+    "hex": "#b0e0e6",
+    "mixing_recipe": "Start with Black, + Black (shade)",
+    "alternative": "Sky Blue"
+  },
+  "18": {
+    "color_name": "Light Coral",
+    "rgb": [
+      240,
+      128,
+      128
+    ],
+    "hex": "#f08080",
+    "mixing_recipe": "Mix to match RGB values",
+    "alternative": "Tan"
+  }
+}

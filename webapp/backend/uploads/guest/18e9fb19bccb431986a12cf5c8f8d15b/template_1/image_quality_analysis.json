@@ -1,0 +1,19 @@
+{
+  "overall_quality": 634.0,
+  "quality_grade": "Excellent",
+  "quality_emoji": "\u2b50\u2b50\u2b50\u2b50\u2b50",
+  "scores": {
+    "color_accuracy": 0,
+    "region_quality": 40.0,
+    "number_visibility": 93.3,
+    "color_distribution": 3970.3,
+    "edge_clarity": 100,
+    "paintability": 43.3
+  },
+  "improvements": [
+    "Consider using more colors for better color accuracy",
+    "Try increasing MIN_REGION_SIZE to get more consistent regions",
+    "Template may be too complex - try reducing number of colors",
+    "Increase MIN_REGION_SIZE for easier painting"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "overall_difficulty": 47.4,
+  "difficulty_level": "Medium",
+  "difficulty_emoji": "\ud83d\udfe1",
+  "scores": {
+    "region_complexity": 60.0,
+    "small_region_difficulty": 61.1,
+    "color_count_difficulty": 70.0,
+    "color_similarity_difficulty": 0.5,
+    "density_difficulty": 35.1
+  },
+  "statistics": {
+    "total_regions": 1439,
+    "total_colors": 18,
+    "avg_region_size": 5992.4,
+    "min_region_size": 96,
+    "small_regions": 586,
+    "small_region_percentage": 40.7
+  },
+  "time_estimate": "35-39 hours",
+  "recommendations": [
+    "Follow the color guide and enjoy painting!"
+  ]
+}

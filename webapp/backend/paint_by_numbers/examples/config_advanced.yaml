@@ -1,0 +1,33 @@
+# Advanced Configuration
+# For experienced painters who want more detail
+# More colors, smaller regions, complex designs
+
+# Image Processing
+MAX_IMAGE_SIZE: [1500, 1500]
+MIN_IMAGE_SIZE: [400, 400]
+
+# Color Settings
+DEFAULT_NUM_COLORS: 22
+USE_UNIFIED_PALETTE: false  # Use K-means for custom colors
+
+# Region Detection
+MIN_REGION_SIZE: 75  # Smaller regions for more detail
+MORPHOLOGY_KERNEL_SIZE: 3
+
+# Filtering
+BILATERAL_FILTER_D: 11
+BILATERAL_SIGMA_COLOR: 85
+BILATERAL_SIGMA_SPACE: 85
+
+# Number Placement
+FONT_SCALE: 0.4
+FONT_THICKNESS: 1
+
+# Output
+GENERATE_SVG: true
+GENERATE_PDF: true
+DPI: 300
+
+# Processing
+SHOW_PROGRESS: true
+LOG_LEVEL: INFO

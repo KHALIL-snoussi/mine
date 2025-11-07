@@ -13,6 +13,7 @@ interface PortraitCropSelectorProps {
 const PORTRAIT_ASPECT_RATIO = 3 / 4
 
 // Responsive crop sizing configuration
+// IMPORTANT: Keep dimensions within backend MAX_IMAGE_SIZE limits to prevent crashes
 const CROP_SIZE_CONFIG = {
   // Crop will be this percentage of the image width
   imageWidthPercentage: 0.6, // 60% of image width
@@ -22,8 +23,9 @@ const CROP_SIZE_CONFIG = {
   minHeight: 533, // 400 * (4/3) to maintain aspect ratio
 
   // Maximum crop dimensions (in pixels)
-  maxWidth: 1200,
-  maxHeight: 1600, // 1200 * (4/3)
+  // Backend config.py MAX_IMAGE_SIZE is (1200, 1200), so we must stay under that
+  maxWidth: 900,  // Reduced from 1200 to be safe
+  maxHeight: 1200, // Reduced from 1600 to stay within backend limits (1200 * 4/3 = 1600 was too large)
 }
 
 // Calculate responsive crop dimensions based on image size

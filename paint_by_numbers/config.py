@@ -11,8 +11,10 @@ class Config:
     """Configuration settings for the paint-by-numbers generator"""
 
     # Image Processing
-    MAX_IMAGE_SIZE = (1200, 1200)  # Maximum dimensions for processing
+    MAX_IMAGE_SIZE = (1200, 1200)  # Maximum dimensions for processing (backend limit)
     MIN_IMAGE_SIZE = (400, 400)    # Minimum dimensions for good results
+    # IMPORTANT: Frontend PortraitCropSelector must stay within MAX_IMAGE_SIZE
+    # to prevent memory issues and crashes
     AUTO_WHITE_BALANCE = True      # Apply gray-world white balance correction
     WHITE_BALANCE_CLIP = 0.01      # Clip percentile for white balance scaling
     APPLY_DENOISE = True           # Run fast denoising prior to clustering
