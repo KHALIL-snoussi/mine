@@ -269,6 +269,9 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
             🎨 Paint by Numbers AI
           </Link>
           <nav className="flex items-center gap-2 text-sm text-slate-600">
+            <Link href="/diamond-painting" className="rounded-full px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900">
+              💎 Diamond Painting
+            </Link>
             <Link href="/shop" className="rounded-full px-3 py-1.5 transition-colors hover:bg-slate-100 hover:text-slate-900">
               Shop Kits
             </Link>

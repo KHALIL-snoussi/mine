@@ -18,7 +18,10 @@ export default function LandingPage() {
                 <Button variant="ghost">Shop Kits</Button>
               </Link>
               <Link href="/create">
-                <Button variant="ghost">Try Free</Button>
+                <Button variant="ghost">Paint by Numbers</Button>
+              </Link>
+              <Link href="/diamond-painting">
+                <Button variant="ghost">💎 Diamond</Button>
               </Link>
               <Link href="/login">
                 <Button variant="outline">Log In</Button>
@@ -49,7 +52,12 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up">
               <Link href="/create">
                 <Button size="lg" className="text-lg px-8 py-4">
-                  🎨 Create & Preview Free
+                  🎨 Paint by Numbers
+                </Button>
+              </Link>
+              <Link href="/diamond-painting">
+                <Button size="lg" className="text-lg px-8 py-4">
+                  💎 Diamond Painting
                 </Button>
               </Link>
               <Link href="/shop">
