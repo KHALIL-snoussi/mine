@@ -69,6 +69,15 @@ export interface BeadCount {
   lowUsage: boolean // True if percentage < 1%
 }
 
+export interface ProcessingDiagnostics {
+  isolatedCellsRemoved: number // Single-pixel speckles merged
+  smallClustersRemoved: number // Clusters below minimum size
+  backgroundPercentage: number // Percentage of canvas that is background
+  backgroundDMCCode: string // DMC code used for background
+  edgePixelCount: number // Number of edge pixels preserved
+  averageClusterSize: number // Average size of color clusters
+}
+
 export interface AdvancedDiamondResult {
   imageDataUrl: string // High-res preview
   tiles: BeadTile[] // Tile-by-tile instructions
@@ -90,6 +99,7 @@ export interface AdvancedDiamondResult {
   totalBeads: number
   difficulty: string
   estimatedTime: string
+  diagnostics: ProcessingDiagnostics // Quality metrics for validation
 }
 
 // Fixed canvas presets (~10,000 beads each)
@@ -264,21 +274,60 @@ export async function generateAdvancedDiamondPainting(
 
         // Step 10: Apply majority filter (avoiding edges)
         console.log('Applying majority filter...')
-        const cleaned = majorityFilter(quantized, edgeMask, 30)
+        const filtered = majorityFilter(quantized, edgeMask, 30)
 
-        // Step 6: Build grid data with symbols
+        // Step 11: Advanced cleanup - merge isolated cells (preserving edges)
+        console.log('Cleaning up isolated cells...')
+        const minClusterSize = quality.minClusterSize || 4
+        const { cleaned, stats } = cleanupWithEdgePreservation(
+          filtered,
+          edgeMask,
+          palette,
+          minClusterSize,
+          30
+        )
+
+        // Step 12: Build grid data with symbols
         console.log('Building grid data...')
         const gridData = buildGridData(cleaned, palette, stylePack)
 
-        // Step 7: Split into 16×16 tiles
+        // Step 13: Split into 16×16 tiles
         console.log('Creating tile system...')
         const tiles = createTileSystem(gridData, gridWidth, gridHeight)
 
-        // Step 8: Calculate bead counts
+        // Step 14: Calculate bead counts
         console.log('Calculating bead counts...')
         const beadCounts = calculateBeadCounts(gridData, stylePack)
 
-        // Step 9: Generate high-res preview
+        // Step 15: Calculate diagnostics
+        console.log('Calculating diagnostics...')
+        const clusterStats = calculateClusterStats(cleaned)
+
+        // Find background color (lightest) and its percentage
+        const backgroundDMC = stylePack.colors.find(c => {
+          const rgb = { r: c.rgb[0], g: c.rgb[1], b: c.rgb[2] }
+          return rgb.r === lightestColor.r && rgb.g === lightestColor.g && rgb.b === lightestColor.b
+        }) || stylePack.colors[0]
+
+        const backgroundCount = beadCounts.find(bc => bc.dmcColor.code === backgroundDMC.code)?.count || 0
+        const backgroundPercentage = (backgroundCount / (gridWidth * gridHeight)) * 100
+
+        // Count edge pixels
+        let edgePixelCount = 0
+        for (let i = 0; i < edgeMask.length; i++) {
+          if (edgeMask[i] > 30) edgePixelCount++
+        }
+
+        const diagnostics: ProcessingDiagnostics = {
+          isolatedCellsRemoved: stats.isolated,
+          smallClustersRemoved: stats.smallClusters,
+          backgroundPercentage: Math.round(backgroundPercentage * 10) / 10,
+          backgroundDMCCode: backgroundDMC.code,
+          edgePixelCount,
+          averageClusterSize: Math.round(clusterStats.avgSize * 10) / 10,
+        }
+
+        // Step 16: Generate high-res preview
         console.log('Generating preview...')
         const previewUrl = generatePreview(gridData, gridWidth, gridHeight)
 
@@ -309,6 +358,7 @@ export async function generateAdvancedDiamondPainting(
           totalBeads: gridWidth * gridHeight,
           difficulty: calculateDifficulty(gridWidth * gridHeight, beadCounts.length),
           estimatedTime: estimateTime(gridWidth * gridHeight, beadCounts.length),
+          diagnostics,
         }
 
         resolve(result)
@@ -593,6 +643,94 @@ function findMostCommonNeighborColor(
   })
 
   return mostCommon
+}
+
+/**
+ * Advanced cleanup: merge isolated cells while preserving edges
+ * Returns statistics about the cleanup process
+ */
+function cleanupWithEdgePreservation(
+  imageData: ImageData,
+  edgeMask: Uint8Array,
+  palette: RGB[],
+  minClusterSize: number = 4,
+  edgeThreshold: number = 30
+): { cleaned: ImageData; stats: { isolated: number; smallClusters: number } } {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  let isolatedCellsRemoved = 0
+  let smallClustersRemoved = 0
+
+  // Track visited pixels
+  const visited = new Uint8Array(width * height)
+
+  // Find and merge small clusters
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x
+      if (visited[idx]) continue
+
+      // Skip edge pixels - preserve detail
+      if (edgeMask[idx] > edgeThreshold) {
+        visited[idx] = 1
+        continue
+      }
+
+      // Flood fill to find cluster
+      const cluster = floodFill(data, width, height, x, y, visited)
+
+      // If cluster is too small, replace with most common neighbor color
+      if (cluster.length < minClusterSize) {
+        const neighborColor = findMostCommonNeighborColor(cluster, data, width, height, palette)
+
+        // Replace all pixels in small cluster
+        for (const pixelIdx of cluster) {
+          const dataIdx = pixelIdx * 4
+          output[dataIdx] = neighborColor.r
+          output[dataIdx + 1] = neighborColor.g
+          output[dataIdx + 2] = neighborColor.b
+        }
+
+        // Track statistics
+        if (cluster.length === 1) {
+          isolatedCellsRemoved++
+        } else {
+          smallClustersRemoved++
+        }
+      }
+    }
+  }
+
+  return {
+    cleaned: new ImageData(output, width, height),
+    stats: { isolated: isolatedCellsRemoved, smallClusters: smallClustersRemoved },
+  }
+}
+
+/**
+ * Calculate cluster statistics for diagnostics
+ */
+function calculateClusterStats(imageData: ImageData): { avgSize: number; totalClusters: number } {
+  const { width, height, data } = imageData
+  const visited = new Uint8Array(width * height)
+  const clusterSizes: number[] = []
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x
+      if (visited[idx]) continue
+
+      const cluster = floodFill(data, width, height, x, y, visited)
+      clusterSizes.push(cluster.length)
+    }
+  }
+
+  const avgSize = clusterSizes.length > 0
+    ? clusterSizes.reduce((a, b) => a + b, 0) / clusterSizes.length
+    : 0
+
+  return { avgSize, totalClusters: clusterSizes.length }
 }
 
 /**
