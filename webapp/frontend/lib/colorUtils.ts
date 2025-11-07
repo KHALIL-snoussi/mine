@@ -385,3 +385,247 @@ function boxBlur(imageData: ImageData, radius: number): ImageData {
 
   return new ImageData(output, width, height)
 }
+
+/**
+ * Lanczos resampling for high-quality downsampling
+ * Better than bilinear/bicubic for preserving detail
+ */
+export function lanczosResample(
+  sourceData: ImageData,
+  targetWidth: number,
+  targetHeight: number,
+  lobes: number = 3
+): ImageData {
+  const { width: srcWidth, height: srcHeight, data: srcData } = sourceData
+  const output = new Uint8ClampedArray(targetWidth * targetHeight * 4)
+
+  const xRatio = srcWidth / targetWidth
+  const yRatio = srcHeight / targetHeight
+
+  // Lanczos kernel function
+  const lanczos = (x: number): number => {
+    if (x === 0) return 1
+    if (Math.abs(x) >= lobes) return 0
+    const piX = Math.PI * x
+    return (lobes * Math.sin(piX) * Math.sin(piX / lobes)) / (piX * piX)
+  }
+
+  for (let y = 0; y < targetHeight; y++) {
+    for (let x = 0; x < targetWidth; x++) {
+      const srcX = (x + 0.5) * xRatio - 0.5
+      const srcY = (y + 0.5) * yRatio - 0.5
+
+      let r = 0, g = 0, b = 0, totalWeight = 0
+
+      const startX = Math.max(0, Math.floor(srcX - lobes))
+      const endX = Math.min(srcWidth - 1, Math.ceil(srcX + lobes))
+      const startY = Math.max(0, Math.floor(srcY - lobes))
+      const endY = Math.min(srcHeight - 1, Math.ceil(srcY + lobes))
+
+      for (let sy = startY; sy <= endY; sy++) {
+        for (let sx = startX; sx <= endX; sx++) {
+          const xWeight = lanczos(sx - srcX)
+          const yWeight = lanczos(sy - srcY)
+          const weight = xWeight * yWeight
+
+          const idx = (sy * srcWidth + sx) * 4
+          r += srcData[idx] * weight
+          g += srcData[idx + 1] * weight
+          b += srcData[idx + 2] * weight
+          totalWeight += weight
+        }
+      }
+
+      const outIdx = (y * targetWidth + x) * 4
+      if (totalWeight > 0) {
+        output[outIdx] = Math.max(0, Math.min(255, r / totalWeight))
+        output[outIdx + 1] = Math.max(0, Math.min(255, g / totalWeight))
+        output[outIdx + 2] = Math.max(0, Math.min(255, b / totalWeight))
+      }
+      output[outIdx + 3] = 255 // Alpha
+    }
+  }
+
+  return new ImageData(output, targetWidth, targetHeight)
+}
+
+/**
+ * Sobel edge detection - returns edge strength map (0-255)
+ */
+export function sobelEdgeDetection(imageData: ImageData): Uint8Array {
+  const { width, height, data } = imageData
+  const edges = new Uint8Array(width * height)
+
+  // Sobel kernels
+  const sobelX = [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]
+  const sobelY = [[-1, -2, -1], [0, 0, 0], [1, 2, 1]]
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let gx = 0, gy = 0
+
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const idx = ((y + ky) * width + (x + kx)) * 4
+          const gray = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2]
+
+          gx += gray * sobelX[ky + 1][kx + 1]
+          gy += gray * sobelY[ky + 1][kx + 1]
+        }
+      }
+
+      const magnitude = Math.sqrt(gx * gx + gy * gy)
+      edges[y * width + x] = Math.min(255, magnitude)
+    }
+  }
+
+  return edges
+}
+
+/**
+ * Apply 3×3 majority filter to remove single-pixel noise
+ * Only affects non-edge pixels
+ */
+export function majorityFilter(
+  imageData: ImageData,
+  edgeMask: Uint8Array,
+  edgeThreshold: number = 30
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const idx = y * width + x
+
+      // Skip if this is an edge pixel
+      if (edgeMask[idx] > edgeThreshold) continue
+
+      // Count color occurrences in 3×3 neighborhood
+      const colorCounts = new Map<string, { count: number; rgb: [number, number, number] }>()
+
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const nidx = ((y + ky) * width + (x + kx)) * 4
+          const r = data[nidx]
+          const g = data[nidx + 1]
+          const b = data[nidx + 2]
+          const key = `${r},${g},${b}`
+
+          const existing = colorCounts.get(key)
+          if (existing) {
+            existing.count++
+          } else {
+            colorCounts.set(key, { count: 1, rgb: [r, g, b] })
+          }
+        }
+      }
+
+      // Find majority color
+      let maxCount = 0
+      let majorityColor: [number, number, number] = [data[idx * 4], data[idx * 4 + 1], data[idx * 4 + 2]]
+
+      colorCounts.forEach((info) => {
+        if (info.count > maxCount) {
+          maxCount = info.count
+          majorityColor = info.rgb
+        }
+      })
+
+      // Apply majority color if different from current
+      const dataIdx = idx * 4
+      output[dataIdx] = majorityColor[0]
+      output[dataIdx + 1] = majorityColor[1]
+      output[dataIdx + 2] = majorityColor[2]
+    }
+  }
+
+  return new ImageData(output, width, height)
+}
+
+/**
+ * Detect dominant background color via border sampling
+ */
+export function detectBackgroundColor(imageData: ImageData): RGB {
+  const { width, height, data } = imageData
+  const borderPixels: RGB[] = []
+
+  // Sample top and bottom borders
+  for (let x = 0; x < width; x++) {
+    // Top border
+    const topIdx = x * 4
+    borderPixels.push({ r: data[topIdx], g: data[topIdx + 1], b: data[topIdx + 2] })
+
+    // Bottom border
+    const bottomIdx = ((height - 1) * width + x) * 4
+    borderPixels.push({ r: data[bottomIdx], g: data[bottomIdx + 1], b: data[bottomIdx + 2] })
+  }
+
+  // Sample left and right borders (excluding corners to avoid double-counting)
+  for (let y = 1; y < height - 1; y++) {
+    // Left border
+    const leftIdx = (y * width) * 4
+    borderPixels.push({ r: data[leftIdx], g: data[leftIdx + 1], b: data[leftIdx + 2] })
+
+    // Right border
+    const rightIdx = (y * width + (width - 1)) * 4
+    borderPixels.push({ r: data[rightIdx], g: data[rightIdx + 1], b: data[rightIdx + 2] })
+  }
+
+  // Cluster border colors and find most common
+  const colorCounts = new Map<string, { count: number; rgb: RGB }>()
+
+  borderPixels.forEach((rgb) => {
+    // Quantize to reduce noise (round to nearest 16)
+    const qr = Math.round(rgb.r / 16) * 16
+    const qg = Math.round(rgb.g / 16) * 16
+    const qb = Math.round(rgb.b / 16) * 16
+    const key = `${qr},${qg},${qb}`
+
+    const existing = colorCounts.get(key)
+    if (existing) {
+      existing.count++
+    } else {
+      colorCounts.set(key, { count: 1, rgb: { r: qr, g: qg, b: qb } })
+    }
+  })
+
+  // Find most common color
+  let maxCount = 0
+  let bgColor: RGB = { r: 255, g: 255, b: 255 } // Default to white
+
+  colorCounts.forEach((info) => {
+    if (info.count > maxCount) {
+      maxCount = info.count
+      bgColor = info.rgb
+    }
+  })
+
+  return bgColor
+}
+
+/**
+ * Blend edges back into quantized image for crisp details
+ */
+export function blendEdges(
+  quantizedData: ImageData,
+  originalData: ImageData,
+  edgeMask: Uint8Array,
+  edgeStrength: number = 0.5
+): ImageData {
+  const { width, height, data: quantData } = quantizedData
+  const { data: origData } = originalData
+  const output = new Uint8ClampedArray(quantData)
+
+  for (let i = 0; i < width * height; i++) {
+    const edgeValue = edgeMask[i] / 255 // Normalize 0-1
+    const blend = edgeValue * edgeStrength
+
+    const idx = i * 4
+    output[idx] = quantData[idx] * (1 - blend) + origData[idx] * blend
+    output[idx + 1] = quantData[idx + 1] * (1 - blend) + origData[idx + 1] * blend
+    output[idx + 2] = quantData[idx + 2] * (1 - blend) + origData[idx + 2] * blend
+  }
+
+  return new ImageData(output, width, height)
+}

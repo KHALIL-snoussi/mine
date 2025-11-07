@@ -23,6 +23,11 @@ import {
   bilateralFilter,
   unsharpMask,
   deltaE2000,
+  lanczosResample,
+  sobelEdgeDetection,
+  majorityFilter,
+  detectBackgroundColor,
+  blendEdges,
 } from './colorUtils'
 
 export interface AdvancedDiamondOptions {
@@ -61,6 +66,7 @@ export interface BeadCount {
   count: number
   percentage: number
   symbol: string
+  lowUsage: boolean // True if percentage < 1%
 }
 
 export interface AdvancedDiamondResult {
@@ -97,6 +103,51 @@ const TILE_SIZE = 16 // 16×16 beads per tile (QBRIX standard)
 const BEAD_SIZE_MM = 2.5 // Standard diamond drill size
 
 /**
+ * Find the lightest color in palette (for background)
+ */
+function findLightestColor(palette: RGB[]): RGB {
+  let maxBrightness = 0
+  let lightest = palette[0]
+
+  palette.forEach((color) => {
+    const brightness = (color.r + color.g + color.b) / 3
+    if (brightness > maxBrightness) {
+      maxBrightness = brightness
+      lightest = color
+    }
+  })
+
+  return lightest
+}
+
+/**
+ * Force background pixels to map to lightest palette color
+ */
+function forceBackgroundColor(imageData: ImageData, bgColor: RGB, targetColor: RGB): void {
+  const { data } = imageData
+  const threshold = 40 // Color similarity threshold
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+
+    // Calculate distance to background color
+    const dr = r - bgColor.r
+    const dg = g - bgColor.g
+    const db = b - bgColor.b
+    const distance = Math.sqrt(dr * dr + dg * dg + db * db)
+
+    // If close to background, replace with target
+    if (distance < threshold) {
+      data[i] = targetColor.r
+      data[i + 1] = targetColor.g
+      data[i + 2] = targetColor.b
+    }
+  }
+}
+
+/**
  * Generate professional QBRIX-quality diamond painting
  */
 export async function generateAdvancedDiamondPainting(
@@ -126,7 +177,8 @@ export async function generateAdvancedDiamondPainting(
 
     img.onload = async () => {
       try {
-        // Step 1: Load and resize to grid dimensions
+        // Step 1: Upscale to 2× for better detail preservation
+        console.log('Upscaling image 2×...')
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) {
@@ -134,13 +186,16 @@ export async function generateAdvancedDiamondPainting(
           return
         }
 
-        canvas.width = gridWidth
-        canvas.height = gridHeight
-        ctx.drawImage(img, 0, 0, gridWidth, gridHeight)
+        // Upscale to 2× resolution
+        const upscaleWidth = gridWidth * 2
+        const upscaleHeight = gridHeight * 2
+        canvas.width = upscaleWidth
+        canvas.height = upscaleHeight
+        ctx.drawImage(img, 0, 0, upscaleWidth, upscaleHeight)
 
-        let imageData = ctx.getImageData(0, 0, gridWidth, gridHeight)
+        let imageData = ctx.getImageData(0, 0, upscaleWidth, upscaleHeight)
 
-        // Step 2: Advanced preprocessing pipeline
+        // Step 2: Advanced preprocessing pipeline (at 2× resolution)
         console.log('Applying white balance...')
         whiteBalance(imageData)
 
@@ -154,17 +209,62 @@ export async function generateAdvancedDiamondPainting(
         console.log('Applying style-specific processing...')
         applyStyleProcessing(imageData, stylePackId)
 
-        // Step 4: LAB-based quantization with error diffusion
+        // Step 4: Detect background and store for later
+        console.log('Detecting background color...')
+        const bgColor = detectBackgroundColor(imageData)
+
+        // Step 5: Extract edge mask BEFORE downsampling
+        console.log('Extracting edge mask...')
+        const edgeMask2x = sobelEdgeDetection(imageData)
+
+        // Store original for edge blending
+        const originalData = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height)
+
+        // Step 6: Downsample to target resolution using Lanczos
+        console.log('Downsampling with Lanczos...')
+        imageData = lanczosResample(imageData, gridWidth, gridHeight, 3)
+
+        // Downsample edge mask too
+        const edgeMaskCanvas = document.createElement('canvas')
+        const edgeMaskCtx = edgeMaskCanvas.getContext('2d')!
+        edgeMaskCanvas.width = upscaleWidth
+        edgeMaskCanvas.height = upscaleHeight
+        const edgeMaskImageData = edgeMaskCtx.createImageData(upscaleWidth, upscaleHeight)
+        for (let i = 0; i < edgeMask2x.length; i++) {
+          const idx = i * 4
+          edgeMaskImageData.data[idx] = edgeMask2x[i]
+          edgeMaskImageData.data[idx + 1] = edgeMask2x[i]
+          edgeMaskImageData.data[idx + 2] = edgeMask2x[i]
+          edgeMaskImageData.data[idx + 3] = 255
+        }
+        edgeMaskCtx.putImageData(edgeMaskImageData, 0, 0)
+        const downsampledEdgeMask = lanczosResample(edgeMaskImageData, gridWidth, gridHeight, 3)
+        const edgeMask = new Uint8Array(gridWidth * gridHeight)
+        for (let i = 0; i < edgeMask.length; i++) {
+          edgeMask[i] = downsampledEdgeMask.data[i * 4]
+        }
+
+        // Step 7: Force background to lightest color in palette
+        console.log('Separating background...')
+        const lightestColor = findLightestColor(palette)
+        forceBackgroundColor(imageData, bgColor, lightestColor)
+
+        // Step 8: LAB-based quantization with error diffusion
         console.log('Quantizing to 7-color palette...')
-        const quantized = quantizeWithErrorDiffusion(
+        let quantized = quantizeWithErrorDiffusion(
           imageData,
           palette,
           quality.ditheringStrength || 0.5
         )
 
-        // Step 5: Region cleanup - remove speckles and enforce minimum clusters
-        console.log('Cleaning up regions...')
-        const cleaned = cleanupRegions(quantized, palette, quality.minClusterSize || 4)
+        // Step 9: Blend edges back for crisp details
+        console.log('Blending edges for detail...')
+        const downsampledOriginal = lanczosResample(originalData, gridWidth, gridHeight, 3)
+        quantized = blendEdges(quantized, downsampledOriginal, edgeMask, 0.3)
+
+        // Step 10: Apply majority filter (avoiding edges)
+        console.log('Applying majority filter...')
+        const cleaned = majorityFilter(quantized, edgeMask, 30)
 
         // Step 6: Build grid data with symbols
         console.log('Building grid data...')
@@ -496,27 +596,20 @@ function findMostCommonNeighborColor(
 }
 
 /**
- * Build grid data with DMC codes and symbols
+ * Build grid data with DMC codes and defaultSymbols from style pack
  */
 function buildGridData(imageData: ImageData, palette: RGB[], stylePack: StylePack): DiamondCell[][] {
   const { width, height, data } = imageData
   const grid: DiamondCell[][] = []
 
-  // Create color to DMC mapping
-  const colorToDMC = new Map<string, DMCColor>()
+  // Create color to DMC+Symbol mapping using defaultSymbol from style pack
+  const colorToDMC = new Map<string, { dmc: typeof stylePack.colors[0]; symbol: string }>()
   palette.forEach((rgb, idx) => {
     const key = `${rgb.r},${rgb.g},${rgb.b}`
-    colorToDMC.set(key, stylePack.colors[idx])
-  })
-
-  // Assign symbols (A-Z for up to 26, then 0-9, then special chars)
-  const symbols = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*+='.split('')
-  const colorToSymbol = new Map<string, string>()
-  let symbolIdx = 0
-  palette.forEach((rgb) => {
-    const key = `${rgb.r},${rgb.g},${rgb.b}`
-    colorToSymbol.set(key, symbols[symbolIdx % symbols.length])
-    symbolIdx++
+    colorToDMC.set(key, {
+      dmc: stylePack.colors[idx],
+      symbol: stylePack.colors[idx].defaultSymbol,
+    })
   })
 
   for (let y = 0; y < height; y++) {
@@ -528,15 +621,17 @@ function buildGridData(imageData: ImageData, palette: RGB[], stylePack: StylePac
       const b = data[idx + 2]
       const colorKey = `${r},${g},${b}`
 
-      const dmc = colorToDMC.get(colorKey) || stylePack.colors[0]
-      const symbol = colorToSymbol.get(colorKey) || 'A'
+      const mapping = colorToDMC.get(colorKey) || {
+        dmc: stylePack.colors[0],
+        symbol: stylePack.colors[0].defaultSymbol,
+      }
 
       row.push({
         x,
         y,
-        dmcCode: dmc.code,
+        dmcCode: mapping.dmc.code,
         rgb: { r, g, b },
-        symbol,
+        symbol: mapping.symbol,
         tileCoord: { tx: x % TILE_SIZE, ty: y % TILE_SIZE },
       })
     }
@@ -616,7 +711,8 @@ function calculateBeadCounts(grid: DiamondCell[][], stylePack: StylePack): BeadC
       dmcColor: dmc,
       count,
       percentage: Math.round(percentage * 10) / 10,
-      symbol: symbols.get(dmc.code) || '?',
+      symbol: symbols.get(dmc.code) || dmc.defaultSymbol,
+      lowUsage: percentage < 1.0, // Mark colors below 1% as optional/low usage
     })
   })
 
@@ -627,7 +723,7 @@ function calculateBeadCounts(grid: DiamondCell[][], stylePack: StylePack): BeadC
 }
 
 /**
- * Generate high-res preview image
+ * Generate high-res preview image with stud outlines (QBRIX style)
  */
 function generatePreview(grid: DiamondCell[][], width: number, height: number): string {
   const scale = 8 // 8 pixels per bead
@@ -636,14 +732,18 @@ function generatePreview(grid: DiamondCell[][], width: number, height: number): 
   canvas.height = height * scale
   const ctx = canvas.getContext('2d')!
 
-  // Draw beads with diamond effect
+  // QBRIX-style beige background
+  ctx.fillStyle = '#EBD4B0'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  // Draw beads with diamond effect and stud outlines
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const cell = grid[y][x]
       const px = x * scale
       const py = y * scale
 
-      // Fill bead
+      // Fill bead color
       ctx.fillStyle = `rgb(${cell.rgb.r}, ${cell.rgb.g}, ${cell.rgb.b})`
       ctx.fillRect(px, py, scale, scale)
 
@@ -661,10 +761,19 @@ function generatePreview(grid: DiamondCell[][], width: number, height: number): 
       ctx.fillStyle = gradient
       ctx.fillRect(px, py, scale, scale)
 
-      // Grid lines
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)'
-      ctx.lineWidth = 0.5
+      // QBRIX-style stud outlines (visible grid)
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.25)'
+      ctx.lineWidth = 1
       ctx.strokeRect(px, py, scale, scale)
+
+      // Add symbol in center for reference (optional, subtle)
+      if (scale >= 8) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'
+        ctx.font = `${scale * 0.5}px Arial`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(cell.symbol, px + scale / 2, py + scale / 2)
+      }
     }
   }
 
