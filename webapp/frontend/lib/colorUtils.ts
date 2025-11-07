@@ -629,3 +629,434 @@ export function blendEdges(
 
   return new ImageData(output, width, height)
 }
+
+/**
+ * K-Means clustering for foreground/background segmentation
+ * Returns a binary mask (0 = background, 255 = foreground)
+ */
+export function kMeansSegmentation(imageData: ImageData, k: number = 2): Uint8Array {
+  const { width, height, data } = imageData
+  const pixels: LAB[] = []
+
+  // Convert all pixels to LAB
+  for (let i = 0; i < data.length; i += 4) {
+    const rgb = { r: data[i], g: data[i + 1], b: data[i + 2] }
+    pixels.push(rgbToLab(rgb))
+  }
+
+  // Sample border pixels to initialize background cluster
+  const borderSamples: LAB[] = []
+  const borderThickness = 5
+
+  // Top and bottom borders
+  for (let y = 0; y < borderThickness; y++) {
+    for (let x = 0; x < width; x++) {
+      borderSamples.push(pixels[y * width + x])
+      borderSamples.push(pixels[(height - 1 - y) * width + x])
+    }
+  }
+
+  // Left and right borders
+  for (let y = borderThickness; y < height - borderThickness; y++) {
+    for (let x = 0; x < borderThickness; x++) {
+      borderSamples.push(pixels[y * width + x])
+      borderSamples.push(pixels[y * width + (width - 1 - x)])
+    }
+  }
+
+  // Initialize centroids: background = mean of border, foreground = mean of center
+  let bgCentroid = { l: 0, a: 0, b: 0 }
+  borderSamples.forEach(lab => {
+    bgCentroid.l += lab.l
+    bgCentroid.a += lab.a
+    bgCentroid.b += lab.b
+  })
+  bgCentroid.l /= borderSamples.length
+  bgCentroid.a /= borderSamples.length
+  bgCentroid.b /= borderSamples.length
+
+  // Center region for foreground
+  const centerSamples: LAB[] = []
+  const cx = Math.floor(width / 2)
+  const cy = Math.floor(height / 2)
+  const radius = Math.min(width, height) / 4
+
+  for (let y = cy - radius; y < cy + radius; y++) {
+    for (let x = cx - radius; x < cx + radius; x++) {
+      if (x >= 0 && x < width && y >= 0 && y < height) {
+        centerSamples.push(pixels[y * width + x])
+      }
+    }
+  }
+
+  let fgCentroid = { l: 0, a: 0, b: 0 }
+  centerSamples.forEach(lab => {
+    fgCentroid.l += lab.l
+    fgCentroid.a += lab.a
+    fgCentroid.b += lab.b
+  })
+  fgCentroid.l /= centerSamples.length
+  fgCentroid.a /= centerSamples.length
+  fgCentroid.b /= centerSamples.length
+
+  const centroids = [bgCentroid, fgCentroid]
+
+  // K-means iterations
+  const maxIterations = 10
+  const assignments = new Uint8Array(pixels.length)
+
+  for (let iter = 0; iter < maxIterations; iter++) {
+    // Assignment step
+    for (let i = 0; i < pixels.length; i++) {
+      const pixel = pixels[i]
+      let minDist = Infinity
+      let cluster = 0
+
+      centroids.forEach((centroid, idx) => {
+        const dl = pixel.l - centroid.l
+        const da = pixel.a - centroid.a
+        const db = pixel.b - centroid.b
+        const dist = Math.sqrt(dl * dl + da * da + db * db)
+
+        if (dist < minDist) {
+          minDist = dist
+          cluster = idx
+        }
+      })
+
+      assignments[i] = cluster
+    }
+
+    // Update step
+    const counts = [0, 0]
+    const sums = [
+      { l: 0, a: 0, b: 0 },
+      { l: 0, a: 0, b: 0 }
+    ]
+
+    for (let i = 0; i < pixels.length; i++) {
+      const cluster = assignments[i]
+      counts[cluster]++
+      sums[cluster].l += pixels[i].l
+      sums[cluster].a += pixels[i].a
+      sums[cluster].b += pixels[i].b
+    }
+
+    centroids.forEach((centroid, idx) => {
+      if (counts[idx] > 0) {
+        centroid.l = sums[idx].l / counts[idx]
+        centroid.a = sums[idx].a / counts[idx]
+        centroid.b = sums[idx].b / counts[idx]
+      }
+    })
+  }
+
+  // Convert assignments to mask (0 = background, 255 = foreground)
+  const mask = new Uint8Array(pixels.length)
+  for (let i = 0; i < pixels.length; i++) {
+    mask[i] = assignments[i] === 1 ? 255 : 0
+  }
+
+  return mask
+}
+
+/**
+ * Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+ * Enhances local contrast without amplifying noise
+ */
+export function applyCLAHE(
+  imageData: ImageData,
+  clipLimit: number = 2.0,
+  tileSize: number = 8
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  // Process only L channel in LAB space
+  const lChannel = new Float32Array(width * height)
+  for (let i = 0; i < width * height; i++) {
+    const idx = i * 4
+    const rgb = { r: data[idx], g: data[idx + 1], b: data[idx + 2] }
+    lChannel[i] = rgbToLab(rgb).l
+  }
+
+  // Calculate tile dimensions
+  const tilesX = Math.ceil(width / tileSize)
+  const tilesY = Math.ceil(height / tileSize)
+
+  // Process each tile
+  const histograms: number[][][] = []
+
+  for (let ty = 0; ty < tilesY; ty++) {
+    histograms[ty] = []
+    for (let tx = 0; tx < tilesX; tx++) {
+      const hist = new Array(256).fill(0)
+
+      // Build histogram for this tile
+      const x0 = tx * tileSize
+      const y0 = ty * tileSize
+      const x1 = Math.min(x0 + tileSize, width)
+      const y1 = Math.min(y0 + tileSize, height)
+
+      let pixelCount = 0
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          const l = lChannel[y * width + x]
+          const bin = Math.min(255, Math.max(0, Math.floor(l * 2.55)))
+          hist[bin]++
+          pixelCount++
+        }
+      }
+
+      // Clip histogram
+      const clipValue = Math.floor(clipLimit * pixelCount / 256)
+      let excess = 0
+      for (let i = 0; i < 256; i++) {
+        if (hist[i] > clipValue) {
+          excess += hist[i] - clipValue
+          hist[i] = clipValue
+        }
+      }
+
+      // Redistribute excess
+      const increment = excess / 256
+      for (let i = 0; i < 256; i++) {
+        hist[i] += increment
+      }
+
+      // Create CDF
+      const cdf = new Array(256)
+      cdf[0] = hist[0]
+      for (let i = 1; i < 256; i++) {
+        cdf[i] = cdf[i - 1] + hist[i]
+      }
+
+      // Normalize CDF
+      const scale = 100 / (cdf[255] || 1)
+      for (let i = 0; i < 256; i++) {
+        cdf[i] *= scale
+      }
+
+      histograms[ty][tx] = cdf
+    }
+  }
+
+  // Apply equalization with bilinear interpolation between tiles
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x
+      const l = lChannel[idx]
+      const bin = Math.min(255, Math.max(0, Math.floor(l * 2.55)))
+
+      // Find which tile this pixel belongs to
+      const tx = Math.min(tilesX - 1, Math.floor(x / tileSize))
+      const ty = Math.min(tilesY - 1, Math.floor(y / tileSize))
+
+      // Simple lookup (could add bilinear interpolation for smoother results)
+      const newL = histograms[ty][tx][bin]
+
+      // Convert back to RGB
+      const rgbOrig = { r: data[idx * 4], g: data[idx * 4 + 1], b: data[idx * 4 + 2] }
+      const lab = rgbToLab(rgbOrig)
+      lab.l = newL
+
+      const newRgb = labToRgb(lab)
+      output[idx * 4] = newRgb.r
+      output[idx * 4 + 1] = newRgb.g
+      output[idx * 4 + 2] = newRgb.b
+    }
+  }
+
+  return new ImageData(output, width, height)
+}
+
+/**
+ * Apply different tone curves to foreground and background
+ */
+export function applySegmentedToneCurves(
+  imageData: ImageData,
+  mask: Uint8Array,
+  brightenFg: number = 1.15,
+  desaturateBg: number = 0.7
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  for (let i = 0; i < width * height; i++) {
+    const idx = i * 4
+    const isForeground = mask[i] > 127
+
+    const rgb = { r: data[idx], g: data[idx + 1], b: data[idx + 2] }
+    const lab = rgbToLab(rgb)
+
+    if (isForeground) {
+      // Brighten subject
+      lab.l = Math.min(100, lab.l * brightenFg)
+    } else {
+      // Desaturate background
+      lab.a *= desaturateBg
+      lab.b *= desaturateBg
+    }
+
+    const newRgb = labToRgb(lab)
+    output[idx] = newRgb.r
+    output[idx + 1] = newRgb.g
+    output[idx + 2] = newRgb.b
+  }
+
+  return new ImageData(output, width, height)
+}
+
+/**
+ * Histogram-aware quantization with target percentage enforcement
+ */
+export function quantizeWithTargetPercentages(
+  imageData: ImageData,
+  palette: RGB[],
+  targetPercentages: number[],
+  mask: Uint8Array,
+  tolerance: number = 15
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+  const totalPixels = width * height
+
+  // Initialize counters
+  const currentCounts = new Array(palette.length).fill(0)
+  const assignments = new Int16Array(totalPixels).fill(-1)
+
+  // Convert to LAB for all pixels
+  const labPixels: LAB[] = []
+  for (let i = 0; i < data.length; i += 4) {
+    labPixels.push(rgbToLab({ r: data[i], g: data[i + 1], b: data[i + 2] }))
+  }
+
+  const paletteLab = palette.map(rgbToLab)
+
+  // Multi-pass assignment with histogram balancing
+  const maxPasses = 3
+
+  for (let pass = 0; pass < maxPasses; pass++) {
+    for (let i = 0; i < totalPixels; i++) {
+      if (assignments[i] >= 0 && pass < maxPasses - 1) continue // Skip already assigned
+
+      const pixelLab = labPixels[i]
+      let bestIdx = -1
+      let bestScore = Infinity
+
+      for (let p = 0; p < palette.length; p++) {
+        // Calculate Delta E
+        const deltaE = deltaE2000(pixelLab, paletteLab[p])
+
+        // Calculate penalty if over target
+        const targetCount = (targetPercentages[p] / 100) * totalPixels
+        const currentPercent = (currentCounts[p] / totalPixels) * 100
+        const overTarget = Math.max(0, currentPercent - targetPercentages[p])
+        const penalty = overTarget > tolerance ? overTarget * 10 : 0
+
+        const score = deltaE + penalty
+
+        if (score < bestScore) {
+          bestScore = score
+          bestIdx = p
+        }
+      }
+
+      // Update assignment
+      if (assignments[i] >= 0) {
+        currentCounts[assignments[i]]--
+      }
+      assignments[i] = bestIdx
+      currentCounts[bestIdx]++
+    }
+  }
+
+  // Apply assignments
+  for (let i = 0; i < totalPixels; i++) {
+    const idx = i * 4
+    const colorIdx = assignments[i]
+    const color = palette[colorIdx]
+
+    output[idx] = color.r
+    output[idx + 1] = color.g
+    output[idx + 2] = color.b
+  }
+
+  return new ImageData(output, width, height)
+}
+
+/**
+ * Edge-preserving error diffusion with mask awareness
+ */
+export function errorDiffusionWithMask(
+  imageData: ImageData,
+  palette: RGB[],
+  mask: Uint8Array,
+  strength: number = 0.5
+): ImageData {
+  const { width, height, data } = imageData
+  const output = new Uint8ClampedArray(data)
+
+  // Error buffers
+  const errorR = new Float32Array(width * height)
+  const errorG = new Float32Array(width * height)
+  const errorB = new Float32Array(width * height)
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4
+      const pixelIdx = y * width + x
+
+      // Add accumulated error
+      let r = data[idx] + errorR[pixelIdx]
+      let g = data[idx + 1] + errorG[pixelIdx]
+      let b = data[idx + 2] + errorB[pixelIdx]
+
+      r = Math.max(0, Math.min(255, r))
+      g = Math.max(0, Math.min(255, g))
+      b = Math.max(0, Math.min(255, b))
+
+      // Find closest palette color
+      const closest = findClosestColorLAB({ r, g, b }, palette)
+
+      output[idx] = closest.color.r
+      output[idx + 1] = closest.color.g
+      output[idx + 2] = closest.color.b
+
+      // Calculate error
+      const errR = (r - closest.color.r) * strength
+      const errG = (g - closest.color.g) * strength
+      const errB = (b - closest.color.b) * strength
+
+      // Distribute error only within same mask region
+      const currentMask = mask[pixelIdx] > 127
+
+      // Floyd-Steinberg kernel
+      const distribute = [
+        { dx: 1, dy: 0, weight: 7 / 16 },
+        { dx: -1, dy: 1, weight: 3 / 16 },
+        { dx: 0, dy: 1, weight: 5 / 16 },
+        { dx: 1, dy: 1, weight: 1 / 16 }
+      ]
+
+      distribute.forEach(({ dx, dy, weight }) => {
+        const nx = x + dx
+        const ny = y + dy
+
+        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+          const neighborIdx = ny * width + nx
+          const neighborMask = mask[neighborIdx] > 127
+
+          // Only diffuse within same region
+          if (neighborMask === currentMask) {
+            errorR[neighborIdx] += errR * weight
+            errorG[neighborIdx] += errG * weight
+            errorB[neighborIdx] += errB * weight
+          }
+        }
+      })
+    }
+  }
+
+  return new ImageData(output, width, height)
+}
