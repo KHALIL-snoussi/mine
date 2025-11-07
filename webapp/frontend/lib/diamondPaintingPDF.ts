@@ -1,6 +1,10 @@
 /**
- * Diamond Painting PDF Generator
- * Creates comprehensive PDF with pattern, legend, and materials list
+ * QBRIX-Quality Diamond Painting PDF Generator
+ * Creates professional PDF booklet with:
+ * - Cover page with preview and materials
+ * - 16×16 tile instruction pages
+ * - Color legend
+ * - Assembly guide
  */
 
 import { AdvancedDiamondResult } from './advancedDiamondGenerator'
@@ -15,6 +19,580 @@ export interface PDFGeneratorOptions {
   includeInstructions: boolean
   title?: string
   customerName?: string
+}
+
+/**
+ * Generate QBRIX-style cover page HTML
+ */
+export function generateQBRIXCoverPage(
+  result: DiamondPaintingResult,
+  options: { title?: string; customerName?: string } = {}
+): string {
+  const { beadCounts, dimensions, totalBeads, difficulty, estimatedTime, stylePack, imageDataUrl } = result
+
+  // Calculate total bags needed (each bag contains 200 diamonds)
+  const diamondsPerBag = 200
+  const totalBags = beadCounts.reduce((sum, bead) => {
+    return sum + Math.ceil(bead.count / diamondsPerBag)
+  }, 0)
+
+  // Format name
+  const formatName = dimensions.widthBeads === 84 && dimensions.heightBeads === 119
+    ? 'A4 Portrait'
+    : dimensions.widthBeads === 119 && dimensions.heightBeads === 84
+    ? 'A4 Landscape'
+    : 'A4 Square'
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>QBRIX Diamond Painting - ${options.title || 'Custom Design'}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: white;
+      color: #000;
+      padding: 30px;
+    }
+
+    /* QBRIX Status Strip */
+    .status-strip {
+      background: #000;
+      color: white;
+      padding: 12px 20px;
+      margin-bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .status-strip .format {
+      font-size: 14px;
+    }
+
+    /* Hero Section */
+    .hero-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    .preview-container {
+      border: 2px solid #000;
+      padding: 10px;
+      background: #EBD4B0;
+    }
+
+    .preview-container img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .materials-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .stat-box {
+      border: 2px solid #000;
+      padding: 15px;
+      background: white;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+      color: #666;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #000;
+    }
+
+    .stat-detail {
+      font-size: 11px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    /* Palette Section */
+    .palette-section {
+      margin-bottom: 40px;
+    }
+
+    .section-header {
+      font-size: 18px;
+      font-weight: bold;
+      color: #000;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 3px solid #000;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 12px;
+    }
+
+    .color-card {
+      border: 2px solid #000;
+      background: white;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .color-swatch {
+      width: 100%;
+      height: 50px;
+      border: 1px solid #ccc;
+      margin-bottom: 8px;
+    }
+
+    .symbol-badge {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
+      text-align: center;
+      background: #f5f5f5;
+      border: 2px solid #000;
+      font-weight: bold;
+      font-family: monospace;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .dmc-code {
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 4px;
+      font-family: monospace;
+    }
+
+    .bead-count {
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 2px;
+    }
+
+    .bag-count {
+      font-size: 10px;
+      font-weight: 600;
+      color: #000;
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* Summary Table */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 30px;
+    }
+
+    .summary-table th {
+      background: #000;
+      color: white;
+      padding: 10px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .summary-table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      font-size: 12px;
+    }
+
+    .summary-table tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+
+    @media print {
+      body {
+        padding: 15px;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- QBRIX Status Strip -->
+  <div class="status-strip">
+    <div class="format">${formatName}</div>
+    <div class="style">${stylePack.name} Pack</div>
+    <div class="colors">${beadCounts.length} Colors</div>
+  </div>
+
+  <!-- Hero Section -->
+  <div class="hero-section">
+    <div class="preview-container">
+      <img src="${imageDataUrl}" alt="Diamond Painting Preview" />
+    </div>
+
+    <div class="materials-summary">
+      <div class="stat-box">
+        <div class="stat-label">Canvas Size</div>
+        <div class="stat-value">${dimensions.widthBeads} × ${dimensions.heightBeads}</div>
+        <div class="stat-detail">${dimensions.widthCm} × ${dimensions.heightCm} cm</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-label">Total Beads</div>
+        <div class="stat-value">${totalBeads.toLocaleString()}</div>
+        <div class="stat-detail">${totalBags} bags needed (200/bag)</div>
+      </div>
+
+      <div class="stat-box">
+        <div class="stat-label">Difficulty</div>
+        <div class="stat-value">${difficulty}</div>
+        <div class="stat-detail">Est. ${estimatedTime}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Palette Section -->
+  <div class="palette-section">
+    <div class="section-header">Color Palette &amp; Bead Requirements</div>
+
+    <div class="color-grid">
+      ${beadCounts
+        .filter(bead => bead.count > 0)
+        .map(
+          (bead) => `
+        <div class="color-card">
+          <div class="color-swatch" style="background-color: ${bead.dmcColor.hex};"></div>
+          <div class="symbol-badge">${bead.symbol}</div>
+          <div class="dmc-code">DMC ${bead.dmcColor.code}</div>
+          <div class="bead-count">${bead.count.toLocaleString()} beads</div>
+          <div class="bead-count">${bead.percentage.toFixed(1)}%</div>
+          <div class="bag-count">${Math.ceil(bead.count / diamondsPerBag)} bag${Math.ceil(bead.count / diamondsPerBag) !== 1 ? 's' : ''}</div>
+        </div>
+      `
+        )
+        .join('')}
+    </div>
+
+    <!-- Detailed Materials Table -->
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>DMC Code</th>
+          <th>Color Name</th>
+          <th>Beads Needed</th>
+          <th>Bags to Order</th>
+          <th>% of Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${beadCounts
+          .filter(bead => bead.count > 0)
+          .map(
+            (bead) => `
+          <tr>
+            <td style="text-align: center; font-weight: bold; font-family: monospace;">${bead.symbol}</td>
+            <td style="font-weight: bold; font-family: monospace;">DMC ${bead.dmcColor.code}</td>
+            <td>${bead.dmcColor.name}</td>
+            <td style="font-weight: bold;">${bead.count.toLocaleString()}</td>
+            <td style="font-weight: bold;">${Math.ceil(bead.count / diamondsPerBag)}</td>
+            <td>${bead.percentage.toFixed(1)}%</td>
+          </tr>
+        `
+          )
+          .join('')}
+        <tr style="background: #f0f0f0; font-weight: bold;">
+          <td colspan="3">TOTAL</td>
+          <td>${totalBeads.toLocaleString()}</td>
+          <td>${totalBags}</td>
+          <td>100%</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
+  `
+}
+
+/**
+ * Generate QBRIX-style tile instruction page
+ */
+export function generateTilePage(
+  result: DiamondPaintingResult,
+  tileIndex: number
+): string {
+  const { tiles, stylePack, beadCounts, dimensions } = result
+  const tile = tiles[tileIndex]
+
+  if (!tile) {
+    throw new Error(`Tile ${tileIndex} not found`)
+  }
+
+  // Get color mapping
+  const colorMap = new Map(
+    beadCounts.map(bc => [bc.dmcColor.code, { color: bc.dmcColor, symbol: bc.symbol }])
+  )
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tile ${tile.tileNumber} of ${tiles.length}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: white;
+      padding: 20px;
+    }
+
+    .status-strip {
+      background: #000;
+      color: white;
+      padding: 10px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    .tile-header {
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .tile-number {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .tile-info {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .grid-container {
+      display: inline-block;
+      border: 3px solid #000;
+      background: #EBD4B0;
+      padding: 10px;
+    }
+
+    .grid-wrapper {
+      display: grid;
+      grid-template-columns: 30px repeat(${tile.width}, 1fr);
+      grid-template-rows: 30px repeat(${tile.height}, 1fr);
+      gap: 0;
+    }
+
+    .corner-cell {
+      grid-column: 1;
+      grid-row: 1;
+      background: #fff;
+      border: 1px solid #999;
+    }
+
+    .col-label {
+      background: #fff;
+      border: 1px solid #999;
+      text-align: center;
+      font-weight: bold;
+      font-size: 10px;
+      padding: 5px 2px;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+
+    .row-label {
+      background: #fff;
+      border: 1px solid #999;
+      text-align: center;
+      font-weight: bold;
+      font-size: 10px;
+      padding: 2px 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .bead-cell {
+      width: 28px;
+      height: 28px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-family: monospace;
+      font-size: 14px;
+      position: relative;
+    }
+
+    .legend-section {
+      margin-top: 30px;
+      padding: 15px;
+      border: 2px solid #000;
+      background: white;
+    }
+
+    .legend-title {
+      font-weight: bold;
+      font-size: 14px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .legend-symbol {
+      width: 24px;
+      height: 24px;
+      border: 2px solid #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-family: monospace;
+      background: #f5f5f5;
+    }
+
+    .legend-swatch {
+      width: 24px;
+      height: 24px;
+      border: 1px solid #999;
+    }
+
+    @media print {
+      body {
+        padding: 10px;
+      }
+      .page-break {
+        page-break-after: always;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="status-strip">
+    <div>Tile ${tile.tileNumber} of ${tiles.length}</div>
+    <div>Position: Row ${tile.y + 1}, Col ${tile.x + 1}</div>
+    <div>${stylePack.name} Pack</div>
+  </div>
+
+  <div class="tile-header">
+    <div class="tile-number">Tile #${tile.tileNumber}</div>
+    <div class="tile-info">
+      Rows ${tile.startRow + 1}-${tile.startRow + tile.height} •
+      Columns ${tile.startCol + 1}-${tile.startCol + tile.width}
+    </div>
+  </div>
+
+  <div style="text-align: center;">
+    <div class="grid-container">
+      <div class="grid-wrapper">
+        <!-- Corner cell -->
+        <div class="corner-cell"></div>
+
+        <!-- Column labels -->
+        ${Array.from({ length: tile.width }, (_, i) => `
+          <div class="col-label">${tile.startCol + i + 1}</div>
+        `).join('')}
+
+        <!-- Grid rows with row labels -->
+        ${tile.beads.map((row, y) => `
+          <div class="row-label">${tile.startRow + y + 1}</div>
+          ${row.map((cell) => {
+            const mapping = colorMap.get(cell.dmcCode)
+            return `
+              <div class="bead-cell" style="background-color: ${cell.rgb.r > 200 && cell.rgb.g > 200 && cell.rgb.b > 200 ? '#fff' : mapping?.color.hex || '#fff'};">
+                <span style="color: ${cell.rgb.r + cell.rgb.g + cell.rgb.b > 400 ? '#000' : '#fff'}; text-shadow: ${cell.rgb.r + cell.rgb.g + cell.rgb.b > 400 ? '0 0 2px #fff' : '0 0 2px #000'};">
+                  ${mapping?.symbol || cell.symbol}
+                </span>
+              </div>
+            `
+          }).join('')}
+        `).join('')}
+      </div>
+    </div>
+  </div>
+
+  <!-- Color Legend for this tile -->
+  <div class="legend-section">
+    <div class="legend-title">Colors in this tile:</div>
+    <div class="legend-grid">
+      ${Array.from(new Set(tile.beads.flat().map(c => c.dmcCode)))
+        .map(code => {
+          const mapping = colorMap.get(code)
+          if (!mapping) return ''
+          return `
+            <div class="legend-item">
+              <div class="legend-symbol">${mapping.symbol}</div>
+              <div class="legend-swatch" style="background-color: ${mapping.color.hex};"></div>
+              <div>
+                <div style="font-weight: bold;">DMC ${code}</div>
+                <div style="font-size: 10px; color: #666;">${mapping.color.name}</div>
+              </div>
+            </div>
+          `
+        })
+        .filter(Boolean)
+        .join('')}
+    </div>
+  </div>
+</body>
+</html>
+  `
 }
 
 /**
@@ -521,18 +1099,18 @@ export function generatePatternLegendHTML(beadCounts: import('./advancedDiamondG
 }
 
 /**
- * Download materials list as HTML file
+ * Download QBRIX-style cover page
  */
-export function downloadMaterialsList(
+export function downloadQBRIXCover(
   result: DiamondPaintingResult,
   options: { title?: string; customerName?: string } = {}
 ): void {
-  const html = generateMaterialsListHTML(result, options)
+  const html = generateQBRIXCoverPage(result, options)
   const blob = new Blob([html], { type: 'text/html' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `diamond-painting-materials-${options.title || 'custom'}.html`
+  a.download = `qbrix-cover-${options.title || 'custom'}.html`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -540,13 +1118,43 @@ export function downloadMaterialsList(
 }
 
 /**
- * Print materials list
+ * Download specific tile page
  */
-export function printMaterialsList(
+export function downloadTilePage(
+  result: DiamondPaintingResult,
+  tileIndex: number
+): void {
+  const html = generateTilePage(result, tileIndex)
+  const blob = new Blob([html], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `tile-${tileIndex + 1}-of-${result.tiles.length}.html`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Download all tile pages as separate HTML files (zipped)
+ */
+export function downloadAllTiles(result: DiamondPaintingResult): void {
+  // For now, download them sequentially
+  // In production, you'd want to use JSZip to create a single zip file
+  result.tiles.forEach((_, index) => {
+    setTimeout(() => downloadTilePage(result, index), index * 100)
+  })
+}
+
+/**
+ * Print QBRIX cover page
+ */
+export function printQBRIXCover(
   result: DiamondPaintingResult,
   options: { title?: string; customerName?: string } = {}
 ): void {
-  const html = generateMaterialsListHTML(result, options)
+  const html = generateQBRIXCoverPage(result, options)
   const printWindow = window.open('', '_blank')
   if (printWindow) {
     printWindow.document.write(html)
@@ -556,4 +1164,42 @@ export function printMaterialsList(
       printWindow.print()
     }, 250)
   }
+}
+
+/**
+ * Print specific tile page
+ */
+export function printTilePage(result: DiamondPaintingResult, tileIndex: number): void {
+  const html = generateTilePage(result, tileIndex)
+  const printWindow = window.open('', '_blank')
+  if (printWindow) {
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 250)
+  }
+}
+
+/**
+ * Download materials list as HTML file (legacy)
+ */
+export function downloadMaterialsList(
+  result: DiamondPaintingResult,
+  options: { title?: string; customerName?: string } = {}
+): void {
+  // Use new QBRIX cover page instead
+  downloadQBRIXCover(result, options)
+}
+
+/**
+ * Print materials list (legacy)
+ */
+export function printMaterialsList(
+  result: DiamondPaintingResult,
+  options: { title?: string; customerName?: string } = {}
+): void {
+  // Use new QBRIX cover page instead
+  printQBRIXCover(result, options)
 }
