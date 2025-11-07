@@ -8,7 +8,15 @@ import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/Button'
 import DiamondCropSelector from '@/components/DiamondCropSelector'
 import { generateAdvancedDiamondPainting, AdvancedDiamondResult, AdvancedDiamondOptions } from '@/lib/advancedDiamondGenerator'
-import { downloadMaterialsList, printMaterialsList } from '@/lib/diamondPaintingPDF'
+import {
+  downloadMaterialsList,
+  printMaterialsList,
+  downloadQBRIXCover,
+  printQBRIXCover,
+  downloadTilePage,
+  printTilePage,
+  downloadAllTiles,
+} from '@/lib/diamondPaintingPDF'
 import { getAllStylePacks } from '@/lib/diamondStylePacks'
 
 function formatFileSize(bytes: number) {
@@ -27,6 +35,7 @@ export default function DiamondPaintingPage() {
   const [generationProgress, setGenerationProgress] = useState(0)
   const [generationStep, setGenerationStep] = useState<string>('Preparing...')
   const [result, setResult] = useState<AdvancedDiamondResult | null>(null)
+  const [selectedTile, setSelectedTile] = useState<number>(0) // For tile preview
 
   // Diamond painting options - Qbrix style (manual selection)
   const [canvasFormat, setCanvasFormat] = useState<'a4_portrait' | 'a4_landscape' | 'a4_square'>('a4_square')
@@ -180,6 +189,21 @@ export default function DiamondPaintingPage() {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+  }
+
+  const handleViewTile = (tileIndex: number) => {
+    if (!result) return
+    printTilePage(result, tileIndex)
+  }
+
+  const handleDownloadTile = (tileIndex: number) => {
+    if (!result) return
+    downloadTilePage(result, tileIndex)
+  }
+
+  const handleDownloadAllTiles = () => {
+    if (!result) return
+    downloadAllTiles(result)
   }
 
   return (
@@ -522,10 +546,13 @@ export default function DiamondPaintingPage() {
                         📥 Download Pattern Image
                       </Button>
                       <Button onClick={handleDownloadMaterials} variant="outline" className="w-full">
-                        📋 Download Materials List (HTML)
+                        📋 Download QBRIX Cover Page
                       </Button>
                       <Button onClick={handlePrintMaterials} variant="outline" className="w-full">
-                        🖨️ Print Materials List
+                        🖨️ Print Cover Page
+                      </Button>
+                      <Button onClick={handleDownloadAllTiles} variant="outline" className="w-full">
+                        📦 Download All Tiles ({result.tiles.length})
                       </Button>
                     </div>
 
@@ -533,6 +560,43 @@ export default function DiamondPaintingPage() {
                       <Button onClick={() => window.location.reload()} className="w-full">
                         ✨ Create Another Pattern
                       </Button>
+                    </div>
+                  </div>
+
+                  {/* Tile Viewer */}
+                  <div className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70 p-8">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                      View Assembly Instructions
+                    </h3>
+                    <p className="text-sm text-slate-600 mb-6">
+                      Click any tile to view detailed instructions with symbols and row/column numbers
+                    </p>
+
+                    <div className="grid gap-2" style={{
+                      gridTemplateColumns: `repeat(${result.dimensions.tilesWide}, 1fr)`
+                    }}>
+                      {result.tiles.map((tile, index) => (
+                        <button
+                          key={tile.tileNumber}
+                          onClick={() => handleViewTile(index)}
+                          className="relative group aspect-square border-2 border-slate-300 hover:border-primary-500 rounded-lg transition-all hover:shadow-md bg-gradient-to-br from-slate-50 to-slate-100 hover:from-primary-50 hover:to-primary-100"
+                        >
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-sm font-bold text-slate-700 group-hover:text-primary-700">
+                              {tile.tileNumber}
+                            </span>
+                          </div>
+                          <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded">
+                              View
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="mt-4 text-xs text-slate-500 text-center">
+                      {result.dimensions.tilesWide} × {result.dimensions.tilesHigh} = {result.tiles.length} tiles total
                     </div>
                   </div>
 
