@@ -693,9 +693,9 @@ export default function DiamondPaintingPage() {
                         )
 
                         const rowStart = tile.startRow + 1
-                        const rowEnd = tile.endRow
+                        const rowEnd = tile.startRow + tile.height
                         const colStart = tile.startCol + 1
-                        const colEnd = tile.endCol
+                        const colEnd = tile.startCol + tile.width
 
                         return (
                           <div

@@ -121,8 +121,8 @@ function generateTileSpreadBody(
   // Calculate grid section covered by this spread
   const firstTile = tilesOnPage[0]
   const lastTile = tilesOnPage[tilesOnPage.length - 1]
-  const rowRange = `Rows ${firstTile.startRow + 1}–${lastTile.endRow} of ${dimensions.heightBeads}`
-  const colRange = `Cols ${firstTile.startCol + 1}–${lastTile.endCol} of ${dimensions.widthBeads}`
+  const rowRange = `Rows ${firstTile.startRow + 1}–${lastTile.startRow + lastTile.height} of ${dimensions.heightBeads}`
+  const colRange = `Cols ${firstTile.startCol + 1}–${lastTile.startCol + lastTile.width} of ${dimensions.widthBeads}`
   const pageNumber = Math.floor(startTileIndex / 12) + 1
   const totalPages = Math.ceil(tiles.length / 12)
 
