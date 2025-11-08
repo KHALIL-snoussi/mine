@@ -23,17 +23,23 @@ except ImportError:
     from utils.opencv import require_cv2
 
 
-def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
-    """
-    Assign each pixel in image to the nearest color in palette
+def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Assign each pixel in ``image`` to the nearest entry in ``palette``.
+
+    Returning the palette label grid alongside the quantized image keeps the
+    multi-region pipeline deterministic so that downstream code (region
+    detection, assembly sheet generation, analytics) can re-use the exact same
+    assignments without re-quantizing.
 
     Args:
-        image: Input image (H, W, 3) in BGR
-        palette: Color palette (N, 3) in BGR
+        image: Input image (H, W, 3) in RGB order.
+        palette: Color palette (N, 3) in RGB order.
 
     Returns:
-        Quantized image with pixels assigned to palette colors
+        Tuple ``(quantized_image, label_map)`` where ``label_map`` matches the
+        image dimensions and stores palette indices for each pixel.
     """
+
     h, w = image.shape[:2]
     pixels = image.reshape(-1, 3).astype(np.float32)
 
@@ -44,7 +50,7 @@ def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> np.ndarr
     # Create quantized image
     quantized = palette[labels].reshape(h, w, 3).astype(np.uint8)
 
-    return quantized
+    return quantized, labels.reshape(h, w)
 
 
 class ColorQuantizer:

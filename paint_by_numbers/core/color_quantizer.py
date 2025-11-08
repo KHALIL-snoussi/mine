@@ -139,17 +139,25 @@ def delta_e_cie2000(lab1: np.ndarray, lab2: np.ndarray) -> float:
     return dE
 
 
-def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> np.ndarray:
-    """
-    Assign each pixel in image to the nearest color in palette
+def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Assign each pixel in ``image`` to the nearest entry in ``palette``.
+
+    The previous implementation only returned the quantized image which meant
+    downstream consumers (region detection, assembly sheet generation) had to
+    recompute label maps.  Returning the label grid alongside the quantized
+    image keeps the operation deterministic and gives callers direct access to
+    the exact palette indices used for every pixel – critical for QBRIX-style
+    reporting where we must prove color allocation.
 
     Args:
-        image: Input image (H, W, 3) in BGR
-        palette: Color palette (N, 3) in BGR
+        image: Input image (H, W, 3) in RGB order.
+        palette: Color palette (N, 3) in RGB order.
 
     Returns:
-        Quantized image with pixels assigned to palette colors
+        Tuple containing ``(quantized_image, label_map)`` where ``label_map`` is
+        a 2D array of palette indices matching ``image.shape[:2]``.
     """
+
     h, w = image.shape[:2]
     pixels = image.reshape(-1, 3).astype(np.float32)
 
@@ -160,7 +168,7 @@ def assign_colors_to_palette(image: np.ndarray, palette: np.ndarray) -> np.ndarr
     # Create quantized image
     quantized = palette[labels].reshape(h, w, 3).astype(np.uint8)
 
-    return quantized
+    return quantized, labels.reshape(h, w)
 
 
 class ColorQuantizer:

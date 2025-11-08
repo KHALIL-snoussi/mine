@@ -5,6 +5,8 @@ Template generation and management endpoints
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from pydantic import BaseModel
+import numpy as np
 import shutil
 import sys
 import logging
@@ -31,8 +33,19 @@ from paint_by_numbers.main import PaintByNumbersGenerator
 from paint_by_numbers.palettes import PaletteManager
 from paint_by_numbers.models import ModelRegistry
 from paint_by_numbers.intelligence.kit_recommender import KitRecommender
+from paint_by_numbers.intelligence.subject_detector import SubjectDetector
+from paint_by_numbers.utils.opencv import require_cv2
 
 router = APIRouter()
+
+
+class SubjectDetectionResponse(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+    confidence: float
+    region_type: str
 
 
 # Helper functions
@@ -62,6 +75,36 @@ def convert_file_path_to_url(file_path: Optional[str]) -> Optional[str]:
 
     # Otherwise add backend URL with /uploads/ prefix
     return f"{settings.BACKEND_URL}/uploads/{file_path.lstrip('/')}"
+
+
+@router.post("/detect-subject", response_model=SubjectDetectionResponse)
+async def detect_subject_region(file: UploadFile = File(...)) -> SubjectDetectionResponse:
+    """Detect the primary subject/face for region emphasis previews."""
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty image payload")
+
+    np_bytes = np.frombuffer(data, dtype=np.uint8)
+    cv2 = require_cv2()
+    image = cv2.imdecode(np_bytes, cv2.IMREAD_COLOR)
+
+    if image is None:
+        raise HTTPException(status_code=400, detail="Could not decode image data")
+
+    detector = SubjectDetector()
+    subject = detector.detect_best_subject(image)
+    x, y, width, height = subject.get_bbox()
+    h, w = image.shape[:2]
+
+    return SubjectDetectionResponse(
+        x=float(x / w),
+        y=float(y / h),
+        width=float(width / w),
+        height=float(height / h),
+        confidence=float(subject.confidence),
+        region_type=subject.subject_type,
+    )
 
 
 def prepare_template_response(template: Template) -> dict:
@@ -116,7 +159,7 @@ async def generate_template_background(
     num_colors: Optional[int],
     model: str,
     paper_format: str,
-    use_region_emphasis: bool = False,
+    use_region_emphasis: bool = True,
     emphasized_region: Optional[dict] = None,
 ):
     """Generate template in background with optional region emphasis"""
@@ -197,7 +240,7 @@ async def generate_template(
     paper_format: str = "a4",
     title: Optional[str] = "Untitled",
     is_public: bool = False,
-    use_region_emphasis: bool = False,
+    use_region_emphasis: bool = True,
     region_x: Optional[float] = None,
     region_y: Optional[float] = None,
     region_width: Optional[float] = None,

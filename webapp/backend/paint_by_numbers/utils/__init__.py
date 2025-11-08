@@ -12,6 +12,7 @@ from .helpers import (
     create_color_palette_image,
     ensure_uint8
 )
+from .visualization import AssemblySheetBuilder
 
 __all__ = [
     "resize_image",
@@ -23,5 +24,6 @@ __all__ = [
     "is_point_inside_region",
     "smooth_contours",
     "create_color_palette_image",
-    "ensure_uint8"
+    "ensure_uint8",
+    "AssemblySheetBuilder",
 ]

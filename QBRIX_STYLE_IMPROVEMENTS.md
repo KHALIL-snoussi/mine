@@ -163,6 +163,23 @@ await apiClient.generateTemplate(file, {
 
 ---
 
+## ✅ Regression Coverage & Tooling Checklist
+
+- `tests/test_qbrix_pipeline.py` now runs a full auto-emphasis generation and asserts:
+  - the emphasis summary guarantees ≥70% of the color budget goes to the detected subject,
+  - background regions retain larger minimum sizes (≈1.8×) to stay smooth,
+  - QBRIX-style assembly metadata (84 tiles, 24×24 grid) is emitted alongside image assets.
+- The same test module validates `AssemblySheetBuilder` symbol mapping and page rendering so the 24×24 layout never regresses.
+- Install **OpenCV** locally via `pip install opencv-python-headless` (or system packages providing `cv2`) before running `pytest` — without it, the emphasis and assembly tests will skip.
+- After any pipeline tweak, run:
+  ```bash
+  pytest tests/test_qbrix_pipeline.py -k auto_emphasis
+  pytest tests/test_qbrix_pipeline.py -k assembly
+  ```
+  and capture comparisons from `generate_ultra_hd.py` to confirm premium sharpness.
+
+---
+
 ## 🔧 Integration Steps
 
 ### **Step 1**: Add Face Detection API Endpoint
@@ -365,3 +382,11 @@ Background: 6 colors × 80% area = sufficient for simple areas
 **Result**: Professional QBRIX-quality faces with crystal-clear detail! 🚀
 
 **Next**: Integrate into main generator and deploy! 💪
+
+## ✅ 2024 QBRIX Quality Lock-Ins
+
+- `PaintByNumbersGenerator.generate()` now enables region emphasis by default and auto-detects faces or salient regions when no manual rectangle is supplied. The generated results expose an `emphasis` summary so we can assert ≥70% of the color budget goes to the subject and that background regions stay coarser.
+- A dedicated `AssemblySheetBuilder` produces 84 segments (24×24 cells, 12 per page) with deterministic symbol/ID mapping, stored under `result['assembly']` and exported as `_assembly_page_XX.png` assets.
+- The web UI fetches `/api/v1/templates/detect-subject` to surface the auto-detected focus area, provides a toggle to disable emphasis, and lets artists manually adjust the overlay via the upgraded `<AreaSelector>` component.
+- Backend and frontend share deterministic palette IDs so the printed sheets, legends, and metadata all agree on symbol usage.
+- Regression test `tests/test_qbrix_pipeline.py` fabricates a portrait, runs the full generator, and verifies subject color share, min-region ratios, assembly metadata, and artifact creation—guarding QBRIX sharpness going forward.

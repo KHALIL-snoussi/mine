@@ -35,6 +35,7 @@ from .intelligence.color_optimizer import ColorOptimizer
 from .models import ModelRegistry, ModelProfile
 from .formats import FormatRegistry, ImageFormatter, FitMode
 from .utils.opencv import require_cv2
+from .utils.visualization import AssemblySheetBuilder
 
 
 class PaintByNumbersGenerator:
@@ -90,6 +91,10 @@ class PaintByNumbersGenerator:
         self.color_mixing_guide = None
         self.current_model = None
         self.recommended_paint_kit = None  # Business: Recommend which kit to buy
+        self.multi_region_result = None
+        self.emphasis_summary = None
+        self.assembly_pages = []
+        self.assembly_metadata = {}
 
     def apply_model(self, model_id: str) -> ModelProfile:
         """
@@ -134,7 +139,7 @@ class PaintByNumbersGenerator:
                 palette_name: Optional[str] = None,
                 model: str = "classic",
                 paper_format: str = "a4",
-                use_region_emphasis: bool = False,
+                use_region_emphasis: bool = True,
                 emphasized_region: Optional[dict] = None) -> dict:
         """
         Generate complete paint-by-numbers package from input image
@@ -248,43 +253,62 @@ class PaintByNumbersGenerator:
         styled_image = self.color_quantizer.apply_color_style(self.processed_image)
 
         # Multi-region processing if enabled
-        if use_region_emphasis and emphasized_region:
-            logger.info("🎯 Using multi-region processing with user-selected area")
-
+        self.multi_region_result = None
+        self.emphasis_summary = None
+        if use_region_emphasis:
             from paint_by_numbers.intelligence.subject_detector import SubjectRegion
             from paint_by_numbers.core.multi_region_processor import MultiRegionProcessor
+            from paint_by_numbers.core.color_quantizer import assign_colors_to_palette
 
-            # Convert dict to SubjectRegion
-            h, w = styled_image.shape[:2]
-            subject_reg = SubjectRegion(
-                x=int(emphasized_region['x'] * w),
-                y=int(emphasized_region['y'] * h),
-                width=int(emphasized_region['width'] * w),
-                height=int(emphasized_region['height'] * h),
-                confidence=1.0,
-                subject_type='manual'
-            )
-
-            # Process with emphasis
             processor = MultiRegionProcessor(self.config)
+
+            h, w = styled_image.shape[:2]
+            subject_reg = None
+            auto_detect = True
+
+            if emphasized_region:
+                logger.info("🎯 Using multi-region processing with user-selected area")
+                subject_reg = SubjectRegion(
+                    x=int(emphasized_region['x'] * w),
+                    y=int(emphasized_region['y'] * h),
+                    width=int(emphasized_region['width'] * w),
+                    height=int(emphasized_region['height'] * h),
+                    confidence=1.0,
+                    subject_type='manual'
+                )
+                auto_detect = False
+            else:
+                logger.info("🎯 Auto-detecting subject for premium QBRIX emphasis")
+
             multi_result = processor.process_with_emphasis(
                 styled_image,
                 total_colors=n_colors,
-                auto_detect=False,
+                auto_detect=auto_detect,
                 subject_region=subject_reg
             )
 
-            # Use combined palette from multi-region processing
+            self.multi_region_result = multi_result
             self.palette = multi_result['combined_palette']
 
-            # Quantize using the combined palette
-            from paint_by_numbers.core.color_quantizer import assign_colors_to_palette
-            self.quantized_image = assign_colors_to_palette(styled_image, self.palette)
+            # Quantize using the combined palette and capture label map
+            self.quantized_image, label_map = assign_colors_to_palette(styled_image, self.palette)
+            self.color_quantizer.labels = label_map
+            self.color_quantizer.quantized_image = self.quantized_image
+            self.color_quantizer.palette = self.palette
 
-            logger.info(f"✅ Multi-region processing complete")
+            logger.info("✅ Multi-region processing complete")
             logger.info(f"   Emphasized: {len(multi_result['emphasized_palette'])} colors")
             logger.info(f"   Background: {len(multi_result['background_palette'])} colors")
 
+            subject_used = multi_result['subject_region']
+            self.emphasis_summary = self._summarize_emphasis(
+                subject_used,
+                multi_result['region_configs'],
+                len(multi_result['emphasized_palette']),
+                len(multi_result['background_palette']),
+                styled_image.shape[:2],
+                auto_detect=auto_detect
+            )
         else:
             # Standard single-region quantization
             self.quantized_image, self.palette = self.color_quantizer.quantize(
@@ -313,6 +337,14 @@ class PaintByNumbersGenerator:
         percentages = self.color_quantizer.get_color_percentages()
         logger.info(f"  Colors used: {len(self.palette)}")
         logger.info(f"  Dominant color: {max(percentages.values()):.1f}% of image")
+
+        if self.emphasis_summary:
+            color_allocation = self.emphasis_summary['color_allocation']
+            logger.info(
+                "  Emphasis allocation: %.1f%% subject / %.1f%% background",
+                color_allocation['emphasized_percent'] * 100,
+                color_allocation['background_percent'] * 100,
+            )
 
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
@@ -432,6 +464,17 @@ class PaintByNumbersGenerator:
         if self.config.SHOW_PROGRESS:
             pbar.update(1)
 
+        builder = AssemblySheetBuilder(self.config)
+        color_ids = self._build_color_ids(palette_name, len(self.palette))
+        label_map = self.color_quantizer.labels
+        assembly_pages, assembly_metadata = builder.build_pages(
+            label_map=label_map,
+            palette=self.palette,
+            color_ids=color_ids
+        )
+        self.assembly_pages = assembly_pages
+        self.assembly_metadata = assembly_metadata
+
         # Step 8: Save outputs
         logger.info(f"\n[8/8] Saving outputs...")
 
@@ -483,6 +526,22 @@ class PaintByNumbersGenerator:
         cv2.imwrite(str(guide_path), cv2.cvtColor(guide, cv2.COLOR_RGB2BGR))
         logger.info(f"  Coloring guide saved to: {guide_path}")
         result_files['guide'] = str(guide_path)
+
+        assembly_paths = []
+        for page_idx, page in enumerate(self.assembly_pages, start=1):
+            assembly_path = output_path / f"{input_name}_assembly_page_{page_idx:02d}.png"
+            builder.save_page(page, str(assembly_path))
+            assembly_paths.append(str(assembly_path))
+            logger.info(f"  Assembly page {page_idx:02d} saved to: {assembly_path}")
+
+        if assembly_paths:
+            result_files['assembly'] = {
+                'pages': assembly_paths,
+                'metadata': self.assembly_metadata
+            }
+
+        if self.emphasis_summary:
+            result_files['emphasis'] = self.emphasis_summary
 
         # Save comparison
         comparison = self.template_generator.create_comparison_image(
@@ -641,6 +700,53 @@ class PaintByNumbersGenerator:
         logger.info(f"\n✨ Generated with intelligent color selection and quality analysis!")
 
         return result_files
+
+    def _summarize_emphasis(self, subject_region, region_configs, emphasized_colors,
+                             background_colors, image_shape, auto_detect: bool) -> dict:
+        h, w = image_shape
+        x, y, rw, rh = subject_region.get_bbox()
+
+        total_colors = max(1, emphasized_colors + background_colors)
+        emphasized_percent = emphasized_colors / total_colors
+        background_percent = background_colors / total_colors
+
+        emphasized_cfg = region_configs['emphasized']
+        background_cfg = region_configs['background']
+
+        return {
+            'auto_detected': auto_detect,
+            'subject_region': {
+                'x': x / w,
+                'y': y / h,
+                'width': rw / w,
+                'height': rh / h,
+                'confidence': subject_region.confidence,
+                'type': subject_region.subject_type,
+            },
+            'color_allocation': {
+                'emphasized_colors': emphasized_colors,
+                'background_colors': background_colors,
+                'total_colors': total_colors,
+                'emphasized_percent': emphasized_percent,
+                'background_percent': background_percent,
+            },
+            'region_configs': {
+                'emphasized_min_region': emphasized_cfg.min_region_size,
+                'background_min_region': background_cfg.min_region_size,
+                'emphasized_weight': emphasized_cfg.weight,
+                'background_weight': background_cfg.weight,
+            }
+        }
+
+    def _build_color_ids(self, palette_name: Optional[str], num_colors: int) -> list:
+        qbrix_reference = ["1478", "2351", "379", "712", "1309", "1397", "1851"]
+
+        if num_colors <= len(qbrix_reference):
+            return qbrix_reference[:num_colors]
+
+        base = 2001
+        step = 37
+        return [str(base + step * idx) for idx in range(num_colors)]
 
 
 def main():

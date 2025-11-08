@@ -43,10 +43,18 @@ export default function AreaSelector({
       // If auto-detected area exists, use it
       if (autoDetectedArea) {
         setSelectedArea(autoDetectedArea)
+        onAreaSelect(autoDetectedArea)
       }
     }
     img.src = imageUrl
-  }, [imageUrl, autoDetectedArea])
+  }, [imageUrl, autoDetectedArea, onAreaSelect])
+
+  useEffect(() => {
+    if (autoDetectedArea) {
+      setSelectedArea(autoDetectedArea)
+      onAreaSelect(autoDetectedArea)
+    }
+  }, [autoDetectedArea, onAreaSelect])
 
   // Draw canvas
   useEffect(() => {

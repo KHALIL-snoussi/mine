@@ -45,6 +45,15 @@ export interface Template {
   updated_at?: string
 }
 
+export interface DetectedSubjectRegion {
+  x: number
+  y: number
+  width: number
+  height: number
+  confidence: number
+  region_type: string
+}
+
 export interface Palette {
   name: string
   display_name: string
@@ -265,6 +274,16 @@ class APIClient {
     }
 
     return this.request<Template>('/api/v1/templates/generate', {
+      method: 'POST',
+      body: formData,
+    })
+  }
+
+  async detectSubjectRegion(file: File): Promise<DetectedSubjectRegion> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    return this.request<DetectedSubjectRegion>('/api/v1/templates/detect-subject', {
       method: 'POST',
       body: formData,
     })

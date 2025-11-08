@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useDropzone } from 'react-dropzone'
@@ -8,7 +8,7 @@ import { useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/Button'
 import ModelSelector from '@/components/ModelSelector'
 import BeforeAfterSlider from '@/components/BeforeAfterSlider'
-import ManualAreaSelector, { type SelectedArea } from '@/components/ManualAreaSelector'
+import AreaSelector, { type SelectedArea } from '@/components/AreaSelector'
 import PortraitCropSelector from '@/components/PortraitCropSelector'
 import { apiClient, type KitRecommendation } from '@/lib/api'
 import { useModels, usePalettes } from '@/lib/hooks'
@@ -33,14 +33,19 @@ function formatFileSize(bytes: number) {
 export default function CreatePage() {
   const router = useRouter()
 
-const [selectedFile, setSelectedFile] = useState<File | null>(null)
-const [preview, setPreview] = useState<string | null>(null)
-const [originalPreview, setOriginalPreview] = useState<string | null>(null)
-const [showCropSelector, setShowCropSelector] = useState(false)
-const [croppedFile, setCroppedFile] = useState<File | null>(null)
-const [selectedModel, setSelectedModel] = useState('original')
-const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
-const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [originalPreview, setOriginalPreview] = useState<string | null>(null)
+  const [showCropSelector, setShowCropSelector] = useState(false)
+  const [croppedFile, setCroppedFile] = useState<File | null>(null)
+  const [selectedModel, setSelectedModel] = useState('original')
+  const [recommendedModel, setRecommendedModel] = useState<{ modelId: string; reason: string } | null>(null)
+  const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
+  const [autoDetectedArea, setAutoDetectedArea] = useState<SelectedArea | null>(null)
+  const [autoDetectionConfidence, setAutoDetectionConfidence] = useState<number | null>(null)
+  const [regionDetectionStatus, setRegionDetectionStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [emphasisEnabled, setEmphasisEnabled] = useState(true)
+  const detectionKeyRef = useRef<string | null>(null)
 
   // Model-to-palette mapping (each model has its own colors)
   const MODEL_PALETTES: Record<string, string> = {
@@ -104,6 +109,32 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
     ]
   }, [selectedFile, showValidation, showCropSelector, croppedFile, hasValidImage, isGenerating])
 
+  const runSubjectDetection = useCallback(async (file: File) => {
+    setRegionDetectionStatus('loading')
+
+    try {
+      const detection = await apiClient.detectSubjectRegion(file)
+      const normalizedArea: SelectedArea = {
+        x: Math.min(1, Math.max(0, detection.x)),
+        y: Math.min(1, Math.max(0, detection.y)),
+        width: Math.min(1, Math.max(0.1, detection.width)),
+        height: Math.min(1, Math.max(0.1, detection.height)),
+        type: 'auto',
+      }
+
+      setAutoDetectedArea(normalizedArea)
+      setSelectedArea(normalizedArea)
+      setAutoDetectionConfidence(detection.confidence)
+      setRegionDetectionStatus('ready')
+    } catch (error) {
+      console.error('Subject detection failed:', error)
+      setAutoDetectedArea(null)
+      setAutoDetectionConfidence(null)
+      setSelectedArea(null)
+      setRegionDetectionStatus('error')
+    }
+  }, [])
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
     if (!file) return
@@ -119,6 +150,12 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
     setShowValidation(false)
     setKitRecommendation(null)
     setShowAllKits(false)
+    setSelectedArea(null)
+    setAutoDetectedArea(null)
+    setAutoDetectionConfidence(null)
+    setRegionDetectionStatus('idle')
+    setEmphasisEnabled(true)
+    detectionKeyRef.current = null
 
     const validationResult = await validateImage(file)
     setValidation(validationResult)
@@ -172,6 +209,23 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
     maxSize: 10 * 1024 * 1024,
   })
 
+  useEffect(() => {
+    const file = croppedFile ?? selectedFile
+    if (!file || showCropSelector) {
+      return
+    }
+
+    const lastModified = (file as File & { lastModified?: number }).lastModified ?? 0
+    const key = `${file.name}-${file.size}-${lastModified}`
+
+    if (detectionKeyRef.current === key) {
+      return
+    }
+
+    detectionKeyRef.current = key
+    runSubjectDetection(file)
+  }, [croppedFile, selectedFile, showCropSelector, runSubjectDetection])
+
   // Handle crop completion
   const handleCropComplete = async (croppedImageUrl: string) => {
     // Convert cropped image URL to File
@@ -199,6 +253,13 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
     setSelectedFile(null)
     setOriginalPreview(null)
     setPreview(null)
+    setCroppedFile(null)
+    setSelectedArea(null)
+    setAutoDetectedArea(null)
+    setAutoDetectionConfidence(null)
+    setRegionDetectionStatus('idle')
+    setEmphasisEnabled(true)
+    detectionKeyRef.current = null
   }
 
   const handleGenerate = async () => {
@@ -223,13 +284,23 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
 
       setGenerationMessage('Analyzing colors and balancing detail...')
 
+      const emphasizedRegionPayload =
+        emphasisEnabled && selectedArea
+          ? {
+              x: selectedArea.x,
+              y: selectedArea.y,
+              width: selectedArea.width,
+              height: selectedArea.height,
+            }
+          : undefined
+
       const template = await apiClient.generateTemplate(fileToUpload, {
         palette_name: selectedPalette,
         model: selectedModel,
         title: selectedFile.name || 'Preview Template',
         is_public: !apiClient.isAuthenticated(),
-        // No region emphasis needed - we're using the entire cropped area
-        use_region_emphasis: false,
+        use_region_emphasis: emphasisEnabled,
+        emphasized_region: emphasizedRegionPayload,
       })
 
       setGenerationProgress(100)
@@ -638,6 +709,76 @@ const [selectedArea, setSelectedArea] = useState<SelectedArea | null>(null)
                         onCropComplete={handleCropComplete}
                         onCancel={handleCropCancel}
                       />
+                    </div>
+                  )}
+
+                  {preview && !showCropSelector && (
+                    <div className="mt-8 rounded-3xl bg-white shadow-xl ring-1 ring-slate-200/70">
+                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/70 px-6 py-5">
+                        <div>
+                          <h3 className="text-xl font-semibold text-slate-900">Step 3 · Focus the subject</h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            We auto-detect the face and give it ≥70% of the color budget. Drag to fine-tune just like the QBRIX kit.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEmphasisEnabled((prev) => !prev)}
+                          className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-all ${
+                            emphasisEnabled ? 'bg-emerald-100 text-emerald-700 shadow-sm' : 'bg-slate-200 text-slate-600'
+                          }`}
+                        >
+                          {emphasisEnabled ? '✅ Emphasis enabled' : '⏹ Even color distribution'}
+                        </button>
+                      </div>
+
+                      <div className="space-y-6 p-6">
+                        <AreaSelector
+                          imageUrl={preview}
+                          onAreaSelect={setSelectedArea}
+                          autoDetectedArea={autoDetectedArea}
+                          className={emphasisEnabled ? '' : 'pointer-events-none opacity-60'}
+                        />
+
+                        {!emphasisEnabled && (
+                          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                            Emphasis is off — the generator will distribute colors evenly across the whole canvas.
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                          <div className="flex flex-wrap items-center gap-3">
+                            {regionDetectionStatus === 'loading' && (
+                              <span className="flex items-center gap-2 text-amber-600">
+                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></span>
+                                Scanning for faces...
+                              </span>
+                            )}
+                            {regionDetectionStatus === 'ready' && autoDetectionConfidence !== null && (
+                              <span className="flex items-center gap-2 text-emerald-600">
+                                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                                Auto-detected focus · confidence {Math.round(autoDetectionConfidence * 100)}%
+                              </span>
+                            )}
+                            {regionDetectionStatus === 'error' && (
+                              <span className="text-red-600">Auto-detect failed — drag to pick the subject manually.</span>
+                            )}
+                            {regionDetectionStatus === 'idle' && (
+                              <span className="text-slate-500">Upload an image to auto-detect the main subject.</span>
+                            )}
+                          </div>
+
+                          <div className="text-slate-600">
+                            {selectedArea ? (
+                              <span>
+                                {selectedArea.type === 'auto' ? 'Auto region ready' : 'Custom region active'} · {Math.round(selectedArea.width * selectedArea.height * 100)}% of image
+                              </span>
+                            ) : (
+                              <span>Drag a rectangle to tell us what should stay ultra sharp.</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
 
