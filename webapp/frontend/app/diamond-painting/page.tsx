@@ -320,7 +320,6 @@ export default function DiamondPaintingPage() {
                   {showCropSelector && originalPreview ? (
                     <DiamondCropSelector
                       imageUrl={originalPreview}
-                      aspectRatio="free"
                       onCropComplete={handleCropComplete}
                       onCancel={handleCropCancel}
                     />

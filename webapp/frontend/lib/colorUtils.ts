@@ -919,7 +919,8 @@ export function quantizeWithTargetPercentages(
   mask: Uint8Array,
   tolerance: number = 15,
   underUsePenalty: number = 5, // Negative penalty (bonus) for under-used colors
-  minColorPercent: number = 3 // Floor: no color drops below this %
+  minColorPercent: number = 3, // Floor: no color drops below this %
+  perColorMinimums?: number[]
 ): ImageData {
   const { width, height, data } = imageData
   const output = new Uint8ClampedArray(data)
@@ -959,9 +960,10 @@ export function quantizeWithTargetPercentages(
         let penalty = 0
 
         // FLOOR ENFORCEMENT: If color is below minColorPercent, apply MASSIVE bonus
-        if (currentPercent < minColorPercent) {
+        const floor = perColorMinimums?.[p] ?? minColorPercent
+        if (currentPercent < floor) {
           // Huge bonus (negative penalty) to ensure it reaches the floor
-          penalty = (minColorPercent - currentPercent) * -50
+          penalty = (floor - currentPercent) * -50
         } else if (deviation > tolerance) {
           // Over target: STRONG penalty to push pixels away
           // Increased from 10 to 25 for more aggressive balancing
@@ -1001,6 +1003,35 @@ export function quantizeWithTargetPercentages(
   }
 
   return new ImageData(output, width, height)
+}
+
+/**
+ * Estimate how closely each palette color matches the current image
+ * Returns percentage distribution (sums to 100)
+ */
+export function estimatePaletteUsage(imageData: ImageData, palette: RGB[]): number[] {
+  const { data, width, height } = imageData
+  const totalPixels = width * height || 1
+  const counts = new Array(palette.length).fill(0)
+  const paletteLab = palette.map(rgbToLab)
+
+  for (let i = 0; i < data.length; i += 4) {
+    const pixelLab = rgbToLab({ r: data[i], g: data[i + 1], b: data[i + 2] })
+    let bestIdx = 0
+    let bestScore = Infinity
+
+    for (let p = 0; p < paletteLab.length; p++) {
+      const score = deltaE2000(pixelLab, paletteLab[p])
+      if (score < bestScore) {
+        bestScore = score
+        bestIdx = p
+      }
+    }
+
+    counts[bestIdx]++
+  }
+
+  return counts.map((count) => (count / totalPixels) * 100)
 }
 
 /**

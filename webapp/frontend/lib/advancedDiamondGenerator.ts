@@ -12,7 +12,7 @@
  */
 
 import { DMCColor } from './dmcColors'
-import { StylePack, getStylePackById } from './diamondStylePacks'
+import { StylePack, StylePackColor, getStylePackById } from './diamondStylePacks'
 import {
   RGB,
   LAB,
@@ -36,6 +36,7 @@ import {
   maskAwareUnsharpMask,
   enhanceEdgeDetail,
   applyStochasticDither,
+  estimatePaletteUsage,
 } from './colorUtils'
 
 export interface AdvancedDiamondOptions {
@@ -70,7 +71,7 @@ export interface DiamondCell {
 }
 
 export interface BeadCount {
-  dmcColor: DMCColor
+  dmcColor: StylePackColor
   count: number
   percentage: number
   symbol: string
@@ -124,6 +125,16 @@ const CANVAS_PRESETS = {
 
 const TILE_SIZE = 16 // 16×16 beads per tile (QBRIX standard)
 const BEAD_SIZE_MM = 2.5 // Standard diamond drill size
+
+function normalizePercentages(values: number[]): number[] {
+  if (!values.length) return values
+  const sum = values.reduce((acc, value) => acc + value, 0)
+  if (sum === 0) {
+    const fallback = 100 / values.length
+    return values.map(() => fallback)
+  }
+  return values.map((value) => (value / sum) * 100)
+}
 
 /**
  * Find the lightest color in palette (for background)
@@ -292,17 +303,31 @@ export async function generateAdvancedDiamondPainting(
         console.log('Step 12: Applying stochastic dither...')
         imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
 
-        // Step 13: Histogram-aware quantization with target percentages
+        // Step 13: Histogram-aware quantization with adaptive targets
         console.log('Step 13: Quantizing with histogram balancing...')
-        const targetPercentages = stylePack.colors.map(c => c.targetPercentage)
+        const naturalUsage = estimatePaletteUsage(imageData, palette)
+        const blendedTargets = normalizePercentages(
+          stylePack.colors.map((color, idx) => {
+            const natural = naturalUsage[idx] || 0
+            // Blend scene-aware usage with style intent (heavier weight on scene)
+            return color.targetPercentage * 0.35 + natural * 0.65
+          })
+        )
+        const perColorFloors = naturalUsage.map((percent) => {
+          if (percent < 0.2) return 0 // Allow removal if color doesn't exist
+          if (percent < 1) return percent * 0.5
+          return Math.min(stylePack.minColorPercent, percent * 0.85)
+        })
+
         let quantized = quantizeWithTargetPercentages(
           imageData,
           palette,
-          targetPercentages,
+          blendedTargets,
           segmentationMask,
           15, // ±15% tolerance
           5,  // Under-use penalty (favors under-used colors)
-          stylePack.minColorPercent // Floor: no color drops below this %
+          0,  // Base floor handled via per-color floors
+          perColorFloors
         )
 
         // Step 14: Force background to lightest color (AFTER quantization)
@@ -356,7 +381,7 @@ export async function generateAdvancedDiamondPainting(
         const backgroundCount = beadCounts.find(bc => bc.dmcColor.code === backgroundDMC.code)?.count || 0
         const backgroundPercentage = (backgroundCount / (gridWidth * gridHeight)) * 100
 
-        // Count edge pixels
+        // Count edge pixels (used for quality diagnostics)
         let edgePixelCount = 0
         for (let i = 0; i < edgeMask.length; i++) {
           if (edgeMask[i] > 30) edgePixelCount++
@@ -399,11 +424,7 @@ export async function generateAdvancedDiamondPainting(
             Math.round((foregroundColorCounts[code] / totalForegroundPixels) * 1000) / 10
         }
 
-        // Calculate edge density
-        let edgePixelCount = 0
-        for (let i = 0; i < edgeMask.length; i++) {
-          if (edgeMask[i] > 30) edgePixelCount++
-        }
+        // Calculate edge density from the previously counted edge pixels
         const edgeDensity = (edgePixelCount / (gridWidth * gridHeight)) * 100
 
         const diagnostics: ProcessingDiagnostics = {
