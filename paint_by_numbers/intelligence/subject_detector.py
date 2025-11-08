@@ -110,13 +110,13 @@ class SubjectDetector:
             logger.warning(f"Could not load face cascades: {e}")
 
     def detect_faces(self, image: np.ndarray,
-                     min_size: Tuple[int, int] = (80, 80)) -> List[SubjectRegion]:
+                     min_size: Tuple[int, int] = (60, 60)) -> List[SubjectRegion]:
         """
-        Detect human faces using Haar cascades
+        Detect human faces using Haar cascades with improved QBRIX-quality thresholds
 
         Args:
             image: Input image (BGR)
-            min_size: Minimum face size
+            min_size: Minimum face size (lowered to 60x60 for better detection)
 
         Returns:
             List of detected face regions
@@ -128,35 +128,63 @@ class SubjectDetector:
         # Convert to grayscale for detection
         gray = self.cv2.cvtColor(image, self.cv2.COLOR_BGR2GRAY)
 
-        # Detect faces
+        # Apply histogram equalization for better detection in varying lighting
+        gray = self.cv2.equalizeHist(gray)
+
+        # Detect faces with improved parameters
         faces = self.face_cascade.detectMultiScale(
             gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
+            scaleFactor=1.08,  # More thorough search (was 1.1)
+            minNeighbors=4,    # Slightly more lenient (was 5) for better recall
             minSize=min_size,
             flags=self.cv2.CASCADE_SCALE_IMAGE
         )
 
         detected = []
-        for (x, y, w, h) in faces:
-            # Verify face by checking for eyes
-            confidence = 0.7  # Base confidence
+        h_img, w_img = image.shape[:2]
 
+        for (x, y, w, h) in faces:
+            # Calculate face position and size metrics for confidence scoring
+            face_area = w * h
+            image_area = w_img * h_img
+            face_ratio = face_area / image_area
+
+            # Check if face is reasonably centered (within middle 80% of image)
+            center_x = x + w / 2
+            center_y = y + h / 2
+            is_centered = (0.2 * w_img < center_x < 0.8 * w_img and
+                          0.2 * h_img < center_y < 0.8 * h_img)
+
+            # Base confidence based on face size
+            if face_ratio > 0.15:  # Large face (>15% of image)
+                confidence = 0.85
+            elif face_ratio > 0.08:  # Medium face (8-15%)
+                confidence = 0.80
+            else:  # Small face (<8%)
+                confidence = 0.75
+
+            # Boost confidence if eyes detected
             if self.eye_cascade is not None:
                 face_roi = gray[y:y+h, x:x+w]
-                eyes = self.eye_cascade.detectMultiScale(face_roi, minSize=(20, 20))
+                eyes = self.eye_cascade.detectMultiScale(face_roi, minSize=(15, 15))
                 if len(eyes) >= 2:
-                    confidence = 0.95  # High confidence if eyes detected
+                    confidence = min(0.98, confidence + 0.15)  # High confidence with eyes
+                elif len(eyes) == 1:
+                    confidence = min(0.90, confidence + 0.08)  # Moderate boost
+
+            # Boost confidence if face is well-centered
+            if is_centered:
+                confidence = min(0.99, confidence + 0.05)
 
             region = SubjectRegion(x, y, w, h, confidence, 'face')
             detected.append(region)
 
-        logger.info(f"Detected {len(detected)} faces")
+        logger.info(f"Detected {len(detected)} faces with confidence scores")
         return detected
 
     def detect_salient_region(self, image: np.ndarray) -> Optional[SubjectRegion]:
         """
-        Detect salient/important region using saliency detection
+        Detect salient/important region using saliency detection with QBRIX-quality improvements
         Fallback if no faces detected
 
         Args:
@@ -173,10 +201,17 @@ class SubjectDetector:
             if not success:
                 return None
 
+            # Apply Gaussian blur to reduce noise
+            saliency_map = self.cv2.GaussianBlur(saliency_map, (9, 9), 0)
+
             # Threshold to get salient regions
             saliency_map = (saliency_map * 255).astype(np.uint8)
             _, thresh = self.cv2.threshold(saliency_map, 0, 255,
                                           self.cv2.THRESH_BINARY + self.cv2.THRESH_OTSU)
+
+            # Morphological operations to clean up mask
+            kernel = self.cv2.getStructuringElement(self.cv2.MORPH_ELLIPSE, (11, 11))
+            thresh = self.cv2.morphologyEx(thresh, self.cv2.MORPH_CLOSE, kernel)
 
             # Find largest salient region
             contours, _ = self.cv2.findContours(thresh, self.cv2.RETR_EXTERNAL,
@@ -189,8 +224,27 @@ class SubjectDetector:
             largest = max(contours, key=self.cv2.contourArea)
             x, y, w, h = self.cv2.boundingRect(largest)
 
-            region = SubjectRegion(x, y, w, h, 0.6, 'salient')
-            logger.info(f"Detected salient region at ({x}, {y}, {w}, {h})")
+            # Calculate confidence based on size and position
+            h_img, w_img = image.shape[:2]
+            area_ratio = (w * h) / (w_img * h_img)
+
+            # Higher confidence for larger, more prominent regions
+            if area_ratio > 0.25:  # Large salient region
+                confidence = 0.72
+            elif area_ratio > 0.15:  # Medium salient region
+                confidence = 0.68
+            else:  # Small salient region
+                confidence = 0.62
+
+            # Expand region slightly to include context (10% padding)
+            padding = 0.1
+            x = max(0, int(x - w * padding))
+            y = max(0, int(y - h * padding))
+            w = min(w_img - x, int(w * (1 + 2 * padding)))
+            h = min(h_img - y, int(h * (1 + 2 * padding)))
+
+            region = SubjectRegion(x, y, w, h, confidence, 'salient')
+            logger.info(f"Detected salient region at ({x}, {y}, {w}, {h}) with confidence {confidence:.2f}")
             return region
 
         except Exception as e:
@@ -198,26 +252,45 @@ class SubjectDetector:
             return None
 
     def get_center_region(self, image: np.ndarray,
-                          size_factor: float = 0.6) -> SubjectRegion:
+                          size_factor: float = 0.55) -> SubjectRegion:
         """
-        Get center region as fallback
+        Get center region as fallback with QBRIX-quality improvements
         Assumes subject is in center of image
 
         Args:
             image: Input image
-            size_factor: Size of region relative to image (0-1)
+            size_factor: Size of region relative to image (reduced to 0.55 for tighter crop)
 
         Returns:
             Center region
         """
         h, w = image.shape[:2]
-        region_w = int(w * size_factor)
-        region_h = int(h * size_factor)
+
+        # Adjust size factor based on aspect ratio
+        aspect_ratio = w / h
+
+        # For portrait orientation (taller than wide), use slightly smaller horizontal crop
+        if aspect_ratio < 0.8:  # Portrait
+            region_w = int(w * (size_factor * 0.9))  # Tighter horizontal
+            region_h = int(h * size_factor)
+            logger.info("Detected portrait orientation - using portrait-optimized center crop")
+        # For landscape orientation, use slightly smaller vertical crop
+        elif aspect_ratio > 1.4:  # Landscape
+            region_w = int(w * size_factor)
+            region_h = int(h * (size_factor * 0.9))  # Tighter vertical
+            logger.info("Detected landscape orientation - using landscape-optimized center crop")
+        else:  # Square or moderate aspect ratio
+            region_w = int(w * size_factor)
+            region_h = int(h * size_factor)
+
         x = (w - region_w) // 2
         y = (h - region_h) // 2
 
-        region = SubjectRegion(x, y, region_w, region_h, 0.5, 'center')
-        logger.info(f"Using center region as fallback")
+        # Slightly higher confidence for well-composed images (confidence based on assumption)
+        confidence = 0.55
+
+        region = SubjectRegion(x, y, region_w, region_h, confidence, 'center')
+        logger.info(f"Using center region as fallback (confidence: {confidence:.2f})")
         return region
 
     def detect_best_subject(self, image: np.ndarray,
