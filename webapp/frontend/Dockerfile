@@ -2,7 +2,8 @@ FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# Install native build deps needed for packages like canvas
+RUN apk add --no-cache libc6-compat python3 make g++ cairo-dev pango-dev jpeg-dev giflib-dev
 WORKDIR /app
 
 # Copy package files
