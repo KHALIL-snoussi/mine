@@ -88,12 +88,14 @@ class ImageProcessor:
         return balanced
 
     def _apply_local_contrast(self, image: np.ndarray) -> np.ndarray:
-        """Enhance local contrast using CLAHE in LAB space."""
+        """Enhance local contrast using CLAHE in LAB space (light touch for diamond painting)."""
         if not getattr(self.config, "APPLY_LOCAL_CONTRAST", False):
             return image
 
         cv2 = require_cv2()
-        clip_limit = float(getattr(self.config, "CLAHE_CLIP_LIMIT", 2.0))
+        # Reduced CLAHE for more natural look (diamond painting works best with natural contrast)
+        # clip_limit: 2.0→1.5 (less aggressive enhancement)
+        clip_limit = float(getattr(self.config, "CLAHE_CLIP_LIMIT", 1.5))
         tile_grid = getattr(self.config, "CLAHE_TILE_GRID_SIZE", (8, 8))
         lab = cv2.cvtColor(image, cv2.COLOR_RGB2LAB)
         l_channel, a_channel, b_channel = cv2.split(lab)
@@ -106,13 +108,16 @@ class ImageProcessor:
         return cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2RGB)
 
     def _apply_unsharp_mask(self, image: np.ndarray) -> np.ndarray:
-        """Sharpen image using unsharp masking."""
+        """Sharpen image using unsharp masking (optimized for diamond painting)."""
         if not getattr(self.config, "APPLY_SHARPENING", False):
             return image
 
         cv2 = require_cv2()
-        amount = float(getattr(self.config, "SHARPEN_AMOUNT", 0.5))
-        radius = int(max(1, getattr(self.config, "SHARPEN_RADIUS", 3)))
+        # Reduced sharpening for natural, clean look (like diamond painting)
+        # amount: 0.5→0.25 (lighter sharpening)
+        # radius: 3→2 (smaller kernel for subtle effect)
+        amount = float(getattr(self.config, "SHARPEN_AMOUNT", 0.25))
+        radius = int(max(1, getattr(self.config, "SHARPEN_RADIUS", 2)))
 
         kernel_size = radius * 2 + 1
         blurred = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
@@ -259,10 +264,14 @@ class ImageProcessor:
         processed = self._apply_white_balance(processed)
         processed = self._apply_tone_balance(processed)
 
-        # Pre-denoise to avoid fragmenting regions before clustering
+        # DIAMOND-PAINTING-OPTIMIZED PREPROCESSING
+        # Use lighter filtering for cleaner, more natural results
+        # Similar to canvas downsampling approach but with minimal enhancements
+
+        # Optional light denoising (disabled by default for natural look)
         if getattr(self.config, "APPLY_DENOISE", False):
-            h = float(getattr(self.config, "DENOISE_STRENGTH", 7))
-            h_color = float(getattr(self.config, "DENOISE_COLOR_STRENGTH", 7))
+            h = float(getattr(self.config, "DENOISE_STRENGTH", 5))  # Reduced from 7
+            h_color = float(getattr(self.config, "DENOISE_COLOR_STRENGTH", 5))  # Reduced from 7
             try:
                 processed = cv2.fastNlMeansDenoisingColored(
                     processed, None, h, h_color, 7, 21
@@ -273,25 +282,33 @@ class ImageProcessor:
                         "OpenCV build missing fastNlMeansDenoisingColored; skipping denoise step"
                     )
 
-        # Apply Gaussian blur for subtle noise smoothing
+        # Light Gaussian blur for minimal noise smoothing (like canvas anti-aliasing)
         if apply_gaussian:
-            kernel = self.config.GAUSSIAN_BLUR_KERNEL
+            # Reduced from (5,5) to (3,3) for lighter touch
+            kernel = (3, 3)
             processed = cv2.GaussianBlur(processed, kernel, 0)
 
-        # Apply bilateral filter for edge-preserving smoothing
+        # Lighter bilateral filter - preserve natural colors and edges
         if apply_bilateral:
+            # Reduced parameters for cleaner, less processed look
+            # d: 8→5 (smaller neighborhood)
+            # sigma: 70→40 (less smoothing, more natural)
             processed = cv2.bilateralFilter(
                 processed,
-                d=self.config.BILATERAL_FILTER_D,
-                sigmaColor=self.config.BILATERAL_SIGMA_COLOR,
-                sigmaSpace=self.config.BILATERAL_SIGMA_SPACE
+                d=5,
+                sigmaColor=40,
+                sigmaSpace=40
             )
 
-        # Reinforce local contrast before quantization
-        processed = self._apply_local_contrast(processed)
+        # Optional subtle local contrast (disabled by default to avoid over-processing)
+        # Diamond painting works best with natural contrast
+        if getattr(self.config, "APPLY_LOCAL_CONTRAST", False):
+            processed = self._apply_local_contrast(processed)
 
-        # Final sharpening to keep contours crisp
-        processed = self._apply_unsharp_mask(processed)
+        # Very light sharpening to preserve detail without artifacts
+        if getattr(self.config, "APPLY_SHARPENING", False):
+            # Reduced sharpening for natural look
+            processed = self._apply_unsharp_mask(processed)
 
         processed = ensure_uint8(processed)
 
@@ -359,6 +376,52 @@ class ImageProcessor:
         )
 
         return edges
+
+    def apply_majority_filter(self, image: np.ndarray,
+                             edge_mask: Optional[np.ndarray] = None,
+                             edge_threshold: int = 30) -> np.ndarray:
+        """
+        Apply 3×3 majority filter to remove single-pixel noise.
+        Only affects non-edge pixels to preserve important details.
+
+        Args:
+            image: Input quantized image
+            edge_mask: Optional edge strength map (0-255)
+            edge_threshold: Threshold above which pixels are considered edges
+
+        Returns:
+            Filtered image
+        """
+        cv2 = require_cv2()
+        h, w = image.shape[:2]
+
+        # Generate edge mask if not provided
+        if edge_mask is None:
+            gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            edge_mask = cv2.Canny(gray, 30, 100)
+
+        output = image.copy()
+
+        for y in range(1, h - 1):
+            for x in range(1, w - 1):
+                # Skip edge pixels
+                if edge_mask[y, x] > edge_threshold:
+                    continue
+
+                # Count color occurrences in 3×3 neighborhood
+                color_counts = {}
+
+                for ky in range(-1, 2):
+                    for kx in range(-1, 2):
+                        ny, nx = y + ky, x + kx
+                        color = tuple(image[ny, nx])
+                        color_counts[color] = color_counts.get(color, 0) + 1
+
+                # Find majority color
+                majority_color = max(color_counts.items(), key=lambda x: x[1])[0]
+                output[y, x] = majority_color
+
+        return output
 
     def get_image_info(self) -> dict:
         """

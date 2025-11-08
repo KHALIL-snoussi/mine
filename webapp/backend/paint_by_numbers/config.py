@@ -10,24 +10,24 @@ from pathlib import Path
 class Config:
     """Configuration settings for the paint-by-numbers generator"""
 
-    # Image Processing
+    # Image Processing - DIAMOND PAINTING OPTIMIZED (lighter, cleaner preprocessing)
     MAX_IMAGE_SIZE = (1200, 1200)  # Maximum dimensions for processing (backend limit)
     MIN_IMAGE_SIZE = (400, 400)    # Minimum dimensions for good results
     # IMPORTANT: Frontend PortraitCropSelector must stay within MAX_IMAGE_SIZE
     # to prevent memory issues and crashes
     AUTO_WHITE_BALANCE = True      # Apply gray-world white balance correction
     WHITE_BALANCE_CLIP = 0.01      # Clip percentile for white balance scaling
-    APPLY_DENOISE = True           # Run fast denoising prior to clustering
-    DENOISE_STRENGTH = 7           # Strength for luminance denoising
-    DENOISE_COLOR_STRENGTH = 7     # Strength for chroma denoising
-    APPLY_LOCAL_CONTRAST = True    # Use CLAHE based local contrast enhancement
-    CLAHE_CLIP_LIMIT = 2.5         # Clip limit for CLAHE
+    APPLY_DENOISE = False          # Disabled by default for natural look (like canvas downsampling)
+    DENOISE_STRENGTH = 5           # Lighter strength if enabled (reduced from 7)
+    DENOISE_COLOR_STRENGTH = 5     # Lighter chroma denoising (reduced from 7)
+    APPLY_LOCAL_CONTRAST = False   # Disabled by default to avoid over-processing
+    CLAHE_CLIP_LIMIT = 1.5         # Lighter CLAHE if enabled (reduced from 2.5)
     CLAHE_TILE_GRID_SIZE = (8, 8)  # Tile grid for CLAHE (must be tuple)
     APPLY_TONE_BALANCE = True      # Normalize global brightness before clustering
     TONE_BALANCE_TARGET = 0.55     # Desired normalized luminance (0-1)
-    APPLY_SHARPENING = True        # Apply unsharp masking for edge clarity
-    SHARPEN_RADIUS = 3             # Radius for Gaussian blur in unsharp mask
-    SHARPEN_AMOUNT = 0.6           # Sharpening amount (0-1 suggested)
+    APPLY_SHARPENING = False       # Disabled by default for cleaner, natural look
+    SHARPEN_RADIUS = 2             # Smaller radius if enabled (reduced from 3)
+    SHARPEN_AMOUNT = 0.25          # Much lighter sharpening (reduced from 0.6)
 
     # Color Quantization
     DEFAULT_NUM_COLORS = 15        # Default number of colors
@@ -54,9 +54,10 @@ class Config:
     MORPHOLOGY_KERNEL_SIZE = 3     # Kernel size for morphological operations
     MORPH_CLOSE_ITERATIONS = 1     # Closing passes for mask cleanup
     MORPH_OPEN_ITERATIONS = 1      # Opening passes for mask cleanup
-    BILATERAL_FILTER_D = 9         # Bilateral filter diameter
-    BILATERAL_SIGMA_COLOR = 75     # Bilateral filter sigma color
-    BILATERAL_SIGMA_SPACE = 75     # Bilateral filter sigma space
+    # Lighter bilateral filtering for natural, clean results (like diamond painting)
+    BILATERAL_FILTER_D = 5         # Reduced diameter (was 9) for lighter smoothing
+    BILATERAL_SIGMA_COLOR = 40     # Reduced sigma (was 75) for more natural colors
+    BILATERAL_SIGMA_SPACE = 40     # Reduced sigma (was 75) for cleaner edges
 
     # Contour Detection
     CONTOUR_THICKNESS = 2          # Thickness of contour lines
