@@ -349,10 +349,10 @@ class LegendGenerator:
     def save_legend(self, legend: np.ndarray, output_path: str,
                    dpi: Optional[int] = None):
         """
-        Save legend to file
+        Save legend to file with proper DPI metadata
 
         Args:
-            legend: Legend image
+            legend: Legend image (RGB format)
             output_path: Output file path
             dpi: DPI for saving
         """
@@ -362,11 +362,31 @@ class LegendGenerator:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Convert RGB to BGR
-        cv2 = require_cv2()
-        bgr_legend = cv2.cvtColor(legend, cv2.COLOR_RGB2BGR)
+        # Use PIL to save with proper DPI metadata
+        try:
+            from PIL import Image
 
-        cv2.imwrite(str(output_path), bgr_legend, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            # Convert numpy array to PIL Image
+            pil_image = Image.fromarray(legend)
+
+            # Determine file format
+            file_ext = output_path.suffix.lower()
+
+            if file_ext in ['.png', '.PNG']:
+                pil_image.save(str(output_path), format='PNG', dpi=(dpi, dpi), optimize=True)
+            elif file_ext in ['.jpg', '.jpeg', '.JPG', '.JPEG']:
+                pil_image.save(str(output_path), format='JPEG', dpi=(dpi, dpi), quality=95)
+            else:
+                pil_image.save(str(output_path), format='PNG', dpi=(dpi, dpi), optimize=True)
+
+            logger.info(f"Legend saved to: {output_path} (@ {dpi} DPI)")
+
+        except ImportError:
+            # Fallback to OpenCV if PIL not available
+            logger.warning("PIL not available, saving legend without DPI metadata")
+            cv2 = require_cv2()
+            bgr_legend = cv2.cvtColor(legend, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(str(output_path), bgr_legend, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
         logger.info(f"Legend saved to: {output_path}")
 
