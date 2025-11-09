@@ -32,7 +32,7 @@ class Config:
     # Color Quantization
     DEFAULT_NUM_COLORS = 15        # Default number of colors
     MIN_NUM_COLORS = 5
-    MAX_NUM_COLORS = 30
+    MAX_NUM_COLORS = 36            # Increased for high-quality prints (was 30)
     COLOR_SAMPLE_FRACTION = 0.3    # Fraction of pixels to sample for clustering
     KMEANS_COLOR_SPACE = "lab"     # Color space for clustering (rgb, lab, hsv)
     PALETTE_DISTANCE_METRIC = "lab"  # Metric for palette projection
@@ -173,6 +173,81 @@ class Config:
                 "APPLY_LOCAL_CONTRAST": True,
                 "APPLY_TONE_BALANCE": True,
                 "AUTO_WHITE_BALANCE": True,
+            },
+            "print_quality_50x35": {
+                "DEFAULT_NUM_COLORS": 36,
+                "MIN_REGION_SIZE": 50,  # Larger threshold for high-res to avoid tiny regions
+                "MAX_IMAGE_SIZE": (5906, 4134),  # 50×35 cm @ 300 DPI for print quality
+                "FONT_SCALE": 0.25,
+                "EDGE_THRESHOLD_LOW": 25,
+                "EDGE_THRESHOLD_HIGH": 180,
+                "BILATERAL_FILTER_D": 5,
+                "BILATERAL_SIGMA_COLOR": 45,
+                "BILATERAL_SIGMA_SPACE": 45,
+                "MORPHOLOGY_KERNEL_SIZE": 2,
+                "USE_UNIFIED_PALETTE": False,  # Use custom clustering for maximum accuracy
+                "UNIFIED_PALETTE_NAME": "classic_24",
+                "GENERATE_SVG": True,
+                "GENERATE_PDF": True,
+                "APPLY_SHARPENING": True,
+                "SHARPEN_AMOUNT": 1.2,  # Extra sharpening for print clarity
+                "SHARPEN_RADIUS": 5,
+                "CLAHE_CLIP_LIMIT": 4.0,  # Enhanced contrast for details
+                "APPLY_LOCAL_CONTRAST": True,
+                "APPLY_TONE_BALANCE": True,
+                "AUTO_WHITE_BALANCE": True,
+                "CONTOUR_THICKNESS": 2,  # Thicker lines for print
+                "DPI": 300,
+            },
+            "print_quality_60x40": {
+                "DEFAULT_NUM_COLORS": 36,
+                "MIN_REGION_SIZE": 60,
+                "MAX_IMAGE_SIZE": (7087, 4724),  # 60×40 cm @ 300 DPI
+                "FONT_SCALE": 0.22,
+                "EDGE_THRESHOLD_LOW": 25,
+                "EDGE_THRESHOLD_HIGH": 180,
+                "BILATERAL_FILTER_D": 5,
+                "BILATERAL_SIGMA_COLOR": 45,
+                "BILATERAL_SIGMA_SPACE": 45,
+                "MORPHOLOGY_KERNEL_SIZE": 2,
+                "USE_UNIFIED_PALETTE": False,
+                "UNIFIED_PALETTE_NAME": "classic_24",
+                "GENERATE_SVG": True,
+                "GENERATE_PDF": True,
+                "APPLY_SHARPENING": True,
+                "SHARPEN_AMOUNT": 1.2,
+                "SHARPEN_RADIUS": 5,
+                "CLAHE_CLIP_LIMIT": 4.0,
+                "APPLY_LOCAL_CONTRAST": True,
+                "APPLY_TONE_BALANCE": True,
+                "AUTO_WHITE_BALANCE": True,
+                "CONTOUR_THICKNESS": 2,
+                "DPI": 300,
+            },
+            "print_quality_70x50": {
+                "DEFAULT_NUM_COLORS": 36,
+                "MIN_REGION_SIZE": 75,
+                "MAX_IMAGE_SIZE": (8268, 5906),  # 70×50 cm @ 300 DPI
+                "FONT_SCALE": 0.20,
+                "EDGE_THRESHOLD_LOW": 25,
+                "EDGE_THRESHOLD_HIGH": 180,
+                "BILATERAL_FILTER_D": 5,
+                "BILATERAL_SIGMA_COLOR": 45,
+                "BILATERAL_SIGMA_SPACE": 45,
+                "MORPHOLOGY_KERNEL_SIZE": 2,
+                "USE_UNIFIED_PALETTE": False,
+                "UNIFIED_PALETTE_NAME": "classic_24",
+                "GENERATE_SVG": True,
+                "GENERATE_PDF": True,
+                "APPLY_SHARPENING": True,
+                "SHARPEN_AMOUNT": 1.2,
+                "SHARPEN_RADIUS": 5,
+                "CLAHE_CLIP_LIMIT": 4.0,
+                "APPLY_LOCAL_CONTRAST": True,
+                "APPLY_TONE_BALANCE": True,
+                "AUTO_WHITE_BALANCE": True,
+                "CONTOUR_THICKNESS": 2,
+                "DPI": 300,
             },
         }
 

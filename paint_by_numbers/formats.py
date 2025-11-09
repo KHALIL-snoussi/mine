@@ -148,6 +148,36 @@ class FormatRegistry:
             recommended_for=['Feature wall art', 'Bold images', 'Modern homes'],
             price_modifier=1.6,
         ),
+        'canvas_50x35': PaperFormat(
+            name='canvas_50x35',
+            display_name='Canvas 50×35 cm (Print Quality)',
+            width_mm=500,
+            height_mm=350,
+            dpi=300,
+            description='High-quality print canvas for professional paint-by-numbers kits',
+            recommended_for=['Professional prints', 'Large wall art', 'Detailed landscapes', 'High-quality portraits'],
+            price_modifier=2.0,
+        ),
+        'canvas_60x40': PaperFormat(
+            name='canvas_60x40',
+            display_name='Canvas 60×40 cm (Extra Large)',
+            width_mm=600,
+            height_mm=400,
+            dpi=300,
+            description='Extra-large canvas for maximum detail and impact',
+            recommended_for=['Statement pieces', 'Premium products', 'Professional artists', 'Gallery quality'],
+            price_modifier=2.5,
+        ),
+        'canvas_70x50': PaperFormat(
+            name='canvas_70x50',
+            display_name='Canvas 70×50 cm (Premium)',
+            width_mm=700,
+            height_mm=500,
+            dpi=300,
+            description='Premium large canvas for the ultimate painting experience',
+            recommended_for=['Premium kits', 'Expert painters', 'Large feature walls', 'Commercial prints'],
+            price_modifier=3.0,
+        ),
     }
 
     @classmethod
@@ -386,10 +416,11 @@ def get_format_comparison() -> dict:
         'size_categories': {
             'small': ['a4', 'a4_landscape', 'square_medium'],
             'large': ['a3', 'a3_landscape', 'square_large'],
+            'print_quality': ['canvas_50x35', 'canvas_60x40', 'canvas_70x50'],
         },
         'orientation': {
             'portrait': ['a4', 'a3'],
-            'landscape': ['a4_landscape', 'a3_landscape'],
+            'landscape': ['a4_landscape', 'a3_landscape', 'canvas_50x35', 'canvas_60x40', 'canvas_70x50'],
             'square': ['square_medium', 'square_large'],
         }
     }
@@ -445,7 +476,7 @@ def get_default_grid_spec(format_name: str) -> GridSpec:
     Get default grid specification for a format.
 
     Args:
-        format_name: Format name (e.g., 'a4', 'a3')
+        format_name: Format name (e.g., 'a4', 'a3', 'canvas_50x35')
 
     Returns:
         GridSpec with sensible defaults
@@ -459,6 +490,10 @@ def get_default_grid_spec(format_name: str) -> GridSpec:
     # A3 formats: 5×5 tiles, ~20k regions (more detail for larger canvas)
     elif format_name in ['a3', 'a3_landscape', 'square_large']:
         return calculate_grid_spec(paper_format, target_regions=20000, tile_rows=5, tile_cols=5)
+
+    # High-quality canvas formats: 6×6 tiles, ~30k regions (maximum detail)
+    elif format_name in ['canvas_50x35', 'canvas_60x40', 'canvas_70x50']:
+        return calculate_grid_spec(paper_format, target_regions=30000, tile_rows=6, tile_cols=6)
 
     # Default fallback
     else:

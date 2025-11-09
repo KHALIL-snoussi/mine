@@ -32,26 +32,41 @@ class SVGExporter:
 
     def export_template(self, contour_image: np.ndarray, regions: List[dict],
                        palette: np.ndarray, output_path: str,
-                       width: str = "800px", height: str = "800px"):
+                       width: str = None, height: str = None):
         """
-        Export template as SVG
+        Export template as SVG (vector format for infinite scalability)
 
         Args:
             contour_image: Image with contours
             regions: List of region dictionaries with contours and labels
             palette: Color palette
             output_path: Path to save SVG file
-            width: SVG width (with units)
-            height: SVG height (with units)
+            width: SVG width (with units, e.g., "800px", "50cm"). If None, uses actual pixel dimensions
+            height: SVG height (with units). If None, uses actual pixel dimensions
         """
-        logger.info(f"Exporting SVG template to {output_path}")
+        logger.info(f"Exporting high-resolution SVG template to {output_path}")
 
-        # Create SVG drawing
+        img_height, img_width = contour_image.shape[:2]
+
+        # If width/height not specified, use actual dimensions in pixels
+        if width is None:
+            width = f"{img_width}px"
+        if height is None:
+            height = f"{img_height}px"
+
+        # Create SVG drawing with proper viewBox for scalability
         dwg = svgwrite.Drawing(
             output_path,
             size=(width, height),
-            viewBox=f"0 0 {contour_image.shape[1]} {contour_image.shape[0]}"
+            viewBox=f"0 0 {img_width} {img_height}",
+            profile='full'
         )
+
+        # Add metadata for print quality
+        dwg.defs.add(dwg.metadata(
+            f"Generated for print at 300 DPI. " +
+            f"Original dimensions: {img_width}x{img_height} pixels"
+        ))
 
         # Add white background
         dwg.add(dwg.rect(

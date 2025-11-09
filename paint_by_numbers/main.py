@@ -468,8 +468,7 @@ class PaintByNumbersGenerator:
             self.contour_image
         )
         solution_path = output_path / f"{input_name}_solution.png"
-        cv2 = require_cv2()
-        cv2.imwrite(str(solution_path), cv2.cvtColor(solution, cv2.COLOR_RGB2BGR))
+        self.template_generator.save_template(solution, str(solution_path))
         logger.info(f"  Solution saved to: {solution_path}")
         result_files['solution'] = str(solution_path)
 
@@ -480,7 +479,7 @@ class PaintByNumbersGenerator:
             alpha=0.3
         )
         guide_path = output_path / f"{input_name}_guide.png"
-        cv2.imwrite(str(guide_path), cv2.cvtColor(guide, cv2.COLOR_RGB2BGR))
+        self.template_generator.save_template(guide, str(guide_path))
         logger.info(f"  Coloring guide saved to: {guide_path}")
         result_files['guide'] = str(guide_path)
 
@@ -492,7 +491,7 @@ class PaintByNumbersGenerator:
             layout="horizontal"
         )
         comparison_path = output_path / f"{input_name}_comparison.png"
-        cv2.imwrite(str(comparison_path), cv2.cvtColor(comparison, cv2.COLOR_RGB2BGR))
+        self.template_generator.save_template(comparison, str(comparison_path))
         logger.info(f"  Comparison saved to: {comparison_path}")
         result_files['comparison'] = str(comparison_path)
 

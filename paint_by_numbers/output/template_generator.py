@@ -171,10 +171,10 @@ class TemplateGenerator:
     def save_template(self, template: np.ndarray, output_path: str,
                      dpi: Optional[int] = None):
         """
-        Save template to file
+        Save template to file with proper DPI metadata for print quality
 
         Args:
-            template: Template image
+            template: Template image (RGB format)
             output_path: Output file path
             dpi: DPI for saving (uses config default if None)
         """
@@ -184,14 +184,58 @@ class TemplateGenerator:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        cv2 = require_cv2()
-        # Convert RGB to BGR for saving
-        bgr_template = cv2.cvtColor(template, cv2.COLOR_RGB2BGR)
+        # Use PIL to save with proper DPI metadata
+        try:
+            from PIL import Image
 
-        # Save with high quality
-        cv2.imwrite(str(output_path), bgr_template, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            # Convert numpy array to PIL Image (already in RGB format)
+            pil_image = Image.fromarray(template)
 
-        logger.info(f"Template saved to: {output_path}")
+            # Determine file format
+            file_ext = output_path.suffix.lower()
+
+            if file_ext in ['.png', '.PNG']:
+                # Save as PNG with DPI metadata
+                pil_image.save(
+                    str(output_path),
+                    format='PNG',
+                    dpi=(dpi, dpi),
+                    optimize=True
+                )
+            elif file_ext in ['.jpg', '.jpeg', '.JPG', '.JPEG']:
+                # Save as JPEG with DPI metadata and high quality
+                pil_image.save(
+                    str(output_path),
+                    format='JPEG',
+                    dpi=(dpi, dpi),
+                    quality=95,
+                    optimize=True
+                )
+            else:
+                # Default to PNG for unknown extensions
+                pil_image.save(
+                    str(output_path),
+                    format='PNG',
+                    dpi=(dpi, dpi),
+                    optimize=True
+                )
+
+            logger.info(f"Template saved to: {output_path} (@ {dpi} DPI)")
+
+        except ImportError:
+            # Fallback to OpenCV if PIL not available (but without DPI metadata)
+            logger.warning("PIL not available, saving without DPI metadata")
+            cv2 = require_cv2()
+            bgr_template = cv2.cvtColor(template, cv2.COLOR_RGB2BGR)
+
+            if output_path.suffix.lower() in ['.png', '.PNG']:
+                cv2.imwrite(str(output_path), bgr_template,
+                           [cv2.IMWRITE_PNG_COMPRESSION, 3])
+            else:
+                cv2.imwrite(str(output_path), bgr_template,
+                           [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+            logger.info(f"Template saved to: {output_path}")
 
     def create_coloring_guide(self, quantized_image: np.ndarray,
                              contour_image: np.ndarray,
