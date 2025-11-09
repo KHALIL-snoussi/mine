@@ -10,6 +10,12 @@ try:
     from paint_by_numbers.utils.helpers import is_point_inside_region, get_contrasting_color
     from paint_by_numbers.utils.opencv import require_cv2
     from paint_by_numbers.logger import logger
+    # Import pole-of-inaccessibility for optimal label placement
+    try:
+        from paint_by_numbers.utils.pole_of_inaccessibility import find_best_label_position
+        HAS_POLE_OF_INACCESSIBILITY = True
+    except ImportError:
+        HAS_POLE_OF_INACCESSIBILITY = False
 except ImportError:
     import sys
     from pathlib import Path
@@ -18,6 +24,11 @@ except ImportError:
     from utils.helpers import is_point_inside_region, get_contrasting_color
     from utils.opencv import require_cv2
     from logger import logger
+    try:
+        from utils.pole_of_inaccessibility import find_best_label_position
+        HAS_POLE_OF_INACCESSIBILITY = True
+    except ImportError:
+        HAS_POLE_OF_INACCESSIBILITY = False
 
 
 class NumberPlacer:
@@ -77,7 +88,7 @@ class NumberPlacer:
 
     def _find_best_position(self, region, image_shape: Tuple[int, int]) -> Optional[Tuple[int, int]]:
         """
-        Find best position to place number in region
+        Find best position to place number in region using pole-of-inaccessibility algorithm
 
         Args:
             region: Region object
@@ -86,14 +97,23 @@ class NumberPlacer:
         Returns:
             (x, y) position or None if no suitable position found
         """
-        # Try the geometric center first
+        # Try pole-of-inaccessibility algorithm first (if available)
+        if HAS_POLE_OF_INACCESSIBILITY and hasattr(region, 'contour') and region.contour is not None:
+            try:
+                pole_position = find_best_label_position(region.mask, region.contour, precision=1.0)
+                if pole_position and self._is_position_valid(pole_position, region, image_shape):
+                    return pole_position
+            except Exception as e:
+                # If pole algorithm fails, fall back to distance transform
+                logger.debug(f"Pole-of-inaccessibility failed for region, using fallback: {e}")
+
+        # Fallback 1: Try the geometric center
         center = region.center
 
         if self._is_position_valid(center, region, image_shape):
             return center
 
-        # If center doesn't work, try to find alternative positions
-        # Use distance transform to find interior points
+        # Fallback 2: Use distance transform to find interior points
         cv2 = require_cv2()
         dist_transform = cv2.distanceTransform(region.mask, cv2.DIST_L2, 5)
 
