@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useDropzone } from 'react-dropzone'
 
-import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/button'
 import ModelSelector from '@/components/ModelSelector'
 import BeforeAfterSlider from '@/components/BeforeAfterSlider'
 import ManualAreaSelector, { type SelectedArea } from '@/components/ManualAreaSelector'
