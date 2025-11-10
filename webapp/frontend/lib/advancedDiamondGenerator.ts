@@ -234,7 +234,7 @@ export async function generateAdvancedDiamondPainting(
     const useHDPalette = stylePackId === 'hd_palette'
 
     // Get style pack (if not HD mode)
-    let stylePack: StylePack | null = null
+    let stylePack: StylePack | undefined = undefined
     if (!useHDPalette) {
       stylePack = getStylePackById(stylePackId)
       if (!stylePack) {
