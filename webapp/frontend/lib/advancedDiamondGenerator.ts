@@ -49,6 +49,18 @@ import {
   enhancedCleanupWithEdgePreservation,
   EnhancedCleanupOptions
 } from './premiumDiamondUpgrades'
+import {
+  preprocessImage,
+  PreprocessingOptions
+} from './imagePreprocessing'
+import {
+  performSmartRegionMerging,
+  RegionMergingOptions
+} from './smartRegionMerging'
+import {
+  simplifyBackground,
+  BackgroundSimplificationOptions
+} from './backgroundSimplification'
 
 export interface AdvancedDiamondOptions {
   canvasFormat: 'a4_portrait' | 'a4_landscape' | 'a4_square' |
@@ -62,6 +74,9 @@ export interface AdvancedDiamondOptions {
     drillSize?: number
   }
   hdPaletteOptions?: HDPaletteOptions // Options for HD palette mode
+  preprocessingOptions?: PreprocessingOptions // Image enhancement options
+  regionMergingOptions?: RegionMergingOptions // Smart region merging options
+  backgroundSimplificationOptions?: BackgroundSimplificationOptions // Background simplification options
   qualitySettings?: {
     bilateralSigma?: number // Edge-preserving smoothing strength (default: 3)
     sharpenAmount?: number // Sharpening amount (default: 0.8)
@@ -70,6 +85,7 @@ export interface AdvancedDiamondOptions {
     useFaceDetection?: boolean // Enable face detection for subject emphasis (default: true)
     useRegionAwareDithering?: boolean // Use adaptive dithering (default: true)
     useEnhancedCleanup?: boolean // Use enhanced cleanup (default: true)
+    enablePreprocessing?: boolean // Enable automatic image preprocessing (default: true)
   }
 }
 
@@ -113,6 +129,12 @@ export interface ProcessingDiagnostics {
   paletteUsageDeviation: number // Average deviation from target percentages
   colorsWithinTolerance: number // Number of colors within ±15% of target
   foregroundPaletteCoverage: { [dmcCode: string]: number } // Per-color % in foreground only
+  regionMergingStats?: { // Phase 4: Smart region merging statistics
+    regionsFound: number
+    regionsMerged: number
+    fragmentationReduction: number // Percentage
+    tinyRegionsRemoved: number
+  }
 }
 
 export interface AdvancedDiamondResult {
@@ -239,8 +261,34 @@ export async function generateAdvancedDiamondPainting(
 
     img.onload = async () => {
       try {
-        // Step 1: Upscale to 2× for better detail preservation
-        console.log('Upscaling image 2×...')
+        // Step 0: Load image at original resolution first
+        console.log('Loading image...')
+        const tempCanvas = document.createElement('canvas')
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true })
+        if (!tempCtx) {
+          reject(new Error('Could not get canvas context'))
+          return
+        }
+
+        // Draw at original size first
+        tempCanvas.width = img.naturalWidth
+        tempCanvas.height = img.naturalHeight
+        tempCtx.drawImage(img, 0, 0)
+        let originalImageData = tempCtx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)
+
+        // Step 0.5: Apply professional preprocessing if enabled
+        if (quality.enablePreprocessing !== false) {
+          console.log('Step 0.5: Applying professional image preprocessing...')
+          const preprocessingResult = await preprocessImage(originalImageData, options.preprocessingOptions)
+          originalImageData = preprocessingResult.processedImage
+
+          if (preprocessingResult.appliedEnhancements.length > 0) {
+            console.log('Applied enhancements:', preprocessingResult.appliedEnhancements.join(', '))
+          }
+        }
+
+        // Step 1: Scale to 2× target resolution for processing
+        console.log('Step 1: Scaling to processing resolution...')
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) {
@@ -248,22 +296,24 @@ export async function generateAdvancedDiamondPainting(
           return
         }
 
-        // Upscale to 2× resolution
+        // Calculate 2× target resolution
         const upscaleWidth = gridWidth * 2
         const upscaleHeight = gridHeight * 2
-        canvas.width = upscaleWidth
-        canvas.height = upscaleHeight
-        ctx.drawImage(img, 0, 0, upscaleWidth, upscaleHeight)
 
-        let imageData = ctx.getImageData(0, 0, upscaleWidth, upscaleHeight)
+        // Use Lanczos for high-quality scaling to 2× target
+        let imageData = lanczosResample(originalImageData, upscaleWidth, upscaleHeight, 3)
 
-        // Step 2: Initial preprocessing (at 2× resolution)
-        console.log('Step 2: Applying white balance...')
-        whiteBalance(imageData)
+        // Step 2 & 3: Additional preprocessing (at 2× resolution) - only if not already done
+        if (quality.enablePreprocessing === false) {
+          // Fallback to legacy preprocessing if main preprocessing disabled
+          console.log('Step 2: Applying white balance...')
+          whiteBalance(imageData)
 
-        // Step 3: Tone balance + CLAHE (before segmentation for better masks)
-        console.log('Step 3: Applying CLAHE for tone balance...')
-        imageData = applyCLAHE(imageData, 2.0, 8)
+          console.log('Step 3: Applying CLAHE for tone balance...')
+          imageData = applyCLAHE(imageData, 2.0, 8)
+        } else {
+          console.log('Step 2-3: Skipped (already handled by preprocessing pipeline)')
+        }
 
         // Step 4: Style-specific processing
         console.log('Step 4: Applying style-specific processing...')
@@ -347,6 +397,20 @@ export async function generateAdvancedDiamondPainting(
         console.log('Step 12: Applying stochastic dither...')
         imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
 
+        // Step 12.5: Background simplification (Phase 4)
+        if (options.backgroundSimplificationOptions?.enableSimplification) {
+          console.log('Step 12.5: Simplifying background...')
+          const bgResult = await simplifyBackground(imageData, {
+            ...options.backgroundSimplificationOptions,
+            subjectMask: faceMask || segmentationMask
+          })
+          imageData = bgResult.simplifiedImage
+
+          if (bgResult.statistics.blurApplied || bgResult.statistics.colorsReduced) {
+            console.log(`  Background: ${bgResult.statistics.backgroundPercentage.toFixed(1)}%, Subject: ${bgResult.statistics.subjectPercentage.toFixed(1)}%`)
+          }
+        }
+
         // Step 13: Palette selection and quantization
         console.log('Step 13: Quantizing with histogram balancing...')
 
@@ -389,6 +453,18 @@ export async function generateAdvancedDiamondPainting(
             5,  // Under-use penalty (favors under-used colors)
             stylePack.minColorPercent // Floor: no color drops below this %
           )
+        }
+
+        // Step 13.5: Smart Region Merging (Phase 4)
+        console.log('Step 13.5: Applying smart region merging...')
+        const regionMergingResult = await performSmartRegionMerging(quantized, {
+          ...options.regionMergingOptions,
+          subjectMask: faceMask || segmentationMask
+        })
+        quantized = regionMergingResult.mergedImage
+
+        if (regionMergingResult.regionsMerged > 0) {
+          console.log(`  Merged ${regionMergingResult.regionsMerged} regions (${regionMergingResult.fragmentationReduction.toFixed(1)}% fragmentation reduction)`)
         }
 
         // Step 14: Force background to lightest color (AFTER quantization)
@@ -510,6 +586,12 @@ export async function generateAdvancedDiamondPainting(
           paletteUsageDeviation: Math.round(averageDeviation * 10) / 10,
           colorsWithinTolerance,
           foregroundPaletteCoverage,
+          regionMergingStats: regionMergingResult.regionsMerged > 0 ? {
+            regionsFound: regionMergingResult.regionsFound,
+            regionsMerged: regionMergingResult.regionsMerged,
+            fragmentationReduction: Math.round(regionMergingResult.fragmentationReduction * 10) / 10,
+            tinyRegionsRemoved: regionMergingResult.statistics.tinyRegionsRemoved
+          } : undefined
         }
 
         // Step 22: Generate high-res preview
