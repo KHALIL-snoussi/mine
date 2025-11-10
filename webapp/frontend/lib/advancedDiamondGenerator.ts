@@ -49,6 +49,10 @@ import {
   enhancedCleanupWithEdgePreservation,
   EnhancedCleanupOptions
 } from './premiumDiamondUpgrades'
+import {
+  preprocessImage,
+  PreprocessingOptions
+} from './imagePreprocessing'
 
 export interface AdvancedDiamondOptions {
   canvasFormat: 'a4_portrait' | 'a4_landscape' | 'a4_square' |
@@ -62,6 +66,7 @@ export interface AdvancedDiamondOptions {
     drillSize?: number
   }
   hdPaletteOptions?: HDPaletteOptions // Options for HD palette mode
+  preprocessingOptions?: PreprocessingOptions // Image enhancement options
   qualitySettings?: {
     bilateralSigma?: number // Edge-preserving smoothing strength (default: 3)
     sharpenAmount?: number // Sharpening amount (default: 0.8)
@@ -70,6 +75,7 @@ export interface AdvancedDiamondOptions {
     useFaceDetection?: boolean // Enable face detection for subject emphasis (default: true)
     useRegionAwareDithering?: boolean // Use adaptive dithering (default: true)
     useEnhancedCleanup?: boolean // Use enhanced cleanup (default: true)
+    enablePreprocessing?: boolean // Enable automatic image preprocessing (default: true)
   }
 }
 
@@ -239,8 +245,34 @@ export async function generateAdvancedDiamondPainting(
 
     img.onload = async () => {
       try {
-        // Step 1: Upscale to 2× for better detail preservation
-        console.log('Upscaling image 2×...')
+        // Step 0: Load image at original resolution first
+        console.log('Loading image...')
+        const tempCanvas = document.createElement('canvas')
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true })
+        if (!tempCtx) {
+          reject(new Error('Could not get canvas context'))
+          return
+        }
+
+        // Draw at original size first
+        tempCanvas.width = img.naturalWidth
+        tempCanvas.height = img.naturalHeight
+        tempCtx.drawImage(img, 0, 0)
+        let originalImageData = tempCtx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)
+
+        // Step 0.5: Apply professional preprocessing if enabled
+        if (quality.enablePreprocessing !== false) {
+          console.log('Step 0.5: Applying professional image preprocessing...')
+          const preprocessingResult = await preprocessImage(originalImageData, options.preprocessingOptions)
+          originalImageData = preprocessingResult.processedImage
+
+          if (preprocessingResult.appliedEnhancements.length > 0) {
+            console.log('Applied enhancements:', preprocessingResult.appliedEnhancements.join(', '))
+          }
+        }
+
+        // Step 1: Scale to 2× target resolution for processing
+        console.log('Step 1: Scaling to processing resolution...')
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d', { willReadFrequently: true })
         if (!ctx) {
@@ -248,22 +280,24 @@ export async function generateAdvancedDiamondPainting(
           return
         }
 
-        // Upscale to 2× resolution
+        // Calculate 2× target resolution
         const upscaleWidth = gridWidth * 2
         const upscaleHeight = gridHeight * 2
-        canvas.width = upscaleWidth
-        canvas.height = upscaleHeight
-        ctx.drawImage(img, 0, 0, upscaleWidth, upscaleHeight)
 
-        let imageData = ctx.getImageData(0, 0, upscaleWidth, upscaleHeight)
+        // Use Lanczos for high-quality scaling to 2× target
+        let imageData = lanczosResample(originalImageData, upscaleWidth, upscaleHeight, 3)
 
-        // Step 2: Initial preprocessing (at 2× resolution)
-        console.log('Step 2: Applying white balance...')
-        whiteBalance(imageData)
+        // Step 2 & 3: Additional preprocessing (at 2× resolution) - only if not already done
+        if (quality.enablePreprocessing === false) {
+          // Fallback to legacy preprocessing if main preprocessing disabled
+          console.log('Step 2: Applying white balance...')
+          whiteBalance(imageData)
 
-        // Step 3: Tone balance + CLAHE (before segmentation for better masks)
-        console.log('Step 3: Applying CLAHE for tone balance...')
-        imageData = applyCLAHE(imageData, 2.0, 8)
+          console.log('Step 3: Applying CLAHE for tone balance...')
+          imageData = applyCLAHE(imageData, 2.0, 8)
+        } else {
+          console.log('Step 2-3: Skipped (already handled by preprocessing pipeline)')
+        }
 
         // Step 4: Style-specific processing
         console.log('Step 4: Applying style-specific processing...')
