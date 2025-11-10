@@ -69,7 +69,31 @@ export const PREMIUM_CANVAS_PRESETS: Record<string, CanvasPreset> = {
     difficulty: 'Beginner'
   },
 
-  // NEW: Large canvas formats (commercial quality)
+  // NEW: Popular commercial canvas formats
+  canvas_20x30: {
+    id: 'canvas_20x30',
+    name: 'Canvas 20×30 cm (Small)',
+    widthBeads: 80,
+    heightBeads: 120,
+    widthCm: 20,
+    heightCm: 30,
+    drillSize: 2.5,
+    totalDrills: 9600,
+    estimatedHours: '12-18 hours',
+    difficulty: 'Beginner'
+  },
+  canvas_25x35: {
+    id: 'canvas_25x35',
+    name: 'Canvas 25×35 cm',
+    widthBeads: 100,
+    heightBeads: 140,
+    widthCm: 25,
+    heightCm: 35,
+    drillSize: 2.5,
+    totalDrills: 14000,
+    estimatedHours: '18-24 hours',
+    difficulty: 'Beginner'
+  },
   canvas_30x40: {
     id: 'canvas_30x40',
     name: 'Canvas 30×40 cm',
@@ -80,6 +104,18 @@ export const PREMIUM_CANVAS_PRESETS: Record<string, CanvasPreset> = {
     drillSize: 2.5,
     totalDrills: 19200,
     estimatedHours: '24-36 hours',
+    difficulty: 'Intermediate'
+  },
+  canvas_35x45: {
+    id: 'canvas_35x45',
+    name: 'Canvas 35×45 cm',
+    widthBeads: 140,
+    heightBeads: 180,
+    widthCm: 35,
+    heightCm: 45,
+    drillSize: 2.5,
+    totalDrills: 25200,
+    estimatedHours: '32-48 hours',
     difficulty: 'Intermediate'
   },
   canvas_40x50: {
@@ -140,6 +176,42 @@ export const PREMIUM_CANVAS_PRESETS: Record<string, CanvasPreset> = {
     drillSize: 2.5,
     totalDrills: 56000,
     estimatedHours: '70-100 hours',
+    difficulty: 'Master'
+  },
+  canvas_50x60: {
+    id: 'canvas_50x60',
+    name: 'Canvas 50×60 cm',
+    widthBeads: 200,
+    heightBeads: 240,
+    widthCm: 50,
+    heightCm: 60,
+    drillSize: 2.5,
+    totalDrills: 48000,
+    estimatedHours: '60-80 hours',
+    difficulty: 'Expert'
+  },
+  canvas_60x80: {
+    id: 'canvas_60x80',
+    name: 'Canvas 60×80 cm (Large)',
+    widthBeads: 240,
+    heightBeads: 320,
+    widthCm: 60,
+    heightCm: 80,
+    drillSize: 2.5,
+    totalDrills: 76800,
+    estimatedHours: '100-140 hours',
+    difficulty: 'Master'
+  },
+  canvas_70x90: {
+    id: 'canvas_70x90',
+    name: 'Canvas 70×90 cm (Extra Large)',
+    widthBeads: 280,
+    heightBeads: 360,
+    widthCm: 70,
+    heightCm: 90,
+    drillSize: 2.5,
+    totalDrills: 100800,
+    estimatedHours: '140-180 hours',
     difficulty: 'Master'
   },
 
@@ -211,7 +283,9 @@ export interface HDPaletteOptions {
   maxColors?: number // Maximum colors (default: 30)
   emphasizeSubject?: boolean // Use more colors for subject (default: true)
   minColorPercentage?: number // Minimum % for a color to be included (default: 0.5%)
-  colorSeparationThreshold?: number // Min Delta E between colors (default: 15)
+  colorSeparationThreshold?: number // Min Delta E between colors (default: 20)
+  ensureFullSpectrum?: boolean // Ensure hue diversity across spectrum (default: true)
+  prioritizeSaturation?: boolean // Prefer vivid colors over muted (default: true)
 }
 
 /**
@@ -227,7 +301,9 @@ export function selectHDPalette(
     maxColors = 30,
     emphasizeSubject = true,
     minColorPercentage = 0.5,
-    colorSeparationThreshold = 15
+    colorSeparationThreshold = 20,  // Increased from 15 for better separation
+    ensureFullSpectrum = true,
+    prioritizeSaturation = true
   } = options
 
   const { width, height, data } = imageData
@@ -317,7 +393,185 @@ export function selectHDPalette(
     }
   }
 
+  // ENHANCEMENT: Ensure full spectrum coverage if requested
+  if (ensureFullSpectrum && selectedDMC.length < maxColors) {
+    selectedDMC = ensureSpectrumDiversity(selectedDMC, DMC_COLORS, usedDMCCodes, maxColors, colorSeparationThreshold)
+  }
+
+  // ENHANCEMENT: Prioritize saturated colors if requested
+  if (prioritizeSaturation && selectedDMC.length < maxColors) {
+    selectedDMC = enhancePaletteSaturation(selectedDMC, DMC_COLORS, usedDMCCodes, maxColors, colorSeparationThreshold)
+  }
+
   return selectedDMC
+}
+
+/**
+ * Ensure palette covers full color spectrum with no gaps
+ * Fills in missing hue ranges to achieve better visual diversity
+ */
+function ensureSpectrumDiversity(
+  currentPalette: DMCColor[],
+  allDMC: DMCColor[],
+  usedCodes: Set<string>,
+  maxColors: number,
+  minSeparation: number
+): DMCColor[] {
+  const palette = [...currentPalette]
+
+  // Divide spectrum into 12 hue ranges (30° each)
+  const hueRanges = Array.from({ length: 12 }, (_, i) => i * 30)
+  const hueCoverage = new Map<number, boolean>()
+
+  // Check which hue ranges are covered
+  for (const dmc of palette) {
+    const lab = dmcRgbToLab(dmc)
+    const hue = calculateHue(lab)
+    const range = Math.floor(hue / 30) * 30
+    hueCoverage.set(range, true)
+  }
+
+  // Find missing hue ranges
+  const missingRanges = hueRanges.filter(range => !hueCoverage.has(range))
+
+  // For each missing range, find best DMC color to fill it
+  for (const range of missingRanges) {
+    if (palette.length >= maxColors) break
+
+    let bestCandidate: DMCColor | null = null
+    let bestScore = -Infinity
+
+    for (const dmc of allDMC) {
+      if (usedCodes.has(dmc.code)) continue
+
+      const lab = dmcRgbToLab(dmc)
+      const hue = calculateHue(lab)
+
+      // Check if this color is in the missing range
+      const dmcRange = Math.floor(hue / 30) * 30
+      if (dmcRange !== range) continue
+
+      // Check separation from existing colors
+      const isSeparated = palette.every(existing => {
+        const existingLab = dmcRgbToLab(existing)
+        return deltaE2000(lab, existingLab) >= minSeparation
+      })
+
+      if (!isSeparated) continue
+
+      // Score: prefer saturated colors in this hue range
+      const saturation = Math.sqrt(lab.a * lab.a + lab.b * lab.b)
+      const score = saturation
+
+      if (score > bestScore) {
+        bestScore = score
+        bestCandidate = dmc
+      }
+    }
+
+    if (bestCandidate) {
+      palette.push(bestCandidate)
+      usedCodes.add(bestCandidate.code)
+      hueCoverage.set(range, true)
+    }
+  }
+
+  return palette
+}
+
+/**
+ * Convert DMC RGB tuple to LAB
+ */
+function dmcRgbToLab(dmc: DMCColor): LAB {
+  return rgbToLab({ r: dmc.rgb[0], g: dmc.rgb[1], b: dmc.rgb[2] })
+}
+
+/**
+ * Calculate hue from LAB color (in degrees 0-360)
+ */
+function calculateHue(lab: LAB | { l: number; a: number; b: number }): number {
+  const hue = Math.atan2(lab.b, lab.a) * 180 / Math.PI
+  return hue < 0 ? hue + 360 : hue
+}
+
+/**
+ * Enhance palette by replacing muted colors with more saturated alternatives
+ */
+function enhancePaletteSaturation(
+  currentPalette: DMCColor[],
+  allDMC: DMCColor[],
+  usedCodes: Set<string>,
+  maxColors: number,
+  minSeparation: number
+): DMCColor[] {
+  const palette = [...currentPalette]
+
+  // Find the most muted colors in current palette
+  const colorsBySaturation = palette.map(dmc => {
+    const lab = dmcRgbToLab(dmc)
+    const saturation = Math.sqrt(lab.a * lab.a + lab.b * lab.b)
+    return { dmc, saturation, lab }
+  }).sort((a, b) => a.saturation - b.saturation)
+
+  // Try to replace bottom 20% with more saturated alternatives
+  const replaceCount = Math.floor(palette.length * 0.2)
+
+  for (let i = 0; i < replaceCount; i++) {
+    const mutedColor = colorsBySaturation[i]
+    const targetHue = calculateHue(mutedColor.lab)
+
+    // Find more saturated color in similar hue range
+    let bestReplacement: DMCColor | null = null
+    let bestScore = -Infinity
+
+    for (const dmc of allDMC) {
+      if (usedCodes.has(dmc.code)) continue
+
+      const lab = dmcRgbToLab(dmc)
+      const saturation = Math.sqrt(lab.a * lab.a + lab.b * lab.b)
+
+      // Must be more saturated
+      if (saturation <= mutedColor.saturation * 1.3) continue
+
+      // Must be in similar hue range (±30°)
+      const hue = calculateHue(lab)
+      const hueDiff = Math.min(
+        Math.abs(hue - targetHue),
+        360 - Math.abs(hue - targetHue)
+      )
+      if (hueDiff > 30) continue
+
+      // Check separation from other colors (excluding the one being replaced)
+      const isSeparated = palette.every(existing => {
+        if (existing.code === mutedColor.dmc.code) return true
+        const existingLab = dmcRgbToLab(existing)
+        return deltaE2000(lab, existingLab) >= minSeparation
+      })
+
+      if (!isSeparated) continue
+
+      // Score: prefer higher saturation with similar lightness
+      const lightnessDiff = Math.abs(lab.l - mutedColor.lab.l)
+      const score = saturation - lightnessDiff * 0.5
+
+      if (score > bestScore) {
+        bestScore = score
+        bestReplacement = dmc
+      }
+    }
+
+    // Perform replacement if found
+    if (bestReplacement) {
+      const index = palette.findIndex(c => c.code === mutedColor.dmc.code)
+      if (index !== -1) {
+        palette[index] = bestReplacement
+        usedCodes.delete(mutedColor.dmc.code)
+        usedCodes.add(bestReplacement.code)
+      }
+    }
+  }
+
+  return palette
 }
 
 /**
@@ -399,25 +653,38 @@ function kMeansClusterColors(colors: RGB[], k: number, maxIterations: number = 2
 // ENHANCED SYMBOL MANAGEMENT
 // ============================================================================
 
-// Comprehensive symbol set avoiding confusion
+// Professional symbol set - Optimized for maximum clarity and no confusion
+// Avoids: I/1, O/0, S/5, Z/2, B/8, Q/O which are commonly confused
 const SAFE_SYMBOLS = [
-  // Uppercase letters (excluding I/O if numbers used)
-  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M',
-  'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-  // Numbers (excluding 0/1 if I/O used)
-  '2', '3', '4', '5', '6', '7', '8', '9',
-  // Special characters (clear, distinct)
-  '#', '$', '%', '&', '*', '+', '=', '@',
-  // Greek letters (if needed)
-  'α', 'β', 'γ', 'δ', 'ε', 'θ', 'λ', 'μ', 'π', 'σ', 'ω',
-  // Geometric shapes
-  '■', '□', '●', '○', '◆', '◇', '▲', '△', '▼', '▽', '★', '☆'
+  // Uppercase letters - Highly distinct shapes only
+  'A', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M',
+  'N', 'P', 'R', 'T', 'U', 'V', 'W', 'X', 'Y',  // 20 letters
+
+  // Numbers - Excluding confusable 0, 1
+  '2', '3', '4', '5', '6', '7', '8', '9',  // 8 numbers
+
+  // Special characters - High contrast, distinct shapes
+  '#', '$', '%', '&', '*', '+', '=', '@', '!', '?',  // 10 special
+
+  // Geometric shapes - Very distinct, excellent for printing
+  '■', '●', '▲', '▼', '◆', '★',  // 6 filled shapes
+  '□', '○', '△', '▽', '◇', '☆',  // 6 outline shapes
+
+  // Additional high-visibility symbols
+  '♠', '♣', '♥', '♦',  // 4 card suits
 ]
 
-// Dual-character symbols for palettes > 50 colors
+// Extended symbols for very large palettes (50+ colors)
+// Format: Letter + Number for clarity (e.g., "A1" is distinct from "A" and "1")
 const DUAL_SYMBOLS = [
-  'A1', 'A2', 'A3', 'B1', 'B2', 'B3', 'C1', 'C2', 'C3',
-  'D1', 'D2', 'D3', 'E1', 'E2', 'E3', 'F1', 'F2', 'F3'
+  // First tier: A-Y with 1-9
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9',
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
+  'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9',
+  'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9',
+  'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9',
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9',
 ]
 
 export function assignSymbolsForPalette(
