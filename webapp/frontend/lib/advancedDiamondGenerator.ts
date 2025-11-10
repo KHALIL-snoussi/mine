@@ -523,11 +523,12 @@ export async function generateAdvancedDiamondPainting(
         const backgroundCount = beadCounts.find(bc => bc.dmcColor.code === backgroundDMC.code)?.count || 0
         const backgroundPercentage = (backgroundCount / (gridWidth * gridHeight)) * 100
 
-        // Count edge pixels
+        // Count edge pixels and calculate edge density
         let edgePixelCount = 0
         for (let i = 0; i < edgeMask.length; i++) {
           if (edgeMask[i] > 30) edgePixelCount++
         }
+        const edgeDensity = (edgePixelCount / (gridWidth * gridHeight)) * 100
 
         // Calculate palette usage deviation from targets
         let totalDeviation = 0
@@ -566,13 +567,6 @@ export async function generateAdvancedDiamondPainting(
           foregroundPaletteCoverage[code] =
             Math.round((foregroundColorCounts[code] / totalForegroundPixels) * 1000) / 10
         }
-
-        // Calculate edge density
-        let edgePixelCount = 0
-        for (let i = 0; i < edgeMask.length; i++) {
-          if (edgeMask[i] > 30) edgePixelCount++
-        }
-        const edgeDensity = (edgePixelCount / (gridWidth * gridHeight)) * 100
 
         const diagnostics: ProcessingDiagnostics = {
           isolatedCellsRemoved: stats.isolated,

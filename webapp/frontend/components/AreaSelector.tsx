@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Button } from './ui/Button'
+import { Button } from './ui/button'
 
 interface AreaSelectorProps {
   imageUrl: string

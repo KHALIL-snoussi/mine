@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect, useCallback } from 'react'
-import { Button } from './ui/Button'
+import { Button } from './ui/button'
 
 interface DiamondCropSelectorProps {
   imageUrl: string
