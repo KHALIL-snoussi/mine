@@ -5,6 +5,7 @@ import { Button } from './ui/button'
 
 interface DiamondCropSelectorProps {
   imageUrl: string
+  aspectRatio?: string
   onCropComplete: (croppedImageUrl: string) => void
   onCancel: () => void
 }
@@ -26,6 +27,7 @@ interface EdgeWarnings {
 
 export default function DiamondCropSelector({
   imageUrl,
+  aspectRatio,
   onCropComplete,
   onCancel,
 }: DiamondCropSelectorProps) {
