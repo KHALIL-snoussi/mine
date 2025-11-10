@@ -37,15 +37,36 @@ import {
   enhanceEdgeDetail,
   applyStochasticDither,
 } from './colorUtils'
+import {
+  PREMIUM_CANVAS_PRESETS,
+  CanvasPreset,
+  HDPaletteOptions,
+  selectHDPalette,
+  assignSymbolsForPalette,
+  detectFaces,
+  applyRegionAwareDithering,
+  RegionAwareDitheringOptions,
+  enhancedCleanupWithEdgePreservation,
+  EnhancedCleanupOptions
+} from './premiumDiamondUpgrades'
 
 export interface AdvancedDiamondOptions {
-  canvasFormat: 'a4_portrait' | 'a4_landscape' | 'a4_square'
-  stylePack: string // Style pack ID
+  canvasFormat: 'a4_portrait' | 'a4_landscape' | 'a4_square' | 'canvas_30x40' | 'canvas_40x50' | 'canvas_50x35' | 'canvas_50x70' | 'canvas_60x40' | 'canvas_70x50' | 'custom'
+  stylePack: string // Style pack ID or 'hd_palette' for HD mode
+  customCanvas?: {
+    widthCm: number
+    heightCm: number
+    drillSize?: number
+  }
+  hdPaletteOptions?: HDPaletteOptions // Options for HD palette mode
   qualitySettings?: {
     bilateralSigma?: number // Edge-preserving smoothing strength (default: 3)
     sharpenAmount?: number // Sharpening amount (default: 0.8)
     ditheringStrength?: number // Error diffusion strength (default: 0.5)
     minClusterSize?: number // Minimum bead cluster size (default: 4 = 2×2)
+    useFaceDetection?: boolean // Enable face detection for subject emphasis (default: true)
+    useRegionAwareDithering?: boolean // Use adaptive dithering (default: true)
+    useEnhancedCleanup?: boolean // Use enhanced cleanup (default: true)
   }
 }
 
@@ -115,11 +136,14 @@ export interface AdvancedDiamondResult {
   diagnostics: ProcessingDiagnostics // Quality metrics for validation
 }
 
-// Fixed canvas presets (~10,000 beads each)
-const CANVAS_PRESETS = {
-  a4_portrait: { width: 84, height: 119 },
-  a4_landscape: { width: 119, height: 84 },
-  a4_square: { width: 100, height: 100 },
+// Canvas presets - now supports large formats too!
+// Extract just width/height for backward compatibility
+const CANVAS_PRESETS: Record<string, { width: number; height: number }> = {}
+for (const [key, preset] of Object.entries(PREMIUM_CANVAS_PRESETS)) {
+  CANVAS_PRESETS[key] = {
+    width: preset.widthBeads,
+    height: preset.heightBeads
+  }
 }
 
 const TILE_SIZE = 16 // 16×16 beads per tile (QBRIX standard)
@@ -181,18 +205,30 @@ export async function generateAdvancedDiamondPainting(
     const { canvasFormat, stylePack: stylePackId } = options
     const quality = options.qualitySettings || {}
 
-    // Get style pack
-    const stylePack = getStylePackById(stylePackId)
-    if (!stylePack) {
-      reject(new Error('Invalid style pack'))
-      return
+    // Check if using HD palette mode
+    const useHDPalette = stylePackId === 'hd_palette'
+
+    // Get style pack (if not HD mode)
+    let stylePack: StylePack | null = null
+    if (!useHDPalette) {
+      stylePack = getStylePackById(stylePackId)
+      if (!stylePack) {
+        reject(new Error('Invalid style pack'))
+        return
+      }
     }
 
     // Get canvas dimensions
-    const { width: gridWidth, height: gridHeight } = CANVAS_PRESETS[canvasFormat]
+    const canvasPreset = CANVAS_PRESETS[canvasFormat]
+    if (!canvasPreset) {
+      reject(new Error('Invalid canvas format'))
+      return
+    }
+    const { width: gridWidth, height: gridHeight } = canvasPreset
 
-    // Convert DMC palette to RGB
-    const palette: RGB[] = stylePack.colors.map((c) => ({ r: c.rgb[0], g: c.rgb[1], b: c.rgb[2] }))
+    // Initial palette (will be replaced if HD mode)
+    let palette: RGB[] = useHDPalette ? [] : stylePack!.colors.map((c) => ({ r: c.rgb[0], g: c.rgb[1], b: c.rgb[2] }))
+    let hdDMCColors: DMCColor[] = []
 
     // Load and preprocess image
     const img = new Image()
@@ -261,9 +297,25 @@ export async function generateAdvancedDiamondPainting(
           edgeMask[i] = downsampledEdgeMask.data[i * 4]
         }
 
+        // Step 6.5: Face detection for subject emphasis (if enabled)
+        let faceMask: Uint8ClampedArray | null = null
+        if (quality.useFaceDetection !== false) {
+          console.log('Step 6.5: Detecting faces...')
+          faceMask = await detectFaces(imageData)
+        }
+
         // Step 7: Generate foreground/background segmentation mask
         console.log('Step 7: Generating segmentation mask...')
-        const segmentationMask = kMeansSegmentation(imageData, 2)
+        let segmentationMask = kMeansSegmentation(imageData, 2)
+
+        // If face detection found faces, merge with segmentation
+        if (faceMask) {
+          for (let i = 0; i < segmentationMask.length; i++) {
+            if (faceMask[i] > 128) {
+              segmentationMask[i] = 255 // Force faces to be foreground
+            }
+          }
+        }
 
         // Calculate foreground coverage
         let foregroundPixels = 0
@@ -292,18 +344,49 @@ export async function generateAdvancedDiamondPainting(
         console.log('Step 12: Applying stochastic dither...')
         imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
 
-        // Step 13: Histogram-aware quantization with target percentages
+        // Step 13: Palette selection and quantization
         console.log('Step 13: Quantizing with histogram balancing...')
-        const targetPercentages = stylePack.colors.map(c => c.targetPercentage)
-        let quantized = quantizeWithTargetPercentages(
-          imageData,
-          palette,
-          targetPercentages,
-          segmentationMask,
-          15, // ±15% tolerance
-          5,  // Under-use penalty (favors under-used colors)
-          stylePack.minColorPercent // Floor: no color drops below this %
-        )
+
+        // If HD mode, select optimal DMC colors from image
+        if (useHDPalette) {
+          console.log('Step 13a: Selecting HD palette from image...')
+          hdDMCColors = selectHDPalette(imageData, options.hdPaletteOptions, faceMask || segmentationMask)
+          palette = hdDMCColors.map(dmc => ({ r: dmc.rgb[0], g: dmc.rgb[1], b: dmc.rgb[2] }))
+          console.log(`Selected ${hdDMCColors.length} optimal DMC colors`)
+        }
+
+        // Quantize to palette
+        let quantized: ImageData
+        if (useHDPalette || !stylePack) {
+          // HD mode: simple quantization (no target percentages)
+          const tempCanvas = document.createElement('canvas')
+          tempCanvas.width = imageData.width
+          tempCanvas.height = imageData.height
+          const tempCtx = tempCanvas.getContext('2d')!
+          tempCtx.putImageData(imageData, 0, 0)
+          quantized = tempCtx.getImageData(0, 0, imageData.width, imageData.height)
+
+          // Quantize each pixel to closest palette color
+          for (let i = 0; i < quantized.data.length; i += 4) {
+            const rgb: RGB = { r: quantized.data[i], g: quantized.data[i + 1], b: quantized.data[i + 2] }
+            const closest = findClosestColorLAB(rgb, palette)
+            quantized.data[i] = closest.color.r
+            quantized.data[i + 1] = closest.color.g
+            quantized.data[i + 2] = closest.color.b
+          }
+        } else {
+          // Style pack mode: histogram-aware quantization
+          const targetPercentages = stylePack.colors.map(c => c.targetPercentage)
+          quantized = quantizeWithTargetPercentages(
+            imageData,
+            palette,
+            targetPercentages,
+            segmentationMask,
+            15, // ±15% tolerance
+            5,  // Under-use penalty (favors under-used colors)
+            stylePack.minColorPercent // Floor: no color drops below this %
+          )
+        }
 
         // Step 14: Force background to lightest color (AFTER quantization)
         console.log('Step 14: Forcing background to lightest color...')
@@ -333,7 +416,9 @@ export async function generateAdvancedDiamondPainting(
 
         // Step 18: Build grid data with symbols
         console.log('Step 18: Building grid data...')
-        const gridData = buildGridData(cleaned, palette, stylePack)
+        const gridData = useHDPalette
+          ? buildGridDataHD(cleaned, palette, hdDMCColors)
+          : buildGridData(cleaned, palette, stylePack!)
 
         // Step 19: Split into 16×16 tiles
         console.log('Step 19: Creating tile system...')
@@ -341,17 +426,20 @@ export async function generateAdvancedDiamondPainting(
 
         // Step 20: Calculate bead counts
         console.log('Step 20: Calculating bead counts...')
-        const beadCounts = calculateBeadCounts(gridData, stylePack)
+        const beadCounts = useHDPalette
+          ? calculateBeadCountsHD(gridData, hdDMCColors)
+          : calculateBeadCounts(gridData, stylePack!)
 
         // Step 21: Calculate diagnostics
         console.log('Step 21: Calculating diagnostics...')
         const clusterStats = calculateClusterStats(cleaned)
 
         // Find background color (lightest) and its percentage
-        const backgroundDMC = stylePack.colors.find(c => {
+        const paletteColors = useHDPalette ? hdDMCColors : stylePack!.colors
+        const backgroundDMC = paletteColors.find(c => {
           const rgb = { r: c.rgb[0], g: c.rgb[1], b: c.rgb[2] }
           return rgb.r === lightestColor.r && rgb.g === lightestColor.g && rgb.b === lightestColor.b
-        }) || stylePack.colors[0]
+        }) || paletteColors[0]
 
         const backgroundCount = beadCounts.find(bc => bc.dmcColor.code === backgroundDMC.code)?.count || 0
         const backgroundPercentage = (backgroundCount / (gridWidth * gridHeight)) * 100
@@ -368,7 +456,8 @@ export async function generateAdvancedDiamondPainting(
         const tolerance = 15 // ±15%
 
         beadCounts.forEach((bead) => {
-          const deviation = Math.abs(bead.percentage - bead.dmcColor.targetPercentage)
+          const targetPercentage = (bead.dmcColor as any).targetPercentage || (100 / beadCounts.length)
+          const deviation = Math.abs(bead.percentage - targetPercentage)
           totalDeviation += deviation
           if (deviation <= tolerance) colorsWithinTolerance++
         })
@@ -430,6 +519,19 @@ export async function generateAdvancedDiamondPainting(
         const widthCm = (gridWidth * BEAD_SIZE_MM) / 10
         const heightCm = (gridHeight * BEAD_SIZE_MM) / 10
 
+        // Create synthetic style pack for HD mode
+        const finalStylePack: StylePack = useHDPalette ? {
+          id: 'hd_palette',
+          name: `HD Palette (${hdDMCColors.length} colors)`,
+          colors: hdDMCColors.map((dmc, idx) => ({
+            ...dmc,
+            defaultSymbol: assignSymbolsForPalette(hdDMCColors).get(dmc.code) || '?',
+            targetPercentage: 100 / hdDMCColors.length
+          })),
+          minColorPercent: 0.5,
+          description: `Dynamically selected ${hdDMCColors.length}-color HD palette optimized for your image`
+        } : stylePack!
+
         const result: AdvancedDiamondResult = {
           imageDataUrl: previewUrl,
           tiles,
@@ -447,7 +549,7 @@ export async function generateAdvancedDiamondPainting(
             tilesWide,
             tilesHigh,
           },
-          stylePack,
+          stylePack: finalStylePack,
           totalBeads: gridWidth * gridHeight,
           difficulty: calculateDifficulty(gridWidth * gridHeight, beadCounts.length),
           estimatedTime: estimateTime(gridWidth * gridHeight, beadCounts.length),
@@ -880,6 +982,56 @@ function buildGridData(imageData: ImageData, palette: RGB[], stylePack: StylePac
 }
 
 /**
+ * Build grid data for HD palette mode with intelligent symbol assignment
+ */
+function buildGridDataHD(imageData: ImageData, palette: RGB[], dmcColors: DMCColor[]): DiamondCell[][] {
+  const { width, height, data } = imageData
+  const grid: DiamondCell[][] = []
+
+  // Use intelligent symbol assignment for large palettes
+  const symbolMap = assignSymbolsForPalette(dmcColors)
+
+  // Create color to DMC+Symbol mapping
+  const colorToDMC = new Map<string, { dmc: DMCColor; symbol: string }>()
+  palette.forEach((rgb, idx) => {
+    const key = `${rgb.r},${rgb.g},${rgb.b}`
+    const dmc = dmcColors[idx]
+    colorToDMC.set(key, {
+      dmc: dmc,
+      symbol: symbolMap.get(dmc.code) || '?',
+    })
+  })
+
+  for (let y = 0; y < height; y++) {
+    const row: DiamondCell[] = []
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4
+      const r = data[idx]
+      const g = data[idx + 1]
+      const b = data[idx + 2]
+      const colorKey = `${r},${g},${b}`
+
+      const mapping = colorToDMC.get(colorKey) || {
+        dmc: dmcColors[0],
+        symbol: symbolMap.get(dmcColors[0].code) || '?',
+      }
+
+      row.push({
+        x,
+        y,
+        dmcCode: mapping.dmc.code,
+        rgb: { r, g, b },
+        symbol: mapping.symbol,
+        tileCoord: { tx: x % TILE_SIZE, ty: y % TILE_SIZE },
+      })
+    }
+    grid.push(row)
+  }
+
+  return grid
+}
+
+/**
  * Create 16×16 tile system
  */
 function createTileSystem(grid: DiamondCell[][], width: number, height: number): BeadTile[] {
@@ -950,6 +1102,43 @@ function calculateBeadCounts(grid: DiamondCell[][], stylePack: StylePack): BeadC
       count,
       percentage: Math.round(percentage * 10) / 10,
       symbol: symbols.get(dmc.code) || dmc.defaultSymbol,
+      lowUsage: percentage < 1.0, // Mark colors below 1% as optional/low usage
+    })
+  })
+
+  // Sort by count descending
+  beadCounts.sort((a, b) => b.count - a.count)
+
+  return beadCounts
+}
+
+/**
+ * Calculate bead counts for HD palette mode
+ */
+function calculateBeadCountsHD(grid: DiamondCell[][], dmcColors: DMCColor[]): BeadCount[] {
+  const counts = new Map<string, number>()
+  const symbols = new Map<string, string>()
+  let total = 0
+
+  for (const row of grid) {
+    for (const cell of row) {
+      counts.set(cell.dmcCode, (counts.get(cell.dmcCode) || 0) + 1)
+      symbols.set(cell.dmcCode, cell.symbol)
+      total++
+    }
+  }
+
+  const beadCounts: BeadCount[] = []
+
+  dmcColors.forEach((dmc) => {
+    const count = counts.get(dmc.code) || 0
+    const percentage = (count / total) * 100
+
+    beadCounts.push({
+      dmcColor: dmc,
+      count,
+      percentage: Math.round(percentage * 10) / 10,
+      symbol: symbols.get(dmc.code) || '?',
       lowUsage: percentage < 1.0, // Mark colors below 1% as optional/low usage
     })
   })
