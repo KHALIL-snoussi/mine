@@ -345,7 +345,7 @@ export function selectHDPalette(
   const clusters = kMeansClusterColors(significantColors.map(c => c.rgb), targetColors)
 
   // Match cluster centers to closest DMC colors
-  const selectedDMC: DMCColor[] = []
+  let selectedDMC: DMCColor[] = []
   const usedDMCCodes = new Set<string>()
 
   for (const clusterCenter of clusters) {

@@ -514,7 +514,6 @@ function labToRgb(l: number, a: number, b: number): { r: number; g: number; b: n
 }
 
 export {
-  preprocessImage,
   intelligentUpscale,
   autoWhiteBalance_GrayWorld,
   applyCLAHE,
