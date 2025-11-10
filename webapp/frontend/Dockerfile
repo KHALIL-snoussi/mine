@@ -7,13 +7,13 @@ WORKDIR /app
 
 # Copy package files
 COPY webapp/frontend/package.json webapp/frontend/package-lock.json* ./
-RUN npm ci
+RUN npm install --legacy-peer-deps --omit=dev
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY webapp/frontend/. .
+COPY webapp/frontend/ .
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED 1
