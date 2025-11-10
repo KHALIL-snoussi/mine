@@ -2,6 +2,42 @@
 
 ## 🚀 Getting Started in 5 Minutes
 
+### Using Quality Presets (NEW - Phase 4!)
+
+The easiest way to get started is with quality presets:
+
+```typescript
+import { generateAdvancedDiamondPainting } from './lib/advancedDiamondGenerator'
+import { applyPreset } from './lib/qualityPresets'
+
+// Beginner preset (fast, simple, 7 colors)
+const options = applyPreset('beginner', {
+  canvasFormat: 'canvas_25x35'
+})
+
+// Professional preset (high quality, 22-28 colors)
+const options = applyPreset('professional', {
+  canvasFormat: 'canvas_50x70'
+})
+
+// Gallery masterpiece preset (maximum quality, 30 colors)
+const options = applyPreset('gallery_masterpiece', {
+  canvasFormat: 'canvas_70x90'
+})
+
+const result = await generateAdvancedDiamondPainting(imageUrl, options)
+```
+
+**Available Presets**:
+- `beginner` - Your first project (20-30cm, 7 colors, 2-3 weeks)
+- `intermediate` - Some experience (30-40cm, 15-20 colors, 1-2 months)
+- `professional` - High quality (40-70cm, 22-28 colors, 2-4 months)
+- `master` - Expert level (60-90cm, 28-30 colors, 4-6 months)
+- `quick_gift` - Fast turnaround (30-40cm, 18-22 colors, 3-4 weeks)
+- `gallery_masterpiece` - Ultimate quality (70-90cm, 30 colors, 6+ months)
+
+---
+
 ### Basic Usage
 
 ```typescript

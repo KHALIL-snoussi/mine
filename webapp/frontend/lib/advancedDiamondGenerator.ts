@@ -53,6 +53,14 @@ import {
   preprocessImage,
   PreprocessingOptions
 } from './imagePreprocessing'
+import {
+  performSmartRegionMerging,
+  RegionMergingOptions
+} from './smartRegionMerging'
+import {
+  simplifyBackground,
+  BackgroundSimplificationOptions
+} from './backgroundSimplification'
 
 export interface AdvancedDiamondOptions {
   canvasFormat: 'a4_portrait' | 'a4_landscape' | 'a4_square' |
@@ -67,6 +75,8 @@ export interface AdvancedDiamondOptions {
   }
   hdPaletteOptions?: HDPaletteOptions // Options for HD palette mode
   preprocessingOptions?: PreprocessingOptions // Image enhancement options
+  regionMergingOptions?: RegionMergingOptions // Smart region merging options
+  backgroundSimplificationOptions?: BackgroundSimplificationOptions // Background simplification options
   qualitySettings?: {
     bilateralSigma?: number // Edge-preserving smoothing strength (default: 3)
     sharpenAmount?: number // Sharpening amount (default: 0.8)
@@ -119,6 +129,12 @@ export interface ProcessingDiagnostics {
   paletteUsageDeviation: number // Average deviation from target percentages
   colorsWithinTolerance: number // Number of colors within ±15% of target
   foregroundPaletteCoverage: { [dmcCode: string]: number } // Per-color % in foreground only
+  regionMergingStats?: { // Phase 4: Smart region merging statistics
+    regionsFound: number
+    regionsMerged: number
+    fragmentationReduction: number // Percentage
+    tinyRegionsRemoved: number
+  }
 }
 
 export interface AdvancedDiamondResult {
@@ -381,6 +397,20 @@ export async function generateAdvancedDiamondPainting(
         console.log('Step 12: Applying stochastic dither...')
         imageData = applyStochasticDither(imageData, edgeMask, 3, 30)
 
+        // Step 12.5: Background simplification (Phase 4)
+        if (options.backgroundSimplificationOptions?.enableSimplification) {
+          console.log('Step 12.5: Simplifying background...')
+          const bgResult = await simplifyBackground(imageData, {
+            ...options.backgroundSimplificationOptions,
+            subjectMask: faceMask || segmentationMask
+          })
+          imageData = bgResult.simplifiedImage
+
+          if (bgResult.statistics.blurApplied || bgResult.statistics.colorsReduced) {
+            console.log(`  Background: ${bgResult.statistics.backgroundPercentage.toFixed(1)}%, Subject: ${bgResult.statistics.subjectPercentage.toFixed(1)}%`)
+          }
+        }
+
         // Step 13: Palette selection and quantization
         console.log('Step 13: Quantizing with histogram balancing...')
 
@@ -423,6 +453,18 @@ export async function generateAdvancedDiamondPainting(
             5,  // Under-use penalty (favors under-used colors)
             stylePack.minColorPercent // Floor: no color drops below this %
           )
+        }
+
+        // Step 13.5: Smart Region Merging (Phase 4)
+        console.log('Step 13.5: Applying smart region merging...')
+        const regionMergingResult = await performSmartRegionMerging(quantized, {
+          ...options.regionMergingOptions,
+          subjectMask: faceMask || segmentationMask
+        })
+        quantized = regionMergingResult.mergedImage
+
+        if (regionMergingResult.regionsMerged > 0) {
+          console.log(`  Merged ${regionMergingResult.regionsMerged} regions (${regionMergingResult.fragmentationReduction.toFixed(1)}% fragmentation reduction)`)
         }
 
         // Step 14: Force background to lightest color (AFTER quantization)
@@ -544,6 +586,12 @@ export async function generateAdvancedDiamondPainting(
           paletteUsageDeviation: Math.round(averageDeviation * 10) / 10,
           colorsWithinTolerance,
           foregroundPaletteCoverage,
+          regionMergingStats: regionMergingResult.regionsMerged > 0 ? {
+            regionsFound: regionMergingResult.regionsFound,
+            regionsMerged: regionMergingResult.regionsMerged,
+            fragmentationReduction: Math.round(regionMergingResult.fragmentationReduction * 10) / 10,
+            tinyRegionsRemoved: regionMergingResult.statistics.tinyRegionsRemoved
+          } : undefined
         }
 
         // Step 22: Generate high-res preview
