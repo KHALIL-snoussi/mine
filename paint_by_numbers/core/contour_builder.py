@@ -59,6 +59,25 @@ class ContourBuilder:
             edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE
         )
 
+        # FILTER INSIGNIFICANT EDGES (remove tiny contours that don't contribute)
+        filter_edges = getattr(self.config, 'FILTER_INSIGNIFICANT_EDGES', False)
+        min_contour_length = getattr(self.config, 'MIN_CONTOUR_LENGTH', 20)
+
+        if filter_edges and contours:
+            filtered_contours = []
+            for contour in contours:
+                perimeter = cv2.arcLength(contour, True)
+                # Keep only significant contours
+                if perimeter >= min_contour_length:
+                    filtered_contours.append(contour)
+
+            # Log filtering
+            if len(filtered_contours) < len(contours):
+                from paint_by_numbers.logger import logger
+                logger.info(f"Filtered {len(contours) - len(filtered_contours)} insignificant edges")
+
+            contours = filtered_contours
+
         # ENHANCED SMOOTHING with adaptive epsilon based on contour size
         if smooth and contours:
             smoothed_contours = []

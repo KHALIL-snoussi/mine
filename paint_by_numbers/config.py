@@ -32,24 +32,42 @@ class Config:
     # Color Quantization
     DEFAULT_NUM_COLORS = 15        # Default number of colors
     MIN_NUM_COLORS = 5
-    MAX_NUM_COLORS = 36            # Increased for high-quality prints (was 30)
+    MAX_NUM_COLORS = 72            # Increased for highly detailed outputs (was 36)
     COLOR_SAMPLE_FRACTION = 0.3    # Fraction of pixels to sample for clustering
     KMEANS_COLOR_SPACE = "lab"     # Color space for clustering (rgb, lab, hsv)
     PALETTE_DISTANCE_METRIC = "lab"  # Metric for palette projection
 
     # Unified Palette - BUSINESS MODEL: USE FIXED COLORS FOR REUSABLE PAINT KITS
     # This allows customers to buy ONE paint kit and paint MULTIPLE templates!
-    USE_UNIFIED_PALETTE = True     # RECOMMENDED: Use predefined fixed color palette
-    UNIFIED_PALETTE_NAME = "classic_18"  # Default: 18-color Creative Kit palette
+    USE_UNIFIED_PALETTE = False    # Default to dynamic palette for better color accuracy
+    UNIFIED_PALETTE_NAME = "classic_18"  # Default: 18-color Creative Kit palette (when enabled)
 
-    # Business Benefits:
+    # Business Benefits (when USE_UNIFIED_PALETTE = True):
     # - Customers buy standardized paint kits (Starter/Creative/Professional)
     # - Same kit works for many templates = better value
     # - Predictable inventory and supply chain
     # - Recurring revenue through subscriptions
     # - Lower customer acquisition cost
 
-    # Region Detection
+    # Enhanced Color Control (for dynamic palettes)
+    MAX_SINGLE_COLOR_PERCENTAGE = 40.0  # Max % any color can cover (prevents black dominance)
+    AVOID_PURE_BLACK = True            # Replace pure black with dark shades
+    AVOID_PURE_WHITE = False           # Replace pure white with off-white
+    VIBRANCY_BOOST = 1.15             # Color vibrancy multiplier (1.0 = normal, 1.15 = 15% boost)
+    SIMPLIFY_BACKGROUND = False        # Simplify/lighten background regions
+
+    # Artistic Refinements (uPaint-style enhancements)
+    MIN_COLOR_DISTANCE = 25.0          # Minimum Delta E distance between colors for vivid separation
+    REDUCE_SKIN_CLUTTER = True         # Merge small dark regions in skin tones
+    ARTISTIC_SIMPLIFICATION = False    # Enable aggressive region merging for painterly effect
+    SIMPLIFICATION_THRESHOLD = 15.0    # LAB distance threshold for artistic merging
+
+    # Detail Level Control - NEW: Single parameter to control segment complexity
+    # Options: 1 (very simple), 2 (simple), 3 (balanced), 4 (detailed), 5 (very detailed)
+    # Or use preset names: 'very_simple', 'simple', 'balanced', 'detailed', 'very_detailed'
+    DETAIL_LEVEL = 3               # Default: balanced (level 3)
+
+    # Region Detection (can be overridden by DETAIL_LEVEL preset)
     MIN_REGION_SIZE = 100          # Minimum pixels for a region to be numbered
     MORPHOLOGY_KERNEL_SIZE = 3     # Kernel size for morphological operations
     MORPH_CLOSE_ITERATIONS = 1     # Closing passes for mask cleanup
@@ -59,10 +77,12 @@ class Config:
     BILATERAL_SIGMA_SPACE = 75     # Bilateral filter sigma space
 
     # Contour Detection
-    CONTOUR_THICKNESS = 2          # Thickness of contour lines
+    CONTOUR_THICKNESS = 2          # Thickness of contour lines (2-4 for prints)
     CONTOUR_COLOR = (0, 0, 0)      # Black contours
     EDGE_THRESHOLD_LOW = 50        # Canny edge detection low threshold
     EDGE_THRESHOLD_HIGH = 150      # Canny edge detection high threshold
+    MIN_CONTOUR_LENGTH = 20        # Minimum contour length (pixels) to keep
+    FILTER_INSIGNIFICANT_EDGES = True  # Remove minor edge fragments
 
     # Number Placement - ENHANCED FOR CRYSTAL-CLEAR VISIBILITY
     FONT_SCALE = 0.6               # Font size for numbers (bigger = easier to read)
