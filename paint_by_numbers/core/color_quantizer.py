@@ -553,6 +553,182 @@ class ColorQuantizer:
 
         return palette
 
+    def _is_skin_tone(self, color: np.ndarray) -> bool:
+        """
+        Detect if a color is a skin tone using HSV criteria.
+
+        Args:
+            color: RGB color (0-255)
+
+        Returns:
+            True if color is likely a skin tone
+        """
+        cv2 = require_cv2()
+
+        # Convert to HSV
+        color_hsv = cv2.cvtColor(
+            color.reshape(1, 1, 3).astype(np.uint8), cv2.COLOR_RGB2HSV
+        ).reshape(3).astype(float)
+
+        h, s, v = color_hsv[0], color_hsv[1], color_hsv[2]
+
+        # Skin tone HSV ranges (empirically determined)
+        # Hue: 0-50 (red-orange-yellow range)
+        # Saturation: 20-170 (not too gray, not too vibrant)
+        # Value: 40-255 (not too dark)
+        is_skin_hue = (h >= 0 and h <= 50) or (h >= 340)  # Wrapping around red
+        is_skin_sat = s >= 20 and s <= 170
+        is_skin_val = v >= 40
+
+        return is_skin_hue and is_skin_sat and is_skin_val
+
+    def _enforce_minimum_color_distance(self, palette: np.ndarray, min_distance: float = 25.0) -> np.ndarray:
+        """
+        Enforce minimum perceptual distance between palette colors for vivid separation.
+
+        Args:
+            palette: Color palette in RGB
+            min_distance: Minimum Delta E distance in LAB space
+
+        Returns:
+            Adjusted palette with better color separation
+        """
+        if len(palette) <= 1:
+            return palette
+
+        logger.info(f"Enforcing minimum color distance: {min_distance} Delta E")
+
+        # Convert to LAB for perceptual distance
+        palette_lab = rgb_to_lab(palette)
+
+        # Iteratively push colors apart
+        max_iterations = 10
+        adjustment_factor = 1.5
+
+        for iteration in range(max_iterations):
+            adjusted = False
+
+            for i in range(len(palette_lab)):
+                for j in range(i + 1, len(palette_lab)):
+                    # Calculate perceptual distance
+                    distance = delta_e_cie2000(palette_lab[i], palette_lab[j])
+
+                    if distance < min_distance:
+                        # Colors too similar - push them apart
+                        adjusted = True
+
+                        # Calculate midpoint
+                        mid = (palette_lab[i] + palette_lab[j]) / 2
+
+                        # Push colors away from midpoint
+                        diff_i = palette_lab[i] - mid
+                        diff_j = palette_lab[j] - mid
+
+                        palette_lab[i] = mid + diff_i * adjustment_factor
+                        palette_lab[j] = mid + diff_j * adjustment_factor
+
+                        # Clip to valid LAB range
+                        palette_lab[i] = np.clip(palette_lab[i], [0, -128, -128], [100, 127, 127])
+                        palette_lab[j] = np.clip(palette_lab[j], [0, -128, -128], [100, 127, 127])
+
+            if not adjusted:
+                break
+
+        # Convert back to RGB
+        adjusted_palette = lab_to_rgb(palette_lab)
+
+        # Verify improvements
+        min_dist_before = float('inf')
+        min_dist_after = float('inf')
+
+        palette_lab_orig = rgb_to_lab(palette)
+        for i in range(len(palette)):
+            for j in range(i + 1, len(palette)):
+                dist_before = delta_e_cie2000(palette_lab_orig[i], palette_lab_orig[j])
+                dist_after = delta_e_cie2000(palette_lab[i], palette_lab[j])
+                min_dist_before = min(min_dist_before, dist_before)
+                min_dist_after = min(min_dist_after, dist_after)
+
+        logger.info(f"Color separation: min distance {min_dist_before:.1f} → {min_dist_after:.1f} Delta E")
+
+        return adjusted_palette
+
+    def _reduce_dark_clutter_in_skin(self, image: np.ndarray, palette: np.ndarray,
+                                     labels: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Reduce dark speckling in skin tone areas by merging very dark regions.
+
+        Args:
+            image: Original image
+            palette: Color palette
+            labels: Pixel labels
+
+        Returns:
+            Tuple of (adjusted_palette, adjusted_labels)
+        """
+        h, w = image.shape[:2]
+        labels_2d = labels.reshape(h, w) if len(labels.shape) == 1 else labels
+
+        # Identify skin tone colors
+        skin_color_indices = []
+        dark_color_indices = []
+
+        for i, color in enumerate(palette):
+            if self._is_skin_tone(color):
+                skin_color_indices.append(i)
+            elif np.mean(color) < 60:  # Dark color
+                dark_color_indices.append(i)
+
+        if not skin_color_indices or not dark_color_indices:
+            return palette, labels_2d
+
+        logger.info(f"Found {len(skin_color_indices)} skin tones and {len(dark_color_indices)} dark colors")
+
+        # For each dark color, check if it appears in small regions near skin tones
+        for dark_idx in dark_color_indices:
+            dark_mask = (labels_2d == dark_idx)
+
+            # Find connected components of this dark color
+            cv2 = require_cv2()
+            num_labels, components, stats, centroids = cv2.connectedComponentsWithStats(
+                dark_mask.astype(np.uint8), connectivity=8
+            )
+
+            # Check each dark region
+            for region_idx in range(1, num_labels):  # Skip background (0)
+                area = stats[region_idx, cv2.CC_STAT_AREA]
+
+                # If region is small (< 200 pixels), consider merging
+                if area < 200:
+                    # Get region mask
+                    region_mask = (components == region_idx)
+
+                    # Dilate to find neighboring colors
+                    kernel = np.ones((5, 5), np.uint8)
+                    dilated = cv2.dilate(region_mask.astype(np.uint8), kernel, iterations=1)
+                    neighbor_mask = dilated & ~region_mask
+
+                    # Get neighboring color labels
+                    neighbor_labels = labels_2d[neighbor_mask]
+                    if len(neighbor_labels) == 0:
+                        continue
+
+                    # Find most common neighbor
+                    unique_neighbors, counts = np.unique(neighbor_labels, return_counts=True)
+
+                    # Prefer skin tone neighbors
+                    skin_neighbors = [n for n in unique_neighbors if n in skin_color_indices]
+
+                    if skin_neighbors:
+                        # Merge into most common skin tone neighbor
+                        neighbor_counts = counts[[list(unique_neighbors).index(n) for n in skin_neighbors]]
+                        best_neighbor = skin_neighbors[np.argmax(neighbor_counts)]
+
+                        logger.info(f"Merging small dark region ({area}px) into skin tone {best_neighbor}")
+                        labels_2d[region_mask] = best_neighbor
+
+        return palette, labels_2d
+
     def apply_color_style(self, image: np.ndarray) -> np.ndarray:
         """
         Apply color style adjustments (saturation boost, warmth adjustment)
@@ -690,6 +866,17 @@ class ColorQuantizer:
             background_idx = self._detect_background_color(enhanced_image, labels, palette)
             if background_idx is not None:
                 palette = self._simplify_background(palette, labels, background_idx)
+
+        # ENHANCEMENT 5: Enforce minimum color distance for vivid separation
+        min_color_distance = getattr(self.config, 'MIN_COLOR_DISTANCE', 25.0)
+        if min_color_distance > 0:
+            palette = self._enforce_minimum_color_distance(palette, min_color_distance)
+
+        # ENHANCEMENT 6: Reduce dark clutter in skin tones
+        reduce_skin_clutter = getattr(self.config, 'REDUCE_SKIN_CLUTTER', True)
+        if reduce_skin_clutter:
+            palette, labels_2d = self._reduce_dark_clutter_in_skin(enhanced_image, palette, labels)
+            labels = labels_2d.flatten()
 
         # Update stored values
         n_colors_actual = len(palette)

@@ -290,3 +290,100 @@ class RegionDetector:
                     return region
 
         return None
+
+    def apply_artistic_simplification(self, palette: np.ndarray, labels: np.ndarray,
+                                      threshold: float = 15.0) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Apply artistic simplification by merging adjacent regions with similar colors.
+        This creates a more painterly, less photo-traced appearance.
+
+        Args:
+            palette: Color palette (RGB)
+            labels: Label map
+            threshold: LAB distance threshold for merging (lower = more aggressive)
+
+        Returns:
+            Tuple of (updated_palette, updated_labels)
+        """
+        logger.info(f"Applying artistic simplification (threshold: {threshold} Delta E)")
+
+        # Import LAB conversion functions
+        try:
+            from paint_by_numbers.core.color_quantizer import rgb_to_lab, delta_e_cie2000
+        except ImportError:
+            from core.color_quantizer import rgb_to_lab, delta_e_cie2000
+
+        cv2 = require_cv2()
+        h, w = labels.shape[:2]
+
+        # Convert palette to LAB
+        palette_lab = rgb_to_lab(palette)
+
+        # Find pairs of similar colors
+        merge_map = {}  # Maps color_idx to target color_idx
+        for i in range(len(palette)):
+            merge_map[i] = i  # Initially, each color maps to itself
+
+        # Find colors that are perceptually similar
+        for i in range(len(palette)):
+            for j in range(i + 1, len(palette)):
+                distance = delta_e_cie2000(palette_lab[i], palette_lab[j])
+
+                if distance < threshold:
+                    # These colors are similar enough to merge
+                    # Merge j into i (keep lower index)
+                    logger.info(f"Merging color {j} into {i} (distance: {distance:.1f})")
+                    merge_map[j] = i
+
+        # Check for adjacent regions with similar colors
+        # Create adjacency matrix
+        adjacency = np.zeros((len(palette), len(palette)), dtype=bool)
+
+        # Scan image to find adjacent colors
+        for y in range(h - 1):
+            for x in range(w - 1):
+                current = labels[y, x]
+                # Check right neighbor
+                if labels[y, x + 1] != current:
+                    adjacency[current, labels[y, x + 1]] = True
+                    adjacency[labels[y, x + 1], current] = True
+                # Check bottom neighbor
+                if labels[y + 1, x] != current:
+                    adjacency[current, labels[y + 1, x]] = True
+                    adjacency[labels[y + 1, x], current] = True
+
+        # Merge adjacent similar colors more aggressively
+        for i in range(len(palette)):
+            for j in range(i + 1, len(palette)):
+                if adjacency[i, j]:
+                    distance = delta_e_cie2000(palette_lab[i], palette_lab[j])
+                    # Use slightly higher threshold for adjacent regions
+                    if distance < threshold * 1.5:
+                        logger.info(f"Merging adjacent color {j} into {i} (distance: {distance:.1f})")
+                        # Resolve chain: if j was already going to merge with something, update
+                        target_j = merge_map[j]
+                        if target_j != j:
+                            # j is already merging elsewhere, use that target
+                            merge_map[j] = min(i, target_j)
+                        else:
+                            merge_map[j] = i
+
+        # Apply merging to labels
+        new_labels = labels.copy()
+        for old_idx, new_idx in merge_map.items():
+            if old_idx != new_idx:
+                new_labels[labels == old_idx] = new_idx
+
+        # Create new palette with only used colors
+        used_colors = np.unique(new_labels)
+        new_palette = palette[used_colors]
+
+        # Remap labels to consecutive indices
+        remap = {old: new for new, old in enumerate(used_colors)}
+        final_labels = np.zeros_like(new_labels)
+        for old_idx, new_idx in remap.items():
+            final_labels[new_labels == old_idx] = new_idx
+
+        logger.info(f"Artistic simplification: {len(palette)} → {len(new_palette)} colors")
+
+        return new_palette, final_labels

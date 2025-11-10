@@ -271,6 +271,7 @@ def main():
   vibrant_art          - 24 colors, level 2 detail, 6-12 hours  (pop art style)
   quick_masterpiece    - 18 colors, level 2 detail, 3-6 hours   (beginners)
   print_ready_large    - 48 colors, level 4 detail, 40-60 hours (70x50 cm prints)
+  upaint_style         - 30 colors, artistic simplification, 12-18 hours (smooth painterly look) 🎨 NEW!
 
 📊 DETAIL LEVELS (control segment complexity):
   1 - Very Simple    (50-150 regions,  bold poster-like)
@@ -425,6 +426,24 @@ def main():
         help='Disable background simplification'
     )
 
+    parser.add_argument(
+        '--artistic-simplification',
+        action='store_true',
+        help='Enable artistic region merging for painterly effect (uPaint style)'
+    )
+
+    parser.add_argument(
+        '--min-color-distance',
+        type=float,
+        help='Minimum perceptual distance between colors (15-40, default: 25)'
+    )
+
+    parser.add_argument(
+        '--no-skin-clutter-reduction',
+        action='store_true',
+        help='Disable automatic reduction of dark spots in skin tones'
+    )
+
     # Additional options
     parser.add_argument(
         '--grid',
@@ -468,6 +487,14 @@ def main():
             logger.info("Override: Using unified palette (business mode)")
         if args.no_simplify_background:
             generator.config.SIMPLIFY_BACKGROUND = False
+        if args.artistic_simplification:
+            generator.config.ARTISTIC_SIMPLIFICATION = True
+            logger.info("Override: Artistic simplification enabled")
+        if args.min_color_distance:
+            generator.config.MIN_COLOR_DISTANCE = args.min_color_distance
+            logger.info(f"Override: Min color distance = {args.min_color_distance}")
+        if args.no_skin_clutter_reduction:
+            generator.config.REDUCE_SKIN_CLUTTER = False
 
         # Validate color count
         if args.colors is not None:

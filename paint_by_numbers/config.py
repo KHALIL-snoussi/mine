@@ -56,6 +56,12 @@ class Config:
     VIBRANCY_BOOST = 1.15             # Color vibrancy multiplier (1.0 = normal, 1.15 = 15% boost)
     SIMPLIFY_BACKGROUND = False        # Simplify/lighten background regions
 
+    # Artistic Refinements (uPaint-style enhancements)
+    MIN_COLOR_DISTANCE = 25.0          # Minimum Delta E distance between colors for vivid separation
+    REDUCE_SKIN_CLUTTER = True         # Merge small dark regions in skin tones
+    ARTISTIC_SIMPLIFICATION = False    # Enable aggressive region merging for painterly effect
+    SIMPLIFICATION_THRESHOLD = 15.0    # LAB distance threshold for artistic merging
+
     # Detail Level Control - NEW: Single parameter to control segment complexity
     # Options: 1 (very simple), 2 (simple), 3 (balanced), 4 (detailed), 5 (very detailed)
     # Or use preset names: 'very_simple', 'simple', 'balanced', 'detailed', 'very_detailed'
@@ -71,10 +77,12 @@ class Config:
     BILATERAL_SIGMA_SPACE = 75     # Bilateral filter sigma space
 
     # Contour Detection
-    CONTOUR_THICKNESS = 2          # Thickness of contour lines
+    CONTOUR_THICKNESS = 2          # Thickness of contour lines (2-4 for prints)
     CONTOUR_COLOR = (0, 0, 0)      # Black contours
     EDGE_THRESHOLD_LOW = 50        # Canny edge detection low threshold
     EDGE_THRESHOLD_HIGH = 150      # Canny edge detection high threshold
+    MIN_CONTOUR_LENGTH = 20        # Minimum contour length (pixels) to keep
+    FILTER_INSIGNIFICANT_EDGES = True  # Remove minor edge fragments
 
     # Number Placement - ENHANCED FOR CRYSTAL-CLEAR VISIBILITY
     FONT_SCALE = 0.6               # Font size for numbers (bigger = easier to read)

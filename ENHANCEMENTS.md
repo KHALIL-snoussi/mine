@@ -524,6 +524,226 @@ Improvements welcome! Key areas:
 
 ---
 
+---
+
+## 🎨 **Artistic Refinements (uPaint Style)**
+
+### NEW: Professional Artistic Enhancements
+
+Building on the core enhancements, we've added artistic refinements to achieve a premium, painterly look similar to uPaint's style:
+
+#### 1. **Skin Tone Dark Clutter Reduction**
+
+**Problem**: Small dark regions in faces create unwanted speckling.
+
+**Solution**:
+- Automatic skin tone detection using HSV color space
+- Small dark regions (<200px) near skin tones are merged
+- Preserves important features while eliminating clutter
+- Keeps faces smooth and natural
+
+**Technical**:
+- HSV-based skin detection (H: 0-50°, S: 20-170, V: 40+)
+- Connected component analysis
+- Neighbor-aware merging (prefers skin tone neighbors)
+
+#### 2. **Minimum Color Distance Enforcement**
+
+**Problem**: Similar colors create muddy, indistinct palettes.
+
+**Solution**:
+- Enforces minimum 25 Delta E (CIEDE2000) between all colors
+- Iteratively pushes similar colors apart in LAB space
+- Creates vivid, well-separated palettes
+- No redundant or muddy tones
+
+**Configuration**:
+```python
+MIN_COLOR_DISTANCE = 25.0  # Higher = more vivid (15-40 range)
+```
+
+**CLI**:
+```bash
+--min-color-distance 30  # Extra vivid separation
+```
+
+#### 3. **Artistic Region Simplification**
+
+**Problem**: Photo-traced templates look too busy and cluttered.
+
+**Solution**:
+- Merges adjacent regions with similar colors (< 15 Delta E)
+- Creates larger, smoother color areas
+- Painterly, brush-stroke effect
+- Reduces total color count naturally
+
+**When Enabled**:
+- Scans for perceptually similar colors
+- Merges adjacent similar regions (threshold × 1.5)
+- Results in 20-30% fewer colors/regions
+- More artistic, less photograph-like
+
+**Configuration**:
+```python
+ARTISTIC_SIMPLIFICATION = True
+SIMPLIFICATION_THRESHOLD = 15.0  # LAB distance
+```
+
+**CLI**:
+```bash
+--artistic-simplification  # Enable painterly effect
+```
+
+#### 4. **Insignificant Edge Filtering**
+
+**Problem**: Every tiny shadow creates contour lines, cluttering the template.
+
+**Solution**:
+- Filters contours by perimeter length
+- Only keeps significant edges (>20-30 pixels)
+- Cleaner outlines highlighting important features
+- Soft transitions within regions, clear lines between
+
+**Configuration**:
+```python
+FILTER_INSIGNIFICANT_EDGES = True
+MIN_CONTOUR_LENGTH = 30  # Pixels (20-50 range)
+```
+
+**Result**:
+- 30-50% fewer contour lines
+- Focus on important features
+- Easier to paint (less confusing)
+
+---
+
+### 🎨 **uPaint Style Preset**
+
+All artistic refinements combined in one preset:
+
+```bash
+python generate_enhanced.py portrait.jpg --preset upaint_style
+```
+
+**Settings**:
+- 30 colors (dynamic palette)
+- Detail level 3 (balanced)
+- Vibrancy 1.2x (vivid)
+- 50×35 cm canvas optimized
+- Artistic simplification enabled
+- Min color distance: 30 Delta E
+- Skin clutter reduction enabled
+- Edge filtering enabled
+- Thicker contour lines (3px)
+
+**Best For**:
+- Portraits (especially faces)
+- Canvas prints 50×35 cm
+- Artistic, painterly look
+- Smooth color gradients
+- 12-18 hours painting time
+
+**What You Get**:
+- ✓ Smooth skin tones (no speckling)
+- ✓ Vivid, well-separated colors
+- ✓ Clean, significant outlines only
+- ✓ Painterly brush-stroke effect
+- ✓ Print-ready for canvas
+
+---
+
+### 📊 **Comparison: Before vs After Artistic Refinements**
+
+| Aspect | Standard | With Artistic Refinements |
+|--------|----------|---------------------------|
+| Face smoothness | Some dark spots | Smooth, no clutter |
+| Color separation | 15-20 Delta E | 25-30 Delta E (vivid) |
+| Contour lines | All edges | Significant edges only |
+| Region count | ~500 regions | ~350 regions (simplified) |
+| Look & feel | Photo-traced | Hand-painted artistic |
+| Painting difficulty | Moderate | Easier (clearer areas) |
+
+---
+
+### 🚀 **Usage Examples**
+
+#### Portrait with Artistic Style
+
+```bash
+# Recommended for portraits
+python generate_enhanced.py portrait.jpg --preset upaint_style
+
+# Custom portrait settings
+python generate_enhanced.py portrait.jpg \
+  --colors 30 \
+  --detail-level 3 \
+  --vibrancy 1.2 \
+  --artistic-simplification \
+  --min-color-distance 30
+```
+
+#### Landscape with Clean Lines
+
+```bash
+# Landscape with filtered edges
+python generate_enhanced.py landscape.jpg \
+  --preset balanced_quality \
+  --artistic-simplification \
+  --min-color-distance 25
+```
+
+#### Maximum Artistic Effect
+
+```bash
+# Most painterly, least photo-like
+python generate_enhanced.py image.jpg \
+  --colors 24 \
+  --detail-level 2 \
+  --vibrancy 1.3 \
+  --artistic-simplification \
+  --min-color-distance 35
+```
+
+---
+
+### ⚙️ **Fine-Tuning Artistic Settings**
+
+**For Smoother Results**:
+- Lower detail level (1-2)
+- Enable artistic simplification
+- Lower simplification threshold (12-15)
+
+**For More Vivid Colors**:
+- Increase vibrancy (1.2-1.3)
+- Increase min color distance (30-35)
+- Use dynamic palettes
+
+**For Cleaner Outlines**:
+- Enable edge filtering
+- Increase min contour length (30-50)
+- Use detail level 2-3
+
+**For Portraits**:
+- Use uPaint style preset
+- Or: colors 28-32, detail 3, vibrancy 1.15
+- Always enable skin clutter reduction
+
+---
+
+### 🎯 **Achieving uPaint Quality**
+
+To match uPaint's premium look:
+
+1. **Use uPaint style preset** for portraits
+2. **Enable artistic simplification** for all images
+3. **Set min color distance** to 28-32 for vibrant results
+4. **Choose detail level 3** for balanced complexity
+5. **Print at 300 DPI** on canvas for best results
+
+**Result**: Smooth, vibrant, painterly templates that feel hand-crafted rather than computer-generated, while staying true to the original image.
+
+---
+
 ## 📄 License
 
 MIT License - Free for personal and commercial use

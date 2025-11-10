@@ -160,6 +160,26 @@ PREMIUM_PRESETS = {
         best_for=['Large canvas prints', 'Commercial use', 'Professional display', 'Competitions'],
         estimated_hours='40-60 hours'
     ),
+
+    'upaint_style': PremiumPreset(
+        id='upaint_style',
+        name='uPaint Style',
+        display_name='🎨 uPaint Style',
+        description='Artistic simplification with vivid colors - smooth painterly look',
+        num_colors=30,
+        use_dynamic_palette=True,
+        vibrancy_boost=1.2,  # Higher for vivid colors
+        avoid_pure_black=True,
+        simplify_background=True,
+        max_single_color_percentage=35.0,
+        detail_level=3,  # Balanced - not too detailed
+        max_image_size=(5906, 4134),  # 50×35 cm @ 300 DPI
+        font_scale=0.35,
+        generate_svg=True,
+        generate_pdf=True,
+        best_for=['Portraits', 'Canvas 50×35 cm', 'Artistic style', 'Smooth gradients'],
+        estimated_hours='12-18 hours'
+    ),
 }
 
 
@@ -223,6 +243,16 @@ def premium_preset_to_config(preset: PremiumPreset) -> Config:
         config.SHARPEN_AMOUNT = 1.0
     elif preset.detail_level <= 2:
         config.SHARPEN_AMOUNT = 0.5
+
+    # Apply artistic refinements for uPaint style
+    if preset.id == 'upaint_style':
+        config.MIN_COLOR_DISTANCE = 30.0  # Higher for more vivid separation
+        config.REDUCE_SKIN_CLUTTER = True
+        config.ARTISTIC_SIMPLIFICATION = True
+        config.SIMPLIFICATION_THRESHOLD = 15.0
+        config.FILTER_INSIGNIFICANT_EDGES = True
+        config.MIN_CONTOUR_LENGTH = 30
+        config.CONTOUR_THICKNESS = 3  # Thicker lines for canvas
 
     return config
 
