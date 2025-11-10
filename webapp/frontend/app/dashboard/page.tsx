@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardFooter } from '@/components/ui/Card'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { useTemplates, useDeleteTemplate } from '@/lib/hooks'
 import { formatDate } from '@/lib/utils'
 

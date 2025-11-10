@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useDropzone } from 'react-dropzone'
 
-import { Button } from '@/components/ui/Button'
+import { Button } from '@/components/ui/button'
 import DiamondCropSelector from '@/components/DiamondCropSelector'
 import { TileThumbnail, TileLegend } from '@/components/TileThumbnail'
 import { generateAdvancedDiamondPainting, AdvancedDiamondResult, AdvancedDiamondOptions } from '@/lib/advancedDiamondGenerator'
