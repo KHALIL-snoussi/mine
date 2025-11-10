@@ -51,7 +51,10 @@ import {
 } from './premiumDiamondUpgrades'
 
 export interface AdvancedDiamondOptions {
-  canvasFormat: 'a4_portrait' | 'a4_landscape' | 'a4_square' | 'canvas_30x40' | 'canvas_40x50' | 'canvas_50x35' | 'canvas_50x70' | 'canvas_60x40' | 'canvas_70x50' | 'custom'
+  canvasFormat: 'a4_portrait' | 'a4_landscape' | 'a4_square' |
+    'canvas_20x30' | 'canvas_25x35' | 'canvas_30x40' | 'canvas_35x45' |
+    'canvas_40x50' | 'canvas_50x35' | 'canvas_50x60' | 'canvas_50x70' |
+    'canvas_60x40' | 'canvas_60x80' | 'canvas_70x50' | 'canvas_70x90' | 'custom'
   stylePack: string // Style pack ID or 'hd_palette' for HD mode
   customCanvas?: {
     widthCm: number
